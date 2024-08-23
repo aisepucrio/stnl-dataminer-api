@@ -7,6 +7,6 @@ def home(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('miner.urls')),
+    path('api/', include('github.urls')),
     path('', home),  # Adiciona uma página inicial para a URL raiz
 ]
