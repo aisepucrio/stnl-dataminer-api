@@ -110,6 +110,8 @@ env.bak/
 venv.bak/
 api-venv/
 
+features/rust-code/src/linux/
+
 # Spyder project settings
 .spyderproject
 .spyproject
