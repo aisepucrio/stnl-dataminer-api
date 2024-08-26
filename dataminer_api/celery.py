@@ -13,4 +13,5 @@ app = Celery('dataminer_api')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Auto-descobre tarefas dos apps registrados (procura por um arquivo tasks.py em cada app)
-app.autodiscover_tasks()
+app.autodiscover_tasks(['jobs'])
+
