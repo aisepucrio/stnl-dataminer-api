@@ -4,6 +4,10 @@ from celery import shared_task
 from github.miner import GitHubMiner
 
 @shared_task
+def simple_task():
+    return "Task completed successfully"
+
+@shared_task
 def fetch_commits(repo_name, start_date=None, end_date=None):
     miner = GitHubMiner()
     return miner.get_commits(repo_name, start_date, end_date)
