@@ -37,11 +37,11 @@ class JiraIssueCollectView(APIView):
         end_date = request.data.get('end_date', None)  # Data de fim (opcional)
         
         
-        if not all([project_key, jira_domain, jira_email, jira_api_token, issuetypes, start_date, end_date]):
+        if not all([project_key, jira_domain, jira_email, jira_api_token]):
             return Response({"error": "All fields are required, including issue_types"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Chama a tarefa Celery para minerar issues
-        collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes)
+        collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
         
         return Response({"status": "Issue collection started"}, status=status.HTTP_202_ACCEPTED)
 
