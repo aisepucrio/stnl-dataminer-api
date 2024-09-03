@@ -2,6 +2,8 @@ from celery import shared_task
 from .models import JiraIssueType, JiraIssue
 import requests
 from requests.auth import HTTPBasicAuth
+from django.utils.dateparse import parse_datetime
+from urllib.parse import quote
 
 def fetch_issue_types(jira_domain, project_key, jira_email, jira_api_token):
     url = f"https://{jira_domain}/rest/api/2/project/{project_key}/issuetype"
@@ -31,20 +33,31 @@ def fetch_issue_types(jira_domain, project_key, jira_email, jira_api_token):
 def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
     auth = HTTPBasicAuth(jira_email, jira_api_token)
     
-    # Se issue_types não for fornecido, buscar todos os tipos de issues do projeto
-    if not issue_types:
-        issue_types_queryset = JiraIssueType.objects.filter(domain=jira_domain, project_key=project_key)
-        issue_types = [it.issue_type_name for it in issue_types_queryset]
-
-    # Constrói a consulta JQL para tipos de issues e datas
-    issuetypes_jql = " OR ".join([f'issuetype="{issuetype}"' for issuetype in issuetypes])
-    jql_query = f'project={project_key} AND ({issuetypes_jql})'
-
-    # Adiciona o intervalo de datas, se fornecido
+    # Inicia a construção da consulta JQL
+    jql_query = f'project="{project_key}"'
+    
+    # Adiciona filtro de tipos de issues, se fornecido
+    if issuetypes:
+        issuetypes_jql = " OR ".join([f'issuetype="{issuetype}"' for issuetype in issuetypes])
+        jql_query += f' AND ({issuetypes_jql})'
+    
+    # Adiciona filtro de intervalo de datas, se fornecido
     if start_date and end_date:
-        jql_query += f' AND created >= "{start_date}" AND created <= "{end_date}"'
-
-    jira_url = f"https://{jira_domain}/rest/api/2/search?jql={jql_query}"
+        # Valida e formata as datas para o formato esperado pelo Jira
+        try:
+            start_date_parsed = parse_datetime(start_date)
+            end_date_parsed = parse_datetime(end_date)
+            if not start_date_parsed or not end_date_parsed:
+                raise ValueError
+            jql_query += f' AND created >= "{start_date}" AND created <= "{end_date}"'
+        except ValueError:
+            # Opcional: Trate o erro de formato de data conforme necessário
+            return {"error": "Invalid date format. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)."}
+    
+    # Codifica a consulta JQL para ser usada na URL
+    encoded_jql = quote(jql_query)
+    
+    jira_url = f"https://{jira_domain}/rest/api/2/search?jql={encoded_jql}&maxResults=1000"
 
     headers = {
         "Content-Type": "application/json"
@@ -52,7 +65,7 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
     
     response = requests.get(jira_url, headers=headers, auth=auth)
     if response.status_code != 200:
-        return {"error": f"Failed to collect issues: {response.status_code}"}
+        return {"error": f"Failed to collect issues: {response.status_code} - {response.text}"}
     
     issues = response.json().get('issues', [])
     
@@ -75,3 +88,5 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
                 'all_fields': issue_data['fields']
             }
         )
+        
+    return {"status": f"Collected {len(issues)} issues successfully."}
