@@ -78,11 +78,11 @@ WSGI_APPLICATION = 'dataminer_api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'aise-stone',
-        'USER': 'aise-stone',
-        'PASSWORD': '#St@n3L@b2@24!',
-        'HOST': 'opus.servehttp.com',
-        'PORT': '54321',
+        'NAME': 'mining_db',
+        'USER': 'postgres',
+        'PASSWORD': '0000',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 

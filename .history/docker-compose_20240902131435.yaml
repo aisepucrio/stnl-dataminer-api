@@ -1,0 +1,24 @@
+version: '3'
+
+services: # Tenho 2 serviços, ou dois containers (instâncias de imagens) a serem criados.
+  web: # CONTAINER do meu webapp django
+    build: .
+    command: python manage.py runserver 0.0.0.0:7000
+    volumes:
+      - .:/app
+    ports:
+      - "7000:7000"
+    depends_on: # É necessário que o banco de dados inicie antes do webapp
+      - db
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: mining_db
+      POSTGRES_USER: aise-stone
+      POSTGRES_PASSWORD: '#St@n3L@b2@24!'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+volumes:
+  postgres_data:
