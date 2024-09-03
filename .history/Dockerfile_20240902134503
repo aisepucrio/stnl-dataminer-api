@@ -1,0 +1,26 @@
+# A DIFERENÇA ENTRE DOCKERFILE E DOCKER-COMPOSE.YAML
+# DOCKERFILE: Script que define como criar a IMAGEM de um docker
+# DOCKER-COMPOSE.yaml: Arq. de config. que define, gerencia e orquestra multiplos containers (instâncias de imagens).
+
+
+# Usar uma imagem oficial do Python como imagem base
+FROM python:3.10-slim
+
+# Definir o diretório de trabalho no contêiner
+WORKDIR /app
+
+# Copiar o arquivo de requisitos do seu projeto
+COPY requirements.txt .
+
+# Instalar as dependências do projeto
+RUN pip install --no-cache-dir -r requirements.txt
+# pip freeze > requirements.txt
+
+# Copiar o código do projeto para o diretório de trabalho
+COPY . /app
+
+# Expor a porta que o Django usa
+EXPOSE 7000
+
+# Comando para rodar o servidor de desenvolvimento Django
+CMD ["python", "manage.py", "runserver", "0.0.0.0:7000"]
