@@ -3,8 +3,8 @@ from django.db import models
 class JiraIssueType(models.Model):
     domain = models.CharField(max_length=255)
     project_key = models.CharField(max_length=100)
-    issue_type_id = models.CharField(max_length=100)
-    issue_type_name = models.CharField(max_length=100)
+    issuetype_id = models.CharField(max_length=100)
+    issuetype_name = models.CharField(max_length=100)
 
     class Meta:
         unique_together = ('domain', 'project_key', 'issue_type_id')
