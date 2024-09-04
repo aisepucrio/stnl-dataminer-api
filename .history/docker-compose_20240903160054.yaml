@@ -16,7 +16,6 @@ services: # Tenho 2 serviços, ou dois containers (instâncias de imagens) a ser
     depends_on: # É necessário que o banco de dados inicie antes do webapp, por isso informamos essa dependência.
       - db
 # NETWORK
-# VARIAVEIS DOCKER
   db: # CONTAINER do meu banco de dados postgreSQL
     image: postgres:13
     environment:
