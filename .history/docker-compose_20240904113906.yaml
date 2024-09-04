@@ -28,7 +28,7 @@ services: # Tenho 2 serviços, ou dois containers (instâncias de imagens) a ser
     image: redis:latest
     ports:
       - "6379:6379"
-    
+      
 # NETWORK
 # VARIAVEIS DOCKER
   db: # CONTAINER do meu banco de dados postgreSQL
