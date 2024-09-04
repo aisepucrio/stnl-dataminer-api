@@ -1,5 +1,5 @@
 [package]
-name = "rust-code"
+name = "features_mining_rust"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,3 +14,7 @@ git2 = "0.14"
 chrono = "0.4"
 egui = "0.21"
 eframe = "0.21"
+pyo3 = { version = "0.18", features = ["extension-module"] }  # Adiciona PyO3 aqui
+
+[lib]
+crate-type = ["cdylib"]  # Para compilar como uma biblioteca dinâmica (módulo Python)
