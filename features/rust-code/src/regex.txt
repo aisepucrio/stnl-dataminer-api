@@ -1,8 +1,0 @@
-("STACK_TRACER", r"(?i)\bstack\s*tracer\b"),
-("X86_LOCAL_APIC", r"(?i)\bx86\s*local\s*apic\b"),
-("GENERIC_IRQ_EFFECTIVE_AFF_MASK", r"(?i)\bgeneric\s*irq\s*effective\s*aff\s*mask\b"),
-("NFC_FDP", r"(?i)\bnfc\s*fdp\b"),
-("TEXTSEARCH_FSM", r"(?i)\btextsearch\s*fsm\b"),
-("MPLS", r"(?i)\bmpls\b"),
-("INTEL_MEI", r"(?i)\bintel\s*mei\b"),
-("OPENVSWITCH", r"(?i)\bopen\s*vswitch\b"),
