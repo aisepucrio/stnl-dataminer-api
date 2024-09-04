@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'github',
+    'features',
 ]
 
 MIDDLEWARE = [
@@ -77,18 +78,18 @@ WSGI_APPLICATION = 'dataminer_api.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    },
-    'postgres':{
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'mining_db',
-        'USER': 'postgres',
-        'PASSWORD': '0000',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': 'aise-stone',
+        'USER': 'aise-stone',
+        'PASSWORD': '#St@n3L@b2@24!',
+        'HOST': 'opus.servehttp.com',
+        'PORT': '54321',
+        'OPTIONS': {
+            'options': '-c search_path=aisepucrio_stnl_django,aisepucrio_stnl_featuresmining,aisepucrio_stnl_jiramining,aisepucrio_stnl_ghmining'
+        },
     }
-}   
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
