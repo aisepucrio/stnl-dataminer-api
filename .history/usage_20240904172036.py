@@ -63,11 +63,11 @@ def test_branches(repo_name):
 
 # Testando os endpoints
 repo_name = "esp8266/Arduino"
-start_date = "2024-07-20T00:00:00Z"
+start_date = "2024-08-15T00:00:00Z"
 end_date = "2024-08-31T23:59:59Z"
 
-#print("Testing commits...")
-#test_commits(repo_name, start_date, end_date)
+print("Testing commits...")
+test_commits(repo_name, start_date, end_date)
 
 #print("\nTesting issues...")
 #test_issues(repo_name, start_date, end_date)
@@ -75,5 +75,5 @@ end_date = "2024-08-31T23:59:59Z"
 #print("\nTesting pull requests...")
 #test_pull_requests(repo_name, start_date, end_date)
 
-print("\nTesting branches...")
-test_branches(repo_name)
+#print("\nTesting branches...")
+#test_branches(repo_name)

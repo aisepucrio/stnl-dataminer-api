@@ -72,8 +72,8 @@ end_date = "2024-08-31T23:59:59Z"
 #print("\nTesting issues...")
 #test_issues(repo_name, start_date, end_date)
 
-#print("\nTesting pull requests...")
-#test_pull_requests(repo_name, start_date, end_date)
+print("\nTesting pull requests...")
+test_pull_requests(repo_name, start_date, end_date)
 
-print("\nTesting branches...")
-test_branches(repo_name)
+#print("\nTesting branches...")
+#test_branches(repo_name)
