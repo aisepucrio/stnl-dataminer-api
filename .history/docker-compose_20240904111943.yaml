@@ -15,20 +15,6 @@ services: # Tenho 2 serviços, ou dois containers (instâncias de imagens) a ser
     # ferramentas de teste, e a porta 7000 no contêiner será acessível através da mesma porta no host.
     depends_on: # É necessário que o banco de dados inicie antes do webapp, por isso informamos essa dependência.
       - db
-
-  worker:
-    build: .
-    command: celery -A dataminer_api worker --loglevel=info
-    volumes:
-      - .:/app
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379"
-    
 # NETWORK
 # VARIAVEIS DOCKER
   db: # CONTAINER do meu banco de dados postgreSQL
