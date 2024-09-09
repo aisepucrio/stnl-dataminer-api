@@ -1,36 +1,102 @@
-from django.test import TestCase
-from django.urls import reverse
-from rest_framework.test import APIClient
-from rest_framework import status
+import requests
 
-class JiraAPITests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.jira_domain = "stone-puc.atlassian.net/"
-        self.project_key = "CSTONE"
-        self.jira_email = "gabrielmmendes19@gmail.com"
-        self.jira_api_token = "ATATT3xFfGF0xJ__SquSx3bKWcZ4dqWJyOS_MUVkZYTYY7v21dbfiptBvldgNnfYV-EwEim5385HhVlffiS4BgX1NiPYE5bsM8uXYfdO4fiyYIZZhE6hWcNmE2QLJQk6AX_XkUuHW1Xj2vGc97hfSRgejv21NVczaftxtqlQ_c-qdYSCetzZN6M=A80BA930"
-    
-    def test_fetch_issue_types(self):
-        response = self.client.post(reverse('fetch-issue-types'), {
-            "jira_domain": self.jira_domain,
-            "project_key": self.project_key,
-            "jira_email": self.jira_email,
-            "jira_api_token": self.jira_api_token
-        }, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('issue_types', response.data)
-    
-    def test_collect_issues(self):
-        response = self.client.post(reverse('issue-collect'), {
-            "jira_domain": self.jira_domain,
-            "project_key": self.project_key,
-            "jira_email": self.jira_email,
-            "jira_api_token": self.jira_api_token,
-            "issuetypes": ["Bug", "Storie", "Sub-task"],
-            "start_date": "2024-01-01",
-            "end_date": "2024-12-31"
-        }, format='json')
-        
-        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+# Defina a URL base do servidor Django
+BASE_URL = "http://127.0.0.1:8000/jira"
+
+# Função para testar o endpoint de coleta de issues
+def test_collect_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes=None, start_date=None, end_date=None):
+    url = f"{BASE_URL}/issues/collect/"
+    data = {
+        "jira_domain": jira_domain,
+        "project_key": project_key,
+        "jira_email": jira_email,
+        "jira_api_token": jira_api_token,
+        "issuetypes": issuetypes,
+        "start_date": start_date,
+        "end_date": end_date
+    }
+    response = requests.post(url, json=data)
+    print(f"Collect issues status code: {response.status_code}")
+    if response.status_code == 202:
+        result = response.json()
+        print("Issues collection started successfully.")
+        print(f"Total issues collected: {result.get('total_issues', 'Unknown')}")
+    else:
+        print("Failed to start issues collection", response.text)
+
+# Função para testar o endpoint de tipos de issues
+def test_fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token):
+    url = f"{BASE_URL}/issues/types/"
+    data = {
+        "jira_domain": jira_domain,
+        "project_key": project_key,
+        "jira_email": jira_email,
+        "jira_api_token": jira_api_token,
+        "project_id": project_id
+    }
+    response = requests.post(url, json=data)
+    print(f"Fetch issue types status code: {response.status_code}")
+    if response.status_code == 200:
+        print("Issue types data:", response.json())
+    else:
+        print("Failed to retrieve issue types", response.json())
+
+def test_list_issues():
+    url = f"{BASE_URL}/issues/"
+    response = requests.get(url)
+    print(f"List issues status code: {response.status_code}")
+    if response.status_code == 200:
+        # Se a requisição for bem-sucedida, exibir as issues
+        issues = response.json()
+        print(f"Retrieved {len(issues)} issues successfully.")
+        for issue in issues:
+            print(f"Issue key: {issue['key']}, Summary: {issue['summary']}")
+    else:
+        print(f"Failed to list issues. Response: {response.text}")
+
+def test_issue_detail(issue_id):
+    url = f"{BASE_URL}/issues/{issue_id}/"
+    response = requests.get(url)
+    print(f"Issue detail status code: {response.status_code}")
+    if response.status_code == 200:
+        issue = response.json()
+        print(f"Retrieved issue details: Key - {issue['key']}, Summary - {issue['summary']}")
+    else:
+        print(f"Failed to retrieve issue detail. Response: {response.text}")
+
+def test_delete_issue(issue_id):
+    url = f"{BASE_URL}/issues/{issue_id}/delete/"
+    response = requests.delete(url)
+    print(f"Delete issue status code: {response.status_code}")
+    if response.status_code == 204:
+        print(f"Issue {issue_id} deleted successfully.")
+    else:
+        print(f"Failed to delete issue {issue_id}. Response: {response.text}")
+
+# Testando os endpoints do Jira
+jira_domain = "stone-puc.atlassian.net"
+project_key = "CSTONE"
+jira_email = "gabrielmmendes19@gmail.com"
+jira_api_token = "ATATT3xFfGF0xJ__SquSx3bKWcZ4dqWJyOS_MUVkZYTYY7v21dbfiptBvldgNnfYV-EwEim5385HhVlffiS4BgX1NiPYE5bsM8uXYfdO4fiyYIZZhE6hWcNmE2QLJQk6AX_XkUuHW1Xj2vGc97hfSRgejv21NVczaftxtqlQ_c-qdYSCetzZN6M=A80BA930"
+issuetypes = ["Sub-task","Story","Task"]
+start_date = "2024-04-01"
+end_date = "2024-09-05"
+issue_id = 10435
+project_id = 3
+
+
+# Testando os endpoints do Jira
+print("Testing fetch issue types...")
+test_fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token)
+
+print("\nTesting collect issues...")
+test_collect_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes=issuetypes, start_date=start_date, end_date=end_date)
+
+print("\nTesting list issues...")
+test_list_issues()
+
+print(f"\nTesting issue detail for issue ID {issue_id}...")
+test_issue_detail(issue_id)
+
+print(f"\nTesting delete issue for issue ID {issue_id}...")
+test_delete_issue(issue_id)
