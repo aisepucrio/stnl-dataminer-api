@@ -12,11 +12,13 @@ class FetchIssueTypesView(APIView):
         project_key = request.data.get('project_key')
         jira_email = request.data.get('jira_email')
         jira_api_token = request.data.get('jira_api_token')
+        project_id = request.data.get('project_id')
+        print(jira_domain, project_key, jira_email, jira_api_token)
         
-        if not all([jira_domain, project_key, jira_email, jira_api_token]):
+        if not all([jira_domain, project_key, project_id, jira_email, jira_api_token]):
             return Response({"error": "All fields are required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = fetch_issue_types(jira_domain, project_key, jira_email, jira_api_token)
+        result = fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token)
         if "error" in result:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
         
@@ -32,16 +34,17 @@ class JiraIssueCollectView(APIView):
         project_key = request.data.get('project_key')
         jira_email = request.data.get('jira_email')
         jira_api_token = request.data.get('jira_api_token')
-        issuetypes = request.data.get('issuetypes', [])
+        issuetypes = request.data.get('issuetypes', []) # Tipos de issues a serem coletados (opcional)
         start_date = request.data.get('start_date', None)  # Data de início (opcional)
         end_date = request.data.get('end_date', None)  # Data de fim (opcional)
-        
+        # print(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
         
         if not all([project_key, jira_domain, jira_email, jira_api_token]):
             return Response({"error": "All fields are required, including issue_types"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Chama a tarefa Celery para minerar issues
-        collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
+        #collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
+        collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
         
         return Response({"status": "Issue collection started"}, status=status.HTTP_202_ACCEPTED)
 
@@ -52,11 +55,11 @@ class IssueListView(generics.ListAPIView):
 class IssueDetailView(generics.RetrieveAPIView):
     queryset = JiraIssue.objects.all()
     serializer_class = JiraIssueSerializer
-    lookup_field = 'id'
+    lookup_field = 'issue_id'
 
 class IssueDeleteView(generics.DestroyAPIView):
     queryset = JiraIssue.objects.all()
-    lookup_field = 'id'
+    lookup_field = 'issue_id'
     
     def delete(self, request, *args, **kwargs):
         issue = self.get_object()
