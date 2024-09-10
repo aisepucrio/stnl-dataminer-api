@@ -9,24 +9,18 @@ from .tasks import fetch_issue_types, collect_jira_issues
 class FetchIssueTypesView(APIView):
     def post(self, request, *args, **kwargs):
         jira_domain = request.data.get('jira_domain')
-        project_key = request.data.get('project_key')
         jira_email = request.data.get('jira_email')
         jira_api_token = request.data.get('jira_api_token')
-        project_id = request.data.get('project_id')
-        print(jira_domain, project_key, jira_email, jira_api_token)
+        print(jira_domain, jira_email, jira_api_token)
         
-        if not all([jira_domain, project_key, project_id, jira_email, jira_api_token]):
-            return Response({"error": "All fields are required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not all([jira_domain, jira_email, jira_api_token]):
+            return Response({"error": "Missing parameters: jira_domain, jira_email, and jira_api_token are required."}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token)
+        result = fetch_issue_types(jira_domain, jira_email, jira_api_token)
         if "error" in result:
             return Response(result, status=status.HTTP_400_BAD_REQUEST)
         
-        issue_types = JiraIssueType.objects.filter(domain=jira_domain, project_key=project_key)
-        serialized_issue_types = [{"id": it.issue_type_id, "name": it.issue_type_name} for it in issue_types]
-
-        return Response({"issue_types": serialized_issue_types}, status=status.HTTP_200_OK)
-
+        return Response(result, status=status.HTTP_200_OK)
 
 class JiraIssueCollectView(APIView):
     def post(self, request, *args, **kwargs):
