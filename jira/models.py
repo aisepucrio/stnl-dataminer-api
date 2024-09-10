@@ -1,16 +1,16 @@
 from django.db import models
 
 class JiraIssueType(models.Model):
+    issuetype_id = models.CharField(max_length=100, primary_key=True)
+    name = models.CharField(max_length=100)
     domain = models.CharField(max_length=255)
-    project_key = models.CharField(max_length=100)
-    issuetype_id = models.CharField(max_length=100)
-    issuetype_name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
 
     class Meta:
-        unique_together = ('domain', 'project_key', 'issue_type_id')
+        unique_together = ('issuetype_id', 'name', 'domain')
 
     def __str__(self):
-        return f"{self.domain} - {self.project_key}: {self.issue_type_name}"
+        return f"{self.domain}: {self.name} ({self.id})"
 
 class JiraIssue(models.Model):
     issue_id = models.CharField(max_length=100, unique=True)
