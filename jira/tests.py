@@ -25,21 +25,19 @@ def test_collect_issues(jira_domain, project_key, jira_email, jira_api_token, is
         print("Failed to start issues collection", response.text)
 
 # Função para testar o endpoint de tipos de issues
-def test_fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token):
+def test_fetch_issue_types(jira_domain, jira_email, jira_api_token):
     url = f"{BASE_URL}/issues/types/"
     data = {
         "jira_domain": jira_domain,
-        "project_key": project_key,
         "jira_email": jira_email,
-        "jira_api_token": jira_api_token,
-        "project_id": project_id
+        "jira_api_token": jira_api_token
     }
     response = requests.post(url, json=data)
     print(f"Fetch issue types status code: {response.status_code}")
     if response.status_code == 200:
-        print("Issue types data:", response.json())
+        print("Issuetypes data:", response.json())
     else:
-        print("Failed to retrieve issue types", response.json())
+        print("Failed to retrieve issuetypes", response.json())
 
 def test_list_issues():
     url = f"{BASE_URL}/issues/"
@@ -87,7 +85,7 @@ project_id = 3
 
 # Testando os endpoints do Jira
 print("Testing fetch issue types...")
-test_fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token)
+test_fetch_issue_types(jira_domain, jira_email, jira_api_token)
 
 print("\nTesting collect issues...")
 test_collect_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes=issuetypes, start_date=start_date, end_date=end_date)
