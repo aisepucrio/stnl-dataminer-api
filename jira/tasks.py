@@ -6,33 +6,54 @@ from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 
 # @shared_task
-def fetch_issue_types(jira_domain, project_key, project_id, jira_email, jira_api_token):
-    url = f"https://{jira_domain}/rest/api/3/issuetype/project"
+def fetch_issue_types(jira_domain, jira_email, jira_api_token):
+    url = f"https://{jira_domain}/rest/api/3/issuetype"
     auth = HTTPBasicAuth(jira_email, jira_api_token)
     headers = {
-        "Content-Type": "application/json"
-    }
-
-    query = {
-        "projectId": project_id
+        "Accept": "application/json"
     }
     
-    response = requests.get(url, headers=headers, params=query, auth=auth)
-    if response.status_code != 200:
-        return {"error": f"Failed to fetch issue types: {response.status_code}"}
-    
-    issue_types_data = response.json()
-    
-    # Salva os tipos de issues no banco de dados
-    for issue_type in issue_types_data:
-        JiraIssueType.objects.update_or_create(
-            domain=jira_domain,
-            project_key=project_key,
-            issue_type_id=issue_type['id'],
-            defaults={'issue_type_name': issue_type['name']}
-        )
+    try:
+        response = requests.get(url, headers=headers, auth=auth)
 
-    return {"status": "Issue types fetched and saved successfully"}
+        # Verifica se o status code não é 200 (sucesso)
+        if response.status_code != 200:
+            # Adicione mais informações sobre a resposta na mensagem de erro
+            return {"error": f"Failed to fetch issue types: {response.status_code} - {response.text}"}
+
+        issuetypes_data = response.json()
+
+        # Filtra e remove duplicados com base no campo `untranslatedName`
+        unique_issuetypes = {}
+        for issuetype in issuetypes_data:
+            name = issuetype.get('name')
+            untranslated_name = issuetype.get('untranslatedName')
+
+            if name and untranslated_name:
+                if untranslated_name not in unique_issuetypes:
+                    unique_issuetypes[untranslated_name] = {
+                        "issuetype_id": issuetype.get('id'),
+                        "name": issuetype.get('untranslatedName'),
+                        "domain": jira_domain,
+                        "description": issuetype.get('description', '')
+                    }
+
+        # Salva os tipos de issues no banco de dados
+        for issuetype in unique_issuetypes.values():
+            JiraIssueType.objects.update_or_create(
+                issuetype_id=issuetype['issuetype_id'],
+                defaults={
+                    'name': issuetype['name'],
+                    'domain': issuetype['domain'],
+                    'description': issuetype['description']
+                }
+            )
+
+        return {"status": "Issue types fetched and saved successfully"}
+    
+    except Exception as e:
+        # Captura erros inesperados e retorna mais informações
+        return {"error": f"Unexpected error: {str(e)}"}
 
 #@shared_task(ignore_result=True)
 def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
