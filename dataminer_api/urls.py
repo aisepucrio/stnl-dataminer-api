@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from features import views as features_views 
 
 def home(request):
-    return HttpResponse("Bem-vindo à página inicial do DataMiner API")
+    return HttpResponse("Bem-vindo à página inicial do DataMiner API!!!!!!!")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
