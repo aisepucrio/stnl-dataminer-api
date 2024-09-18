@@ -3,26 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import generics
 from .models import JiraIssueType, JiraIssue
-from .serializers import JiraIssueSerializer
-from .tasks import fetch_issue_types, collect_jira_issues
+from .serializers import JiraIssueSerializer, JiraIssueTypeSerializer
+from .tasks import collect_issue_types, collect_jira_issues
 
-class FetchIssueTypesView(APIView):
-    def post(self, request, *args, **kwargs):
-        jira_domain = request.data.get('jira_domain')
-        jira_email = request.data.get('jira_email')
-        jira_api_token = request.data.get('jira_api_token')
-        print(jira_domain, jira_email, jira_api_token)
-        
-        if not all([jira_domain, jira_email, jira_api_token]):
-            return Response({"error": "Missing parameters: jira_domain, jira_email, and jira_api_token are required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        result = fetch_issue_types(jira_domain, jira_email, jira_api_token)
-        if "error" in result:
-            return Response(result, status=status.HTTP_400_BAD_REQUEST)
-        
-        return Response(result, status=status.HTTP_200_OK)
-
-class JiraIssueCollectView(APIView):
+class IssueCollectView(APIView):
     def post(self, request, *args, **kwargs):
         jira_domain = request.data.get('jira_domain')
         project_key = request.data.get('project_key')
@@ -59,3 +43,37 @@ class IssueDeleteView(generics.DestroyAPIView):
         issue = self.get_object()
         self.perform_destroy(issue)
         return Response({"status": "Issue deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+class IssueTypeCollectView(APIView):
+    def post(self, request, *args, **kwargs):
+        jira_domain = request.data.get('jira_domain')
+        jira_email = request.data.get('jira_email')
+        jira_api_token = request.data.get('jira_api_token')
+        print(jira_domain, jira_email, jira_api_token)
+        
+        if not all([jira_domain, jira_email, jira_api_token]):
+            return Response({"error": "Missing parameters: jira_domain, jira_email, and jira_api_token are required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = collect_issue_types(jira_domain, jira_email, jira_api_token)
+        if "error" in result:
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(result, status=status.HTTP_200_OK)
+
+class IssueTypeListView(generics.ListAPIView):
+    queryset = JiraIssueType.objects.all()
+    serializer_class = JiraIssueTypeSerializer
+
+class IssueTypeDetailView(generics.RetrieveAPIView):
+    queryset = JiraIssueType.objects.all()
+    serializer_class = JiraIssueTypeSerializer
+    lookup_field = 'issuetype_id'
+
+class IssueTypeDeleteView(generics.DestroyAPIView):
+    queryset = JiraIssueType.objects.all()
+    lookup_field = 'issuetype_id'
+    
+    def delete(self, request, *args, **kwargs):
+        issuetype = self.get_object()
+        self.perform_destroy(issuetype)
+        return Response({"status": "Issue type deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
