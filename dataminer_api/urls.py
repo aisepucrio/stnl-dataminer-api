@@ -9,6 +9,7 @@ def home(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('github.urls')),
+    path('jira/', include('jira.urls')),
     path('', home),  # Adiciona uma página inicial para a URL raiz
     path('minerar/', features_views.minerar_features_view, name='minerar_features'),
 ]
