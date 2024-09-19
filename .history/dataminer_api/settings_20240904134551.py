@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'github',
-    'jobs',
 ]
 
 MIDDLEWARE = [
@@ -85,7 +84,7 @@ DATABASES = {
         'HOST': 'opus.servehttp.com',
         'PORT': '54321',
     }
-}   
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
