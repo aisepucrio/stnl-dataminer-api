@@ -1,6 +1,9 @@
+# github/views.py
+
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework import status
+#from github.miner import GitHubMiner
 from jobs.tasks import fetch_commits, fetch_issues, fetch_pull_requests, fetch_branches
 
 class GitHubCommitViewSet(viewsets.ViewSet):

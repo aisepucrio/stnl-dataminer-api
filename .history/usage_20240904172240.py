@@ -1,32 +1,7 @@
-import os
-import django
-import time
 import requests
-from django.conf import settings
-from celery.result import AsyncResult
-from jobs.tasks import simple_task
-
-# Inicialize o Django antes de acessar qualquer configuração
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'dataminer_api.settings')
-django.setup()
 
 # Defina a URL base do servidor Django
 BASE_URL = "http://127.0.0.1:8000/api/github"
-
-# Função para verificar o status de uma tarefa
-def check_task_status(task_id):
-    if not settings.CELERY_RESULT_BACKEND:
-        print("Celery result backend is not configured.")
-        return None
-
-    result = AsyncResult(task_id)
-    print(f"Task {task_id} status: {result.status}")
-    if result.ready():
-        print("Result:", result.result)
-        return result.result
-    else:
-        print("Task is still running or failed.")
-        return None
 
 # Função para testar o endpoint de commits
 def test_commits(repo_name, start_date, end_date):
