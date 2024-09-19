@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'github',
-    'jobs',
+    'features',
+    'jobs'
 ]
 
 MIDDLEWARE = [
@@ -84,8 +85,12 @@ DATABASES = {
         'PASSWORD': '#St@n3L@b2@24!',
         'HOST': 'opus.servehttp.com',
         'PORT': '54321',
+        'OPTIONS': {
+            'options': '-c search_path=aisepucrio_stnl_django,aisepucrio_stnl_featuresmining,aisepucrio_stnl_jiramining,aisepucrio_stnl_ghmining'
+        },
     }
-}   
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
