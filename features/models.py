@@ -26,3 +26,19 @@ class FeatureMining(models.Model):
 
     def __str__(self):
         return f"Mineração de Features em {self.repo_path}"
+    
+    from django.db import models
+
+class Repositorio(models.Model):
+    nome = models.CharField(max_length=255)
+    ssh_url = models.CharField(max_length=255)
+    tipo_mineracao = models.CharField(max_length=50)
+    dados = models.JSONField()
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    tamanho = models.BigIntegerField()
+    ultima_atualizacao = models.DateTimeField(auto_now=True)
+    num_commits = models.IntegerField()
+
+    class Meta:
+        db_table = 'repositorios'  # Usa a tabela já criada
+        managed = False  # Impede o Django de tentar criar ou modificar a tabela
