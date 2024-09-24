@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
+
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-4#0!#$y$nhi83cpx_+z+-0r=b@li^csxtj=7adx!js5_#d18bt'
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -80,11 +82,11 @@ WSGI_APPLICATION = 'dataminer_api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'aise-stone',
-        'USER': 'aise-stone',
-        'PASSWORD': '#St@n3L@b2@24!',
-        'HOST': 'opus.servehttp.com',
-        'PORT': '54321',
+        'NAME': os.getenv("POSTGRES_DB"),
+        'USER': os.getenv("POSTGRES_USER"),
+        'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
+        'HOST': os.getenv("POSTGRES_HOST"),
+        'PORT': os.getenv("POSTGRES_PORT"),
         'OPTIONS': {
             'options': '-c search_path=aisepucrio_stnl_django,aisepucrio_stnl_featuresmining,aisepucrio_stnl_jiramining,aisepucrio_stnl_ghmining'
         },

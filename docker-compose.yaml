@@ -14,7 +14,10 @@ services:
     healthcheck:
       test: ["CMD", "nc", "-z", "web", "8000"]
     environment:
-      DJANGO_SUPERUSER_PASSWORD: "admin"
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD}
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL}
 
   worker:
     build: .
@@ -38,9 +41,10 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: mining_db
-      POSTGRES_USER: aise-stone
-      POSTGRES_PASSWORD: "#St@n3L@b2@24!"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGPORT: ${POSTGRES_PORT}
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     healthcheck:
