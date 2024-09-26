@@ -13,13 +13,17 @@ Esta é uma API desenvolvida em Django para realizar a mineração de features e
 
 ## Requisitos
 
+- Docker (com Compose)
+
+ou
+
 - Python 3.10+
 - Django 4.x
 - PostgreSQL 12+
 - Rust (para compilar o minerador de features)
 - Git
 
-## Instalação
+## Configuração do ambiente (Manual)
 
 1. Clonar o Repositório
 
@@ -84,5 +88,42 @@ O binário resultante deve ser movido para o diretório do projeto Django ou ace
 7. Rodar o Servidor Django
 
 ```bash
+source activate.sh
 python manage.py runserver
+```
+
+## Configuração do ambiente (via Docker)
+
+1. Baixe e instale o Docker.
+
+  No Windows (mesmo com WSL) e MacOS é recomendado instalar através do [Docker Desktop](https://docs.docker.com/desktop/).
+
+2. Clonar o repositório
+
+```bash
+Copy code
+git clone https://github.com/seu_usuario/dataminer-api.git
+cd dataminer-api
+```
+
+3. Iniciar o docker desktop
+
+4. Executar o servidor do django
+
+```bash
+docker compose up --build
+```
+
+## Comandos úteis com o Docker
+
+- Resetar o banco de dados (deleta todos os dados dos containers)
+
+```bash
+docker compose down -v
+```
+
+- Executar os testes
+
+```bash
+docker compose run web python manage.py test
 ```
