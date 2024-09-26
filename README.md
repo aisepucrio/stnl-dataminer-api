@@ -85,7 +85,11 @@ cargo build --release
 
 O binário resultante deve ser movido para o diretório do projeto Django ou acessível via PATH.
 
-7. Rodar o Servidor Django
+7. Configurar as variáveis de ambiente
+
+O projeto requer um arquivo `.env` a raiz do repositório. Um arquivo .env.example, com as variáveis que devem ser alteradas, está disponível no repositório.
+
+8. Rodar o Servidor Django
 
 ```bash
 source activate.sh
@@ -106,9 +110,14 @@ git clone https://github.com/seu_usuario/dataminer-api.git
 cd dataminer-api
 ```
 
-3. Iniciar o docker desktop
+3. Configurar as variáveis de ambiente
+
+O projeto requer um arquivo `.env` a raiz do repositório. Um arquivo .env.example, com as variáveis já funcionais para uso com o docker, está disponível no repositório.
+
 
 4. Executar o servidor do django
+
+Inicie o docker e execute o comando:
 
 ```bash
 docker compose up --build
