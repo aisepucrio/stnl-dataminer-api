@@ -5,8 +5,23 @@ from requests.auth import HTTPBasicAuth
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 
+def extract_description_text(description):
+    if 'content' not in description:
+        return ""
+    
+    paragraphs = description['content']
+    text_parts = []
+    
+    for paragraph in paragraphs:
+        if 'content' in paragraph:
+            for content in paragraph['content']:
+                if 'text' in content:
+                    text_parts.append(content['text'])
+    
+    return "\n".join(text_parts)
+
 # @shared_task
-def fetch_issue_types(jira_domain, jira_email, jira_api_token):
+def collect_issue_types(jira_domain, jira_email, jira_api_token):
     url = f"https://{jira_domain}/rest/api/3/issuetype"
     auth = HTTPBasicAuth(jira_email, jira_api_token)
     headers = {
@@ -106,13 +121,17 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
         
         # Salva as issues no banco de dados
         for issue_data in issues:
+            # Extraindo o texto da descrição
+            description_json = issue_data['fields'].get('description', '')
+            description_text = extract_description_text(description_json)
+
             JiraIssue.objects.update_or_create(
                 issue_id=issue_data['id'],
                 defaults={
                     'key': issue_data['key'],
                     'issuetype': issue_data['fields']['issuetype']['name'],
                     'summary': issue_data['fields']['summary'],
-                    'description': issue_data['fields'].get('description', ''),
+                    'description': description_text,
                     'created': issue_data['fields']['created'],
                     'updated': issue_data['fields']['updated'],
                     'status': issue_data['fields']['status']['name'],
