@@ -103,16 +103,17 @@ def test_delete_issue_type(issuetype_id):
         print(f"Failed to delete issue type {issuetype_id}. Response: {response.text}")
 
 # Testando os endpoints do Jira
+# jira_domain = "spark-project.atlassian.net"
+# project_key = "SPARK"
 jira_domain = "stone-puc.atlassian.net"
 project_key = "CSTONE"
 jira_email = "gabrielmmendes19@gmail.com"
 jira_api_token = "ATATT3xFfGF0xJ__SquSx3bKWcZ4dqWJyOS_MUVkZYTYY7v21dbfiptBvldgNnfYV-EwEim5385HhVlffiS4BgX1NiPYE5bsM8uXYfdO4fiyYIZZhE6hWcNmE2QLJQk6AX_XkUuHW1Xj2vGc97hfSRgejv21NVczaftxtqlQ_c-qdYSCetzZN6M=A80BA930"
 issuetypes = ["Sub-task","Story","Task"]
-start_date = "2024-04-01"
+start_date = "2004-04-01"
 end_date = "2024-09-18"
-issue_id = 10435
-project_id = 3
-issuetype_id = 10016
+issue_id = 10466
+issuetype_id = 10017
 
 
 # Testando os endpoints do Jira
@@ -131,7 +132,7 @@ print(f"\nTesting delete issue for issue ID {issue_id}...")
 test_delete_issue(issue_id)
 
 # Rotas dos Tipos de Issues
-print("Testing collect issue types...")
+print("\nTesting collect issue types...")
 test_collect_issue_types(jira_domain, jira_email, jira_api_token)
 
 print("\nTesting list issue types...")
