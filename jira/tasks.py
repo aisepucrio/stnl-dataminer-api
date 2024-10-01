@@ -5,21 +5,6 @@ from requests.auth import HTTPBasicAuth
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 
-def extract_description_text(description):
-    if 'content' not in description:
-        return ""
-    
-    paragraphs = description['content']
-    text_parts = []
-    
-    for paragraph in paragraphs:
-        if 'content' in paragraph:
-            for content in paragraph['content']:
-                if 'text' in content:
-                    text_parts.append(content['text'])
-    
-    return "\n".join(text_parts)
-
 # @shared_task
 def collect_issue_types(jira_domain, jira_email, jira_api_token):
     url = f"https://{jira_domain}/rest/api/3/issuetype"
@@ -69,14 +54,71 @@ def collect_issue_types(jira_domain, jira_email, jira_api_token):
     except Exception as e:
         # Captura erros inesperados e retorna mais informações
         return {"error": f"Unexpected error: {str(e)}"}
+    
+# Função auxiliar para extrair o texto da descrição de uma issue    
+def extract_description_text(description):
+    if 'content' not in description:
+        return ""
+    
+    paragraphs = description['content']
+    text_parts = []
+    
+    for paragraph in paragraphs:
+        if 'content' in paragraph:
+            for content in paragraph['content']:
+                if 'text' in content:
+                    text_parts.append(content['text'])
+    
+    return "\n".join(text_parts)
+
+# Função para mapear os campos customizados do Jira
+def get_custom_fields_mapping(jira_domain, jira_email, jira_api_token):
+    url = f"https://{jira_domain}/rest/api/3/field"
+    auth = HTTPBasicAuth(jira_email, jira_api_token)
+    
+    response = requests.get(url, auth=auth)
+    if response.status_code != 200:
+        raise Exception(f"Failed to get custom fields: {response.status_code} - {response.text}")
+    
+    fields = response.json()
+    custom_fields_mapping = {}
+
+    for field in fields:
+        field_id = field.get('id')  # Exemplo: customfield_12345
+        field_name = field.get('name')  # Nome legível
+        if field_id.startswith('customfield_'):
+            custom_fields_mapping[field_id] = field_name
+    
+    return custom_fields_mapping
+
+# Função para substituir os campos customizados pelo nome mapeado
+def replace_custom_fields_with_names(issue_json, custom_fields_mapping):
+    if 'fields' not in issue_json:
+        return issue_json
+    
+    fields = issue_json['fields']
+    updated_fields = {}
+    
+    for key, value in fields.items():
+        # Se o campo for um customfield, substituímos pelo nome
+        if key in custom_fields_mapping:
+            new_key = custom_fields_mapping[key]
+        else:
+            new_key = key
+        updated_fields[new_key] = value
+    
+    issue_json['fields'] = updated_fields
+    return issue_json
 
 #@shared_task(ignore_result=True)
 def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
     auth = HTTPBasicAuth(jira_email, jira_api_token)
-
     max_results = 100  # Limite máximo de resultados por requisição
     start_at = 0       # Ponto inicial para a paginação
     total_collected = 0  # Contador de issues coletadas 
+
+    # Obtém o mapeamento dos campos personalizados
+    custom_fields_mapping = get_custom_fields_mapping(jira_domain, jira_email, jira_api_token)
     
     # Inicia a construção da consulta JQL
     jql_query = f'project="{project_key}"'
@@ -124,6 +166,9 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
             # Extraindo o texto da descrição
             description_json = issue_data['fields'].get('description', '')
             description_text = extract_description_text(description_json)
+
+            # Substituindo o ID dos campos customizados pelos nomes
+            issue_data = replace_custom_fields_with_names(issue_data, custom_fields_mapping)
 
             JiraIssue.objects.update_or_create(
                 issue_id=issue_data['id'],
