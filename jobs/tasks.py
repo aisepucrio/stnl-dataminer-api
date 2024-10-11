@@ -1,5 +1,3 @@
-# jobs/tasks.py
-
 from celery import shared_task
 from github.miner import GitHubMiner
 
