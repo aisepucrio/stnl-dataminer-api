@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework import generics
 from .models import JiraIssueType, JiraIssue
 from .serializers import JiraIssueSerializer, JiraIssueTypeSerializer
-from .tasks import collect_issue_types, collect_jira_issues
+from .tasks import fetch_issue_types, collect_jira_issues
 
 class IssueCollectView(APIView):
     def post(self, request, *args, **kwargs):
