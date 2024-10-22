@@ -1,12 +1,21 @@
 from celery import shared_task
 from .models import JiraIssueType, JiraIssue
+from jobs.models import Task
 import requests
 from requests.auth import HTTPBasicAuth
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 
-# @shared_task
-def collect_issue_types(jira_domain, jira_email, jira_api_token):
+@shared_task(bind=True, ignore_result=True)
+def collect_issue_types(jira_domain, jira_email, jira_api_token, task_id=None):
+    task = None
+    if task_id:
+        try:
+            task = Task.objects.get(id=task_id)
+            task.mark_in_progress()
+        except Task.DoesNotExist:
+            return {"error": "Task not found"}
+
     url = f"https://{jira_domain}/rest/api/3/issuetype"
     auth = HTTPBasicAuth(jira_email, jira_api_token)
     headers = {
@@ -16,9 +25,10 @@ def collect_issue_types(jira_domain, jira_email, jira_api_token):
     try:
         response = requests.get(url, headers=headers, auth=auth)
 
-        # Verifica se o status code não é 200 (sucesso)
         if response.status_code != 200:
-            # Adicione mais informações sobre a resposta na mensagem de erro
+            if task:
+                task.status = Task.Status.FAILED
+                task.save()
             return {"error": f"Failed to fetch issue types: {response.status_code} - {response.text}"}
 
         issuetypes_data = response.json()
@@ -49,10 +59,15 @@ def collect_issue_types(jira_domain, jira_email, jira_api_token):
                 }
             )
 
+        if task:
+            task.complete()
+
         return {"status": "Issue types fetched and saved successfully"}
     
     except Exception as e:
-        # Captura erros inesperados e retorna mais informações
+        if task:
+            task.status = Task.Status.FAILED
+            task.save()
         return {"error": f"Unexpected error: {str(e)}"}
     
 # Função auxiliar para extrair o texto da descrição de uma issue    
@@ -110,8 +125,16 @@ def replace_custom_fields_with_names(issue_json, custom_fields_mapping):
     issue_json['fields'] = updated_fields
     return issue_json
 
-#@shared_task(ignore_result=True)
-def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
+@shared_task(bind=True, ignore_result=True)
+def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None, task_id=None):
+    task = None
+    if task_id:
+        try:
+            task = Task.objects.get(id=task_id)
+            task.mark_in_progress()
+        except Task.DoesNotExist:
+            return {"error": "Task not found"}
+        
     auth = HTTPBasicAuth(jira_email, jira_api_token)
     max_results = 100  # Limite máximo de resultados por requisição
     start_at = 0       # Ponto inicial para a paginação
@@ -119,8 +142,7 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
 
     # Obtém o mapeamento dos campos personalizados
     custom_fields_mapping = get_custom_fields_mapping(jira_domain, jira_email, jira_api_token)
-    
-    # Inicia a construção da consulta JQL
+  
     jql_query = f'project="{project_key}"'
     
     # Adiciona filtro de tipos de issues, se fornecido
@@ -138,11 +160,12 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
                 raise ValueError
             jql_query += f' AND created >= "{start_date}" AND created <= "{end_date}"'
         except ValueError:
-            # Opcional: Trate o erro de formato de data conforme necessário
+            if task:
+                task.status = Task.Status.FAILED
+                task.save()
             return {"error": "Invalid date format. Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)."}
     
     # Codifica a consulta JQL para ser usada na URL
-    # print(jql_query)
     encoded_jql = quote(jql_query)
     
     while True:
@@ -153,6 +176,9 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
         
         response = requests.get(jira_url, headers=headers, auth=auth)
         if response.status_code != 200:
+            if task:
+                task.status = Task.Status.FAILED
+                task.save()
             return {"error": f"Failed to collect issues: {response.status_code} - {response.text}"}
         
         issues = response.json().get('issues', [])
@@ -194,7 +220,9 @@ def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, is
 
         # Se o número de issues coletadas for menor que o limite, todas as issues foram coletadas
         if len(issues) < max_results:
-            print(total_collected)
             break
     
-    return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
+    if task:
+        task.complete()
+
+    return {"status": f"Collected {total_collected} issues successfully."}
