@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import generics
+from jobs.models import Task
 from .models import JiraIssueType, JiraIssue
 from .serializers import JiraIssueSerializer, JiraIssueTypeSerializer
 from .tasks import collect_issue_types, collect_jira_issues
@@ -20,11 +21,20 @@ class IssueCollectView(APIView):
         if not all([project_key, jira_domain, jira_email, jira_api_token]):
             return Response({"error": "All fields are required, including issue_types"}, status=status.HTTP_400_BAD_REQUEST)
         
+        task = Task.objects.create(
+            status=Task.Status.PENDING,
+            metadata={
+                'project_key': project_key,
+                'issuetypes': issuetypes,
+                'start_date': start_date,
+                'end_date': end_date
+            }
+        )
+
         # Chama a tarefa Celery para minerar issues
-        #collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
-        collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
+        collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date, task.id)
         
-        return Response({"status": "Issue collection started"}, status=status.HTTP_202_ACCEPTED)
+        return Response({"status": "Issue collection started", "task_id": task.id}, status=status.HTTP_202_ACCEPTED)
 
 class IssueListView(generics.ListAPIView):
     queryset = JiraIssue.objects.all()
@@ -54,11 +64,16 @@ class IssueTypeCollectView(APIView):
         if not all([jira_domain, jira_email, jira_api_token]):
             return Response({"error": "Missing parameters: jira_domain, jira_email, and jira_api_token are required."}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = collect_issue_types(jira_domain, jira_email, jira_api_token)
-        if "error" in result:
-            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        # Cria a task no banco de dados
+        task = Task.objects.create(
+            status=Task.Status.PENDING,
+            metadata={'operation': 'collect_issue_types', 'jira_domain': jira_domain}
+        )
+
+        # Chama a tarefa Celery para coletar tipos de issues, passando o ID da task
+        collect_issue_types.delay(jira_domain, jira_email, jira_api_token, task.id)
         
-        return Response(result, status=status.HTTP_200_OK)
+        return Response({"status": "Issue types collection started", "task_id": task.id}, status=status.HTTP_202_ACCEPTED)
 
 class IssueTypeListView(generics.ListAPIView):
     queryset = JiraIssueType.objects.all()
