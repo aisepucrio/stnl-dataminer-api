@@ -8,9 +8,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-        # O serviço web só será iniciado quando o serviço db realmente tiver finalizado a inicialização.
-        # Por padrão, o depends_on apenas espera o container iniciar, mas não garante que o serviço esteja pronto para uso.
-        # Para garantir que o serviço esteja pronto, você pode usar a condição service_healthy.
     healthcheck:
       test: ["CMD", "nc", "-z", "web", "8000"]
     environment:
@@ -41,6 +38,8 @@ services:
       POSTGRES_DB: mining_db
       POSTGRES_USER: aise-stone
       POSTGRES_PASSWORD: "#St@n3L@b2@24!"
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     healthcheck:
