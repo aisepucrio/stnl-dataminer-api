@@ -4,17 +4,16 @@ from rest_framework import status
 
 class GitHubAPITests(APITestCase):
     def setUp(self):
-        # Configurar o cliente para os testes
         self.client = APIClient()
         self.repo_name = "esp8266/Arduino"
         self.start_date = "2024-07-20T00:00:00Z"
         self.end_date = "2024-08-31T23:59:59Z"
         
-        # URLs dos endpoints
-        self.commits_url = reverse('commit-list')  
-        self.issues_url = reverse('issue-list')    
-        self.pull_requests_url = reverse('pullrequest-list')  
-        self.branches_url = reverse('branch-list')  
+        self.commits_url = reverse('commit-list')
+        self.issues_url = reverse('github-issue-list')  
+        print(f'Issues URL: {self.issues_url}')
+        self.pull_requests_url = reverse('pullrequest-list')
+        self.branches_url = reverse('branch-list')
 
     def test_commits(self):
         """Testa o endpoint de commits"""
