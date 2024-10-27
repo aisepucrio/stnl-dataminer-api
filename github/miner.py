@@ -1,37 +1,79 @@
-# github/miner.py
-
 import os
 import requests
 from git import Repo, GitCommandError
 from pydriller import Repository
 from datetime import datetime
 import json
+from dotenv import load_dotenv
 
 class GitHubMiner:
     def __init__(self):
         self.headers = {'Accept': 'application/vnd.github.v3+json'}
-        self.auth = None
-        self.tokens = None
-        self.usernames = None
+        self.tokens = []
         self.current_token_index = 0
-        self.load_tokens()
+        self.load_tokens() 
+        self.update_auth_header()  
+
+    def load_tokens(self):
+        """Carrega tokens do GitHub a partir de um arquivo .env ou variável de ambiente"""
+        load_dotenv()  # Carrega variáveis de ambiente do arquivo .env
+        tokens_str = os.getenv("GITHUB_TOKENS")
+        if tokens_str:
+            self.tokens = tokens_str.split(",")
+            print("Tokens carregados com sucesso.", flush=True)
+        else:
+            print("Nenhum token encontrado. Verifique se GITHUB_TOKENS está definido no .env", flush=True)
+
+    def update_auth_header(self):
+        """Atualiza o cabeçalho Authorization com o token atual"""
+        if self.tokens:
+            self.headers['Authorization'] = f'token {self.tokens[self.current_token_index]}'
+
+    def switch_token(self):
+        """Alterna para o próximo token se disponível"""
+        self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
+        self.update_auth_header()
+        print(f"Alternando para o próximo token. Token atual: {self.current_token_index + 1}/{len(self.tokens)}", flush=True)
+
+    def handle_rate_limit(self, response):
+        """Alterna token caso o limite de requisições seja atingido e exibe requisições restantes"""
+        if response.status_code == 403 and 'rate limit' in response.text.lower():
+            print("Limite de requisições atingido. Alternando token.", flush=True)
+            self.switch_token()
+        else:
+            remaining_requests = response.headers.get('X-RateLimit-Remaining', 'N/A')
+            print(f"Requisições restantes para o token atual: {remaining_requests}", flush=True)
+
+    def print_remaining_requests(self):
+        """Exibe o número de requisições restantes no token atual"""
+        try:
+            url = "https://api.github.com/rate_limit"
+            response = requests.get(url, headers=self.headers)
+            response.raise_for_status()
+            rate_limits = response.json().get("rate", {})
+            remaining_requests = rate_limits.get("remaining", "N/A")
+            limit = rate_limits.get("limit", "N/A")
+            reset_time = rate_limits.get("reset", None)
+            
+            if reset_time:
+                reset_time = datetime.fromtimestamp(reset_time).strftime('%Y-%m-%d %H:%M:%S')
+            
+            print(f"Requisições restantes para o token atual: {remaining_requests}/{limit}, reset em {reset_time}", flush=True)
+        except Exception as e:
+            print(f"Erro ao obter informações de rate limit: {e}", flush=True)
 
     def project_root_directory(self):
         return os.getcwd()
-
-    def load_tokens(self):
-        # Carrega tokens do arquivo .env
-        pass
 
     def user_home_directory(self):
         return os.path.expanduser("~")
 
     def clone_repo(self, repo_url, clone_path):
         if not os.path.exists(clone_path):
-            print(f"Cloning repo: {repo_url}")
+            print(f"Cloning repo: {repo_url}", flush=True)
             Repo.clone_from(repo_url, clone_path)
         else:
-            print(f"Repo already exists: {clone_path}")
+            print(f"Repo already exists: {clone_path}", flush=True)
             self.update_repo(clone_path)
 
     def update_repo(self, repo_path):
@@ -39,9 +81,9 @@ class GitHubMiner:
             repo = Repo(repo_path)
             origin = repo.remotes.origin
             origin.pull()
-            print(f"Repo updated: {repo_path}")
+            print(f"Repo updated: {repo_path}", flush=True)
         except GitCommandError as e:
-            print(f"Error updating repo: {e}")
+            print(f"Error updating repo: {e}", flush=True)
             raise Exception(f"Error updating repo: {e}")
 
     def save_to_json(self, data, filename):
@@ -49,9 +91,9 @@ class GitHubMiner:
         try:
             with open(output_path, 'w') as outfile:
                 json.dump(data, outfile, indent=4)
-            print(f"Data successfully saved to {output_path}")
+            print(f"Data successfully saved to {output_path}", flush=True)
         except Exception as e:
-            print(f"Failed to save data to {output_path}: {e}")
+            print(f"Failed to save data to {output_path}: {e}", flush=True)
     
     def convert_to_iso8601(self, date):
         return date.isoformat()
@@ -110,14 +152,16 @@ class GitHubMiner:
                     commit_data['author']['name'] = commit.author.name
                     commit_data['author']['email'] = commit.author.email
                 except Exception as e:
-                    print(f"Erro ao processar autor do commit {commit.hash}: {e}")
+                    #print(f"Erro ao processar autor do commit {commit.hash}: {e}", flush=True)
+                    pass
                 
                 # Process committer
                 try:
                     commit_data['committer']['name'] = commit.committer.name
                     commit_data['committer']['email'] = commit.committer.email
                 except Exception as e:
-                    print(f"Erro ao processar committer do commit {commit.hash}: {e}")
+                    #print(f"Erro ao processar committer do commit {commit.hash}: {e}", flush=True)
+                    pass
                 
                 # Process DMM metrics
                 try:
@@ -125,7 +169,8 @@ class GitHubMiner:
                     commit_data['dmm_unit_complexity'] = commit.dmm_unit_complexity
                     commit_data['dmm_unit_interfacing'] = commit.dmm_unit_interfacing
                 except Exception as e:
-                    print(f"Erro ao processar DMM metrics do commit {commit.hash}: {e}")
+                    #print(f"Erro ao processar DMM metrics do commit {commit.hash}: {e}", flush=True)
+                    pass
                 
                 # Process modified files
                 for mod in commit.modified_files:
@@ -153,15 +198,18 @@ class GitHubMiner:
                                 try:
                                     method_data['max_nesting'] = method.max_nesting
                                 except AttributeError:
-                                    print(f"Commit {commit.hash}: 'Method' object has no attribute 'max_nesting'")
+                                    #"Commit {commit.hash}: 'Method' object has no attribute 'max_nesting'", flush=True)
+                                    pass
                                 
                                 mod_data['methods'].append(method_data)
                             except Exception as e:
-                                print(f"Erro ao processar método {method.name} do arquivo {mod.filename} no commit {commit.hash}: {e}")
+                                #print(f"Erro ao processar método {method.name} do arquivo {mod.filename} no commit {commit.hash}: {e}", flush=True)
+                                pass
 
                         commit_data['modified_files'].append(mod_data)
                     except Exception as e:
-                        print(f"Erro ao processar arquivo modificado {mod.filename} no commit {commit.hash}: {e}")
+                        #print(f"Erro ao processar arquivo modificado {mod.filename} no commit {commit.hash}: {e}", flush=True)
+                        pass
 
                 essential_commits.append(commit_data)
 
@@ -171,8 +219,12 @@ class GitHubMiner:
             return essential_commits
 
         except Exception as e:
-            print(f"Erro ao acessar o repositório: {e}")
+            #print(f"Erro ao acessar o repositório: {e}", flush=True)
+            pass
             return []
+        finally:
+            # Sempre exibe as requisições restantes
+            self.print_remaining_requests()
 
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
         url = f'https://api.github.com/repos/{repo_name}/issues'
@@ -182,16 +234,18 @@ class GitHubMiner:
         }
         try:
             response = requests.get(url, headers=self.headers, params=params)
+            if response.status_code == 403:
+                self.handle_rate_limit(response)
+                response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             issues = response.json()
-
-            # Salva as issues no arquivo JSON no diretório raiz do projeto
             self.save_to_json(issues, f"{repo_name.replace('/', '_')}_issues.json")
-
             return issues
         except requests.exceptions.RequestException as e:
-            print(f"Erro ao acessar issues: {e}")
+            print(f"Erro ao acessar issues: {e}", flush=True)
             return []
+        finally:
+            self.print_remaining_requests()
 
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
         url = f'https://api.github.com/repos/{repo_name}/pulls'
@@ -202,28 +256,32 @@ class GitHubMiner:
         }
         try:
             response = requests.get(url, headers=self.headers, params=params)
+            if response.status_code == 403:
+                self.handle_rate_limit(response)
+                response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             pull_requests = response.json()
-
-            # Salva os pull requests no arquivo JSON no diretório raiz do projeto
             self.save_to_json(pull_requests, f"{repo_name.replace('/', '_')}_pull_requests.json")
-
             return pull_requests
         except requests.exceptions.RequestException as e:
-            print(f"Erro ao acessar pull requests: {e}")
+            print(f"Erro ao acessar pull requests: {e}", flush=True)
             return []
+        finally:
+            self.print_remaining_requests()
 
     def get_branches(self, repo_name: str):
         url = f'https://api.github.com/repos/{repo_name}/branches'
         try:
             response = requests.get(url, headers=self.headers)
+            if response.status_code == 403:
+                self.handle_rate_limit(response)
+                response = requests.get(url, headers=self.headers)
             response.raise_for_status()
             branches = response.json()
-
-            # Salva as branches no arquivo JSON no diretório raiz do projeto
             self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
-
             return branches
         except requests.exceptions.RequestException as e:
-            print(f"Erro ao acessar branches: {e}")
+            print(f"Erro ao acessar branches: {e}", flush=True)
             return []
+        finally:
+            self.print_remaining_requests()

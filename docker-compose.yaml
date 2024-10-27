@@ -1,23 +1,31 @@
+version: '3.8'
+
 services:
   web:
     build: .
     volumes:
       - .:/app
+      - .env:/app/.env  # Monta o .env no container para ser acessado diretamente
     ports:
       - "8000:8000"
+    env_file:
+      - .env  # Carrega as variáveis do .env
     depends_on:
       db:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "nc", "-z", "web", "8000"]
     environment:
-      DJANGO_SUPERUSER_PASSWORD: "admin"
+      DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD}"
 
   worker:
     build: .
     command: celery -A dataminer_api worker --loglevel=info
     volumes:
       - .:/app
+      - .env:/app/.env
+    env_file:
+      - .env  # Carrega as variáveis do .env
     depends_on:
       redis:
         condition: service_healthy
@@ -35,15 +43,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: mining_db
-      POSTGRES_USER: aise-stone
-      POSTGRES_PASSWORD: "#St@n3L@b2@24!"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d mining_db -U aise-stone"]
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 30s
       retries: 3
