@@ -21,8 +21,7 @@ class IssueCollectView(APIView):
             return Response({"error": "All fields are required, including issue_types"}, status=status.HTTP_400_BAD_REQUEST)
         
         # Chama a tarefa Celery para minerar issues
-        #collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
-        collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
+        collect_jira_issues.delay(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date, end_date)
         
         return Response({"status": "Issue collection started"}, status=status.HTTP_202_ACCEPTED)
 
@@ -54,11 +53,9 @@ class IssueTypeCollectView(APIView):
         if not all([jira_domain, jira_email, jira_api_token]):
             return Response({"error": "Missing parameters: jira_domain, jira_email, and jira_api_token are required."}, status=status.HTTP_400_BAD_REQUEST)
         
-        result = collect_issue_types(jira_domain, jira_email, jira_api_token)
-        if "error" in result:
-            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        collect_issue_types(jira_domain, jira_email, jira_api_token)
         
-        return Response(result, status=status.HTTP_200_OK)
+        return Response({"status": "Issue collection started"}, status=status.HTTP_202_ACCEPTED)
 
 class IssueTypeListView(generics.ListAPIView):
     queryset = JiraIssueType.objects.all()
