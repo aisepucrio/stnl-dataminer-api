@@ -1,6 +1,6 @@
 FROM python:3.12.5-slim
 
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git curl
 
 # Definir o diretório de trabalho no contêiner
 WORKDIR /app
