@@ -5,7 +5,6 @@ from requests.auth import HTTPBasicAuth
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 
-# @shared_task
 def collect_issue_types(jira_domain, jira_email, jira_api_token):
     url = f"https://{jira_domain}/rest/api/3/issuetype"
     auth = HTTPBasicAuth(jira_email, jira_api_token)
@@ -110,7 +109,6 @@ def replace_custom_fields_with_names(issue_json, custom_fields_mapping):
     issue_json['fields'] = updated_fields
     return issue_json
 
-#@shared_task(ignore_result=True)
 def collect_jira_issues(jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
     auth = HTTPBasicAuth(jira_email, jira_api_token)
     max_results = 100  # Limite máximo de resultados por requisição
