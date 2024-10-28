@@ -40,18 +40,18 @@ class SequentialAPITest:
             time.sleep(self.interval_seconds)
 
 
-# Example usage
 if __name__ == "__main__":
-    base_url = "http://localhost:8000"  # Replace with your actual Django API base URL
-    interval_seconds = 2  # Time interval in seconds between requests
+    base_url = "http://localhost:8000"  
+    interval_seconds = 2 
 
     repositories = [
         "grafana/grafana",
         "esp8266/Arduino",
         "tensorflow/tensorflow",
     ]
-    start_date = "2024-01-01T00:00:00Z"  # Replace with desired start date or leave as None
-    end_date = "2024-10-01T00:00:00Z"    # Replace with desired end date or leave as None
+    
+    start_date = "2024-01-01T00:00:00Z"  
+    end_date = "2024-10-01T00:00:00Z"    
 
     api_tester = SequentialAPITest(base_url, interval_seconds)
     api_tester.start_sequential_requests(repositories, start_date, end_date)
