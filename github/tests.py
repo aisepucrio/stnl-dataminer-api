@@ -5,7 +5,7 @@ from rest_framework import status
 class GitHubAPITests(APITestCase):
     def setUp(self):
         self.client = APIClient()
-        self.repo_name = "grafana/grafana"
+        self.repo_name = "esp8266/Arduino"
         self.start_date = "2023-07-20T00:00:00Z"
         self.end_date = "2024-08-31T23:59:59Z"
         
