@@ -19,14 +19,14 @@ class JiraApiTests(LiveServerTestCase):
         cls.issuetypes = ["Sub-task", "Story", "Task"]
         cls.start_date = "2024-09-01"
         cls.end_date = "2024-09-18"
-        cls.issue_id = 10500
-        cls.issuetype_id = 10800
+        cls.issue_id = 5000
+        cls.issuetype_id = 5200
 
     def setUp(self):
         # Criar uma issue no banco de dados de testes
         JiraIssue.objects.create(
             issue_id=self.issue_id,
-            key="CSTONE-330",
+            key="CSTONE-520",
             issuetype="Task",
             summary="Fazer alterações na API a partir das observações",
             description="Descrição da tarefa",
@@ -42,7 +42,7 @@ class JiraApiTests(LiveServerTestCase):
         # Criar um tipo de issue no banco de dados de testes
         JiraIssueType.objects.create(
             issuetype_id=self.issuetype_id,
-            name="Sub-task",
+            name="Teste",
             domain=self.jira_domain,
             description="Descrição do tipo de issue"
         )
