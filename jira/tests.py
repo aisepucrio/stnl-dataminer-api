@@ -2,8 +2,8 @@ from django.test import LiveServerTestCase
 from .models import JiraIssue, JiraIssueType
 import requests
 
-# Defina a URL base do servidor Django
-BASE_URL = "http://127.0.0.1:8000/jira"
+# # Defina a URL base do servidor Django
+# BASE_URL = "http://127.0.0.1:8000/jira"
 
 class JiraApiTests(LiveServerTestCase):
 
