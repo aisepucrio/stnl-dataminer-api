@@ -8,9 +8,6 @@ from celery import current_app
 
 class TaskStatusView(APIView):
     def get(self, request, task_id):
-        """
-        Consulta o status de uma task usando o ID da task.
-        """
         task_result = AsyncResult(task_id, app=current_app)
         
         if task_result.state in ["PENDING", "STARTED", "SUCCESS", "FAILURE", "RETRY", "REVOKED"]:
@@ -26,9 +23,6 @@ class TaskStatusView(APIView):
 
 class TaskCancelView(APIView):
     def delete(self, request, task_id):
-        """
-        Cancela uma task usando o ID da task, se ela estiver em andamento.
-        """
         task_result = AsyncResult(task_id, app=current_app)
 
         if task_result.state in ["PENDING", "STARTED"]:
