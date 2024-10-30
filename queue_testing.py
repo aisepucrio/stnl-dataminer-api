@@ -45,13 +45,12 @@ if __name__ == "__main__":
     interval_seconds = 2 
 
     repositories = [
-        "grafana/grafana",
+        "grafana/github-datasource",
         "esp8266/Arduino",
-        "tensorflow/tensorflow",
     ]
     
-    start_date = "2024-01-01T00:00:00Z"  
-    end_date = "2024-10-01T00:00:00Z"    
+    start_date = "2023-01-01T00:00:00Z"  
+    end_date = "2023-12-29T00:00:00Z"    
 
     api_tester = SequentialAPITest(base_url, interval_seconds)
     api_tester.start_sequential_requests(repositories, start_date, end_date)
