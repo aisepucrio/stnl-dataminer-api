@@ -11,4 +11,5 @@ urlpatterns = [
     path('jira/', include('jira.urls')),
     path('jobs/', include('jobs.urls')),
     path('', home),  # Adiciona uma página inicial para a URL raiz
+    path('api/jobs/', include('jobs.urls')),
 ]
