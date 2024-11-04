@@ -49,7 +49,7 @@ if __name__ == "__main__":
         "esp8266/Arduino",
     ]
     
-    start_date = "2023-01-01T00:00:00Z"  
+    start_date = "2022-11-01T00:00:00Z"  
     end_date = "2023-12-29T00:00:00Z"    
 
     api_tester = SequentialAPITest(base_url, interval_seconds)
