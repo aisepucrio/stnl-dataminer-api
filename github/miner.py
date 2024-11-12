@@ -1,10 +1,11 @@
 import os
 import requests
+import json
+from dotenv import load_dotenv
 from git import Repo, GitCommandError
 from pydriller import Repository
 from datetime import datetime
-import json
-from dotenv import load_dotenv
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod
 
 class GitHubMiner:
     def __init__(self):
@@ -117,113 +118,114 @@ class GitHubMiner:
                 repo_url = f'https://github.com/{repo_name}'
                 self.clone_repo(repo_url, repo_path)
 
-            # Usando Pydriller para minerar os commits do repositório local
             repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
-
             essential_commits = []
+
             for commit in repo:
+                # Cria ou recupera o autor e o committer
+                author, _ = GitHubAuthor.objects.get_or_create(
+                    name=commit.author.name, email=commit.author.email if commit.author else None)
+                committer, _ = GitHubAuthor.objects.get_or_create(
+                    name=commit.committer.name, email=commit.committer.email if commit.committer else None)
+
+                # Cria o commit no banco de dados
+                db_commit = GitHubCommit.objects.create(
+                    sha=commit.hash,
+                    message=commit.msg,
+                    date=commit.author_date,
+                    author=author,
+                    committer=committer,
+                    insertions=commit.insertions,
+                    deletions=commit.deletions,
+                    files_changed=len(commit.modified_files),
+                    in_main_branch=commit.in_main_branch,
+                    merge=commit.merge,
+                    dmm_unit_size=commit.dmm_unit_size,
+                    dmm_unit_complexity=commit.dmm_unit_complexity,
+                    dmm_unit_interfacing=commit.dmm_unit_interfacing
+                )
+
                 commit_data = {
                     'sha': commit.hash,
                     'message': commit.msg,
                     'date': self.convert_to_iso8601(commit.author_date),
                     'author': {
-                        'name': None,
-                        'email': None
+                        'name': author.name,
+                        'email': author.email
                     },
                     'committer': {
-                        'name': None,
-                        'email': None
+                        'name': committer.name,
+                        'email': committer.email
                     },
                     'lines': {
                         'insertions': commit.insertions,
                         'deletions': commit.deletions,
-                        'files': commit.files
+                        'files': len(commit.modified_files)
                     },
                     'in_main_branch': commit.in_main_branch,
                     'merge': commit.merge,
-                    'dmm_unit_size': None,
-                    'dmm_unit_complexity': None,
-                    'dmm_unit_interfacing': None,
+                    'dmm_unit_size': commit.dmm_unit_size,
+                    'dmm_unit_complexity': commit.dmm_unit_complexity,
+                    'dmm_unit_interfacing': commit.dmm_unit_interfacing,
                     'modified_files': []
                 }
-                
-                # Process author
-                try:
-                    commit_data['author']['name'] = commit.author.name
-                    commit_data['author']['email'] = commit.author.email
-                except Exception as e:
-                    #print(f"Erro ao processar autor do commit {commit.hash}: {e}", flush=True)
-                    pass
-                
-                # Process committer
-                try:
-                    commit_data['committer']['name'] = commit.committer.name
-                    commit_data['committer']['email'] = commit.committer.email
-                except Exception as e:
-                    #print(f"Erro ao processar committer do commit {commit.hash}: {e}", flush=True)
-                    pass
-                
-                # Process DMM metrics
-                try:
-                    commit_data['dmm_unit_size'] = commit.dmm_unit_size
-                    commit_data['dmm_unit_complexity'] = commit.dmm_unit_complexity
-                    commit_data['dmm_unit_interfacing'] = commit.dmm_unit_interfacing
-                except Exception as e:
-                    #print(f"Erro ao processar DMM metrics do commit {commit.hash}: {e}", flush=True)
-                    pass
-                
-                # Process modified files
-                for mod in commit.modified_files:
-                    try:
-                        mod_data = {
-                            'old_path': mod.old_path,
-                            'new_path': mod.new_path,
-                            'filename': mod.filename,
-                            'change_type': mod.change_type.name,
-                            'diff': mod.diff,
-                            'added_lines': mod.added_lines,
-                            'deleted_lines': mod.deleted_lines,
-                            'complexity': mod.complexity,
-                            'methods': []
-                        }
-                        
-                        # Process methods
-                        for method in mod.methods:
-                            try:
-                                method_data = {
-                                    'name': method.name,
-                                    'complexity': method.complexity,
-                                    'max_nesting': None
-                                }
-                                try:
-                                    method_data['max_nesting'] = method.max_nesting
-                                except AttributeError:
-                                    #"Commit {commit.hash}: 'Method' object has no attribute 'max_nesting'", flush=True)
-                                    pass
-                                
-                                mod_data['methods'].append(method_data)
-                            except Exception as e:
-                                #print(f"Erro ao processar método {method.name} do arquivo {mod.filename} no commit {commit.hash}: {e}", flush=True)
-                                pass
 
-                        commit_data['modified_files'].append(mod_data)
-                    except Exception as e:
-                        #print(f"Erro ao processar arquivo modificado {mod.filename} no commit {commit.hash}: {e}", flush=True)
-                        pass
+                # Processar arquivos modificados
+                for mod in commit.modified_files:
+                    db_mod_file = GitHubModifiedFile.objects.create(
+                        commit=db_commit,
+                        old_path=mod.old_path,
+                        new_path=mod.new_path,
+                        filename=mod.filename,
+                        change_type=mod.change_type.name,
+                        diff=mod.diff,
+                        added_lines=mod.added_lines,
+                        deleted_lines=mod.deleted_lines,
+                        complexity=mod.complexity
+                    )
+                    
+                    mod_data = {
+                        'old_path': mod.old_path,
+                        'new_path': mod.new_path,
+                        'filename': mod.filename,
+                        'change_type': mod.change_type.name,
+                        'diff': mod.diff,
+                        'added_lines': mod.added_lines,
+                        'deleted_lines': mod.deleted_lines,
+                        'complexity': mod.complexity,
+                        'methods': []
+                    }
+
+                    # Processar métodos
+                    for method in mod.methods:
+                        db_method = GitHubMethod.objects.create(
+                            modified_file=db_mod_file,
+                            name=method.name,
+                            complexity=method.complexity,
+                            max_nesting=getattr(method, 'max_nesting', None)
+                        )
+
+                        method_data = {
+                            'name': method.name,
+                            'complexity': method.complexity,
+                            'max_nesting': getattr(method, 'max_nesting', None)
+                        }
+                        mod_data['methods'].append(method_data)
+
+                    commit_data['modified_files'].append(mod_data)
 
                 essential_commits.append(commit_data)
 
-            # Salva os commits no arquivo JSON no diretório raiz do projeto
+            # Salva os dados JSON
             self.save_to_json(essential_commits, f"{repo_name.replace('/', '_')}_commits.json")
-
+            
+            print("Commits detalhados salvos no banco de dados e no JSON com sucesso.", flush=True)
             return essential_commits
 
         except Exception as e:
-            #print(f"Erro ao acessar o repositório: {e}", flush=True)
-            pass
+            print(f"Erro ao acessar o repositório: {e}", flush=True)
             return []
         finally:
-            # Sempre exibe as requisições restantes
             self.print_remaining_requests()
 
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
@@ -240,6 +242,19 @@ class GitHubMiner:
             response.raise_for_status()
             issues = response.json()
             self.save_to_json(issues, f"{repo_name.replace('/', '_')}_issues.json")
+
+            for issue in issues:
+                GitHubIssue.objects.create(
+                    issue_id=issue['id'],
+                    title=issue['title'],   
+                    state=issue['state'],
+                    creator=issue['user']['login'],
+                    created_at=issue['created_at'],
+                    updated_at=issue['updated_at'],
+                    comments=issue['comments']
+                )
+            print("Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
+
             return issues
         except requests.exceptions.RequestException as e:
             print(f"Erro ao acessar issues: {e}", flush=True)
@@ -262,6 +277,21 @@ class GitHubMiner:
             response.raise_for_status()
             pull_requests = response.json()
             self.save_to_json(pull_requests, f"{repo_name.replace('/', '_')}_pull_requests.json")
+
+            for pr in pull_requests:
+                GitHubPullRequest.objects.create(
+                    pr_id=pr['id'],
+                    title=pr['title'],
+                    state=pr['state'],
+                    creator=pr['user']['login'],
+                    created_at=pr['created_at'],
+                    updated_at=pr['updated_at'],
+                    labels=[label['name'] for label in pr['labels']],
+                    commits=[],  # Adapte conforme necessário
+                    comments=[]
+                )
+            print("Pull requests salvas no banco de dados e no JSON com sucesso.", flush=True)
+
             return pull_requests
         except requests.exceptions.RequestException as e:
             print(f"Erro ao acessar pull requests: {e}", flush=True)
@@ -279,6 +309,13 @@ class GitHubMiner:
             response.raise_for_status()
             branches = response.json()
             self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
+
+            for branch in branches:
+                GitHubBranch.objects.create(
+                    name=branch['name'],
+                    sha=branch['commit']['sha']
+                )
+            print("Branches salvas no banco de dados e no JSON com sucesso.", flush=True)
             return branches
         except requests.exceptions.RequestException as e:
             print(f"Erro ao acessar branches: {e}", flush=True)

@@ -81,7 +81,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'mining_db',
         'USER': 'aise-stone',
-        'PASSWORD': '#St@n3L@b2@24!',
+        'PASSWORD': 'senha',
         'HOST': 'db',
         'PORT': '5432',
     }
