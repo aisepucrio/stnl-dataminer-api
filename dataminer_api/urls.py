@@ -9,5 +9,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('github.urls')),
     path('jira/', include('jira.urls')),
+    path('jobs/', include('jobs.urls')),
     path('', home),  # Adiciona uma página inicial para a URL raiz
 ]

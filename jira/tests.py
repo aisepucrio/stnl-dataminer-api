@@ -141,7 +141,7 @@ class JiraApiTests(LiveServerTestCase):
         time.sleep(2)
 
         # Check the task status
-        status_url = f"{self.live_server_url}/tasks/{task_id}/status/"
+        status_url = f"{self.live_server_url}/jobs/{task_id}/status/"
         status_response = requests.get(status_url)
         print(f"Task status response: {status_response.json()}")
         self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status")
@@ -170,7 +170,7 @@ class JiraApiTests(LiveServerTestCase):
         self.assertIsNotNone(task_id, "No task_id returned in response")
 
         # Attempt to cancel the task
-        cancel_url = f"{self.live_server_url}/tasks/{task_id}/cancel/"
+        cancel_url = f"{self.live_server_url}/jobs/{task_id}/cancel/"
         cancel_response = requests.delete(cancel_url)
         print(f"Task cancel response: {cancel_response.json()}")
         self.assertEqual(cancel_response.status_code, 200, "Failed to cancel task")
