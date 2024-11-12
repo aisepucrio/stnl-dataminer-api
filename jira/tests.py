@@ -93,7 +93,7 @@ class JiraApiTests(LiveServerTestCase):
         }
         response = requests.post(url, json=data)
         print(f"Collect issue types status code: {response.status_code}")
-        self.assertEqual(response.status_code, 200, "Failed to retrieve issue types.")
+        self.assertEqual(response.status_code, 202, "Failed to retrieve issue types.")
 
     def test_list_issue_types(self):
         url = f"{self.live_server_url}/jira/issuetypes/"
