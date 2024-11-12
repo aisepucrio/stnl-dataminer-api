@@ -45,8 +45,7 @@ if __name__ == "__main__":
     interval_seconds = 2 
 
     repositories = [
-        "grafana/github-datasource",
-        "esp8266/Arduino",
+        "esp8266/Arduino"
     ]
     
     start_date = "2022-11-01T00:00:00Z"  
