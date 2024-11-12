@@ -1,6 +1,7 @@
 from django.test import LiveServerTestCase
 from .models import JiraIssue, JiraIssueType
 import requests
+import time
 
 # # Defina a URL base do servidor Django
 # BASE_URL = "http://127.0.0.1:8000/jira"
@@ -116,3 +117,65 @@ class JiraApiTests(LiveServerTestCase):
         response = requests.delete(url)
         print(f"Delete issue type status code: {response.status_code}")
         self.assertEqual(response.status_code, 204, f"Failed to delete issue type {self.issuetype_id}")
+
+    def test_task_status(self):
+        # Start a task
+        url = f"{self.live_server_url}/jira/issues/collect/"
+        data = {
+            "jira_domain": self.jira_domain,
+            "project_key": self.project_key,
+            "jira_email": self.jira_email,
+            "jira_api_token": self.jira_api_token,
+            "issuetypes": self.issuetypes,
+            "start_date": self.start_date,
+            "end_date": self.end_date
+        }
+        response = requests.post(url, json=data)
+        self.assertEqual(response.status_code, 202, "Failed to start issue collection task")
+
+        # Extract the task ID from the response
+        task_id = response.json().get("task_id")
+        self.assertIsNotNone(task_id, "No task_id returned in response")
+
+        # Wait a bit to give the task time to start
+        time.sleep(2)
+
+        # Check the task status
+        status_url = f"{self.live_server_url}/tasks/{task_id}/status/"
+        status_response = requests.get(status_url)
+        print(f"Task status response: {status_response.json()}")
+        self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status")
+
+        # Optionally, check that status is one of the expected states
+        task_status = status_response.json().get("status")
+        self.assertIn(task_status, ["PENDING", "STARTED", "SUCCESS", "FAILURE"])
+
+    def test_task_cancel(self):
+        # Start a task
+        url = f"{self.live_server_url}/jira/issues/collect/"
+        data = {
+            "jira_domain": self.jira_domain,
+            "project_key": self.project_key,
+            "jira_email": self.jira_email,
+            "jira_api_token": self.jira_api_token,
+            "issuetypes": self.issuetypes,
+            "start_date": self.start_date,
+            "end_date": self.end_date
+        }
+        response = requests.post(url, json=data)
+        self.assertEqual(response.status_code, 202, "Failed to start issue collection task")
+
+        # Extract the task ID from the response
+        task_id = response.json().get("task_id")
+        self.assertIsNotNone(task_id, "No task_id returned in response")
+
+        # Attempt to cancel the task
+        cancel_url = f"{self.live_server_url}/tasks/{task_id}/cancel/"
+        cancel_response = requests.delete(cancel_url)
+        print(f"Task cancel response: {cancel_response.json()}")
+        self.assertEqual(cancel_response.status_code, 200, "Failed to cancel task")
+
+        # Verify task is marked as canceled
+        status_url = f"{self.live_server_url}/tasks/{task_id}/status/"
+        status_response = requests.get(status_url)
+        self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status after canceling")
