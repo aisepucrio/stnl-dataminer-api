@@ -176,6 +176,6 @@ class JiraApiTests(LiveServerTestCase):
         self.assertEqual(cancel_response.status_code, 200, "Failed to cancel task")
 
         # Verify task is marked as canceled
-        status_url = f"{self.live_server_url}/tasks/{task_id}/status/"
+        status_url = f"{self.live_server_url}/jobs/{task_id}/status/"
         status_response = requests.get(status_url)
         self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status after canceling")
