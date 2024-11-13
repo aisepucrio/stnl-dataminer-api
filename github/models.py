@@ -2,12 +2,11 @@ from django.db import models
 
 # Modelo para representar autores e committer dos commits
 class GitHubAuthor(models.Model):
-    name = models.CharField(max_length=100, null=True)
-    email = models.EmailField(null=True)
+    name = models.CharField(max_length=255)
+    email = models.EmailField(unique=True)
 
     def __str__(self):
-        return f"{self.name} ({self.email})"
-
+        return f"{self.name} <{self.email}>"
 
 # Modelo principal para representar um commit do GitHub
 class GitHubCommit(models.Model):
@@ -16,9 +15,9 @@ class GitHubCommit(models.Model):
     date = models.DateTimeField()
     author = models.ForeignKey(GitHubAuthor, related_name="author_commits", on_delete=models.SET_NULL, null=True)
     committer = models.ForeignKey(GitHubAuthor, related_name="committer_commits", on_delete=models.SET_NULL, null=True)
-    insertions = models.IntegerField()
+    insertions = models.IntegerField(default=0)  # Adicionado valor padrão
     deletions = models.IntegerField(default=0)
-    files_changed = models.IntegerField()
+    files_changed = models.IntegerField(default=0)
     in_main_branch = models.BooleanField(default=False)
     merge = models.BooleanField(default=False)
     dmm_unit_size = models.FloatField(null=True)
@@ -28,7 +27,6 @@ class GitHubCommit(models.Model):
     def __str__(self):
         return f"Commit {self.sha}"
 
-
 # Modelo para representar um arquivo modificado em um commit específico
 class GitHubModifiedFile(models.Model):
     commit = models.ForeignKey(GitHubCommit, related_name="modified_files", on_delete=models.CASCADE)
@@ -36,7 +34,7 @@ class GitHubModifiedFile(models.Model):
     new_path = models.TextField(null=True)
     filename = models.TextField()
     change_type = models.CharField(max_length=20)
-    diff = models.TextField(null=True)
+    diff = models.TextField(null=True)  
     added_lines = models.IntegerField()
     deleted_lines = models.IntegerField()
     complexity = models.IntegerField(null=True)
