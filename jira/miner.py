@@ -9,7 +9,8 @@ from urllib.parse import quote
 class JiraMiner:
     def __init__(self, jira_domain, jira_email, jira_api_token):
         self.jira_domain = jira_domain
-        self.auth = HTTPBasicAuth(jira_email, jira_api_token)
+        self.jira_email = jira_email
+        self.jira_api_token = jira_api_token
         self.headers = {"Accept": "application/json"}
 
     def collect_issue_types(self):
@@ -46,7 +47,7 @@ class JiraMiner:
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         max_results, start_at, total_collected = 100, 0, 0
-        custom_fields_mapping = self.get_custom_fields_mapping()
+        custom_fields_mapping = self.get_custom_fields_mapping(self.jira_domain, self.jira_email, self.jira_api_token)
         jql_query = f'project="{project_key}"'
         
         if issuetypes:
