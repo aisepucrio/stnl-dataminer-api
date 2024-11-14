@@ -17,7 +17,7 @@ class GitHubMiner:
 
     def load_tokens(self):
         """Carrega tokens do GitHub a partir de um arquivo .env ou variável de ambiente"""
-        load_dotenv()  # Carrega variáveis de ambiente do arquivo .env
+        load_dotenv()
         tokens_str = os.getenv("GITHUB_TOKENS")
         if tokens_str:
             self.tokens = tokens_str.split(",")
@@ -128,23 +128,26 @@ class GitHubMiner:
                 committer, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.committer.name, email=commit.committer.email if commit.committer else None)
 
-                # Cria o commit no banco de dados
-                db_commit = GitHubCommit.objects.create(
+                # Cria ou atualiza o commit no banco de dados
+                db_commit, created = GitHubCommit.objects.update_or_create(
                     sha=commit.hash,
-                    message=commit.msg,
-                    date=commit.author_date,
-                    author=author,
-                    committer=committer,
-                    insertions=commit.insertions,
-                    deletions=commit.deletions,
-                    files_changed=len(commit.modified_files),
-                    in_main_branch=commit.in_main_branch,
-                    merge=commit.merge,
-                    dmm_unit_size=commit.dmm_unit_size,
-                    dmm_unit_complexity=commit.dmm_unit_complexity,
-                    dmm_unit_interfacing=commit.dmm_unit_interfacing
+                    defaults={
+                        'message': commit.msg,
+                        'date': commit.author_date,
+                        'author': author,
+                        'committer': committer,
+                        'insertions': commit.insertions,
+                        'deletions': commit.deletions,
+                        'files_changed': len(commit.modified_files),
+                        'in_main_branch': commit.in_main_branch,
+                        'merge': commit.merge,
+                        'dmm_unit_size': commit.dmm_unit_size,
+                        'dmm_unit_complexity': commit.dmm_unit_complexity,
+                        'dmm_unit_interfacing': commit.dmm_unit_interfacing
+                    }
                 )
 
+                # Prepara dados para JSON
                 commit_data = {
                     'sha': commit.hash,
                     'message': commit.msg,
@@ -170,20 +173,23 @@ class GitHubMiner:
                     'modified_files': []
                 }
 
-                # Processar arquivos modificados
+                # Processa arquivos modificados, evita duplicados
                 for mod in commit.modified_files:
-                    db_mod_file = GitHubModifiedFile.objects.create(
+                    db_mod_file, _ = GitHubModifiedFile.objects.update_or_create(
                         commit=db_commit,
-                        old_path=mod.old_path,
-                        new_path=mod.new_path,
                         filename=mod.filename,
-                        change_type=mod.change_type.name,
-                        diff=mod.diff,
-                        added_lines=mod.added_lines,
-                        deleted_lines=mod.deleted_lines,
-                        complexity=mod.complexity
+                        defaults={
+                            'old_path': mod.old_path,
+                            'new_path': mod.new_path,
+                            'change_type': mod.change_type.name,
+                            'diff': mod.diff,
+                            'added_lines': mod.added_lines,
+                            'deleted_lines': mod.deleted_lines,
+                            'complexity': mod.complexity
+                        }
                     )
                     
+                    # Adiciona dados do arquivo modificado ao JSON
                     mod_data = {
                         'old_path': mod.old_path,
                         'new_path': mod.new_path,
@@ -196,13 +202,15 @@ class GitHubMiner:
                         'methods': []
                     }
 
-                    # Processar métodos
+                    # Processa métodos, evita duplicados
                     for method in mod.methods:
-                        db_method = GitHubMethod.objects.create(
+                        GitHubMethod.objects.update_or_create(
                             modified_file=db_mod_file,
                             name=method.name,
-                            complexity=method.complexity,
-                            max_nesting=getattr(method, 'max_nesting', None)
+                            defaults={
+                                'complexity': method.complexity,
+                                'max_nesting': getattr(method, 'max_nesting', None)
+                            }
                         )
 
                         method_data = {
@@ -218,7 +226,6 @@ class GitHubMiner:
 
             # Salva os dados JSON
             self.save_to_json(essential_commits, f"{repo_name.replace('/', '_')}_commits.json")
-            
             print("Commits detalhados salvos no banco de dados e no JSON com sucesso.", flush=True)
             return essential_commits
 
@@ -244,14 +251,16 @@ class GitHubMiner:
             self.save_to_json(issues, f"{repo_name.replace('/', '_')}_issues.json")
 
             for issue in issues:
-                GitHubIssue.objects.create(
+                GitHubIssue.objects.update_or_create(
                     issue_id=issue['id'],
-                    title=issue['title'],   
-                    state=issue['state'],
-                    creator=issue['user']['login'],
-                    created_at=issue['created_at'],
-                    updated_at=issue['updated_at'],
-                    comments=issue['comments']
+                    defaults={
+                        'title': issue['title'],
+                        'state': issue['state'],
+                        'creator': issue['user']['login'],
+                        'created_at': issue['created_at'],
+                        'updated_at': issue['updated_at'],
+                        'comments': issue['comments']
+                    }
                 )
             print("Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
 
@@ -279,16 +288,18 @@ class GitHubMiner:
             self.save_to_json(pull_requests, f"{repo_name.replace('/', '_')}_pull_requests.json")
 
             for pr in pull_requests:
-                GitHubPullRequest.objects.create(
+                GitHubPullRequest.objects.update_or_create(
                     pr_id=pr['id'],
-                    title=pr['title'],
-                    state=pr['state'],
-                    creator=pr['user']['login'],
-                    created_at=pr['created_at'],
-                    updated_at=pr['updated_at'],
-                    labels=[label['name'] for label in pr['labels']],
-                    commits=[],  # Adapte conforme necessário
-                    comments=[]
+                    defaults={
+                        'title': pr['title'],
+                        'state': pr['state'],
+                        'creator': pr['user']['login'],
+                        'created_at': pr['created_at'],
+                        'updated_at': pr['updated_at'],
+                        'labels': [label['name'] for label in pr['labels']],
+                        'commits': [],
+                        'comments': []
+                    }
                 )
             print("Pull requests salvas no banco de dados e no JSON com sucesso.", flush=True)
 
@@ -311,9 +322,9 @@ class GitHubMiner:
             self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
 
             for branch in branches:
-                GitHubBranch.objects.create(
+                GitHubBranch.objects.update_or_create(
                     name=branch['name'],
-                    sha=branch['commit']['sha']
+                    defaults={'sha': branch['commit']['sha']}
                 )
             print("Branches salvas no banco de dados e no JSON com sucesso.", flush=True)
             return branches
