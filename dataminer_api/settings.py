@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'github',
     'jira',
-    'features'
 ]
 
 MIDDLEWARE = [
