@@ -3,7 +3,7 @@ import requests
 BASE_URL = "http://localhost:8000/api/jobs"
 
 task_ids = [
-    "7afbe8ab-bb1f-490c-8afa-6740050b9e90"
+    "1f91927a-bb18-4aa2-a979-93043091c97a"
 ]
 
 def check_task_status(task_id):
