@@ -10,12 +10,15 @@ class GitHubCommitViewSet(viewsets.ViewSet):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
 
-        # Inicia a tarefa e aguarda o resultado
+        # Inicia a tarefa e obtém o ID da tarefa
         task = fetch_commits.apply_async(args=[repo_name, start_date, end_date])
         result = AsyncResult(task.id)
         data = result.get()  # Aguarda o término da tarefa para obter os dados minerados
 
-        return Response(data, status=status.HTTP_200_OK)
+        return Response({
+            "task_id": task.id,
+            "data": data
+        }, status=status.HTTP_200_OK)
 
 class GitHubIssueViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -27,7 +30,10 @@ class GitHubIssueViewSet(viewsets.ViewSet):
         result = AsyncResult(task.id)
         data = result.get()
 
-        return Response(data, status=status.HTTP_200_OK)
+        return Response({
+            "task_id": task.id,
+            "data": data
+        }, status=status.HTTP_200_OK)
 
 class GitHubPullRequestViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -39,7 +45,10 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
         result = AsyncResult(task.id)
         data = result.get()
 
-        return Response(data, status=status.HTTP_200_OK)
+        return Response({
+            "task_id": task.id,
+            "data": data
+        }, status=status.HTTP_200_OK)
 
 class GitHubBranchViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -49,4 +58,7 @@ class GitHubBranchViewSet(viewsets.ViewSet):
         result = AsyncResult(task.id)
         data = result.get()
 
-        return Response(data, status=status.HTTP_200_OK)
+        return Response({
+            "task_id": task.id,
+            "data": data
+        }, status=status.HTTP_200_OK)
