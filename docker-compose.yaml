@@ -1,15 +1,15 @@
-version: '3.8'
+version: "3.8"
 
 services:
   web:
     build: .
     volumes:
       - .:/app
-      - .env:/app/.env  # Monta o .env no container para ser acessado diretamente
+      - .env:/app/.env # Monta o .env no container para ser acessado diretamente
     ports:
       - "8000:8000"
     env_file:
-      - .env  # Carrega as variáveis do .env
+      - .env # Carrega as variáveis do .env
     depends_on:
       db:
         condition: service_healthy
@@ -28,7 +28,7 @@ services:
       - .:/app
       - .env:/app/.env
     env_file:
-      - .env  
+      - .env
     depends_on:
       redis:
         condition: service_healthy
@@ -50,7 +50,7 @@ services:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     healthcheck:
