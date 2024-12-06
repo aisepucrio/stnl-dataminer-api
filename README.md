@@ -51,7 +51,7 @@ Antes de começar, você precisará instalar:
 
 ## Utilizando a API
 
-A API oferece diversos endpoints para mineração de dados. Aqui estão alguns exemplos:
+A API oferece diversos endpoints para mineração de dados. Os exemplos abaixo utilizam o repositório esp8266/Arduino como demonstração, mas você pode substituir por qualquer repositório público do GitHub alterando o parâmetro `repo_name`. Da mesma forma, o intervalo de datas (`start_date` e `end_date`) pode ser ajustado conforme sua necessidade.
 
 ### 1. Mineração de Commits
 ```
@@ -72,6 +72,39 @@ GET http://localhost:8000/api/github/pull-requests/?repo_name=esp8266/Arduino&st
 ```
 GET http://localhost:8000/api/github/branches/?repo_name=esp8266/Arduino
 ```
+
+## Armazenamento dos Dados
+
+Após a conclusão da mineração, os dados são:
+
+1. **Salvos no PostgreSQL**: Você pode acessar os dados localmente usando as mesmas credenciais configuradas no arquivo `.env`. Por exemplo:
+   ```bash
+   psql -h localhost -U seu_usuario -d nome_do_banco
+   ```
+
+2. **Retornados como JSON**: Uma resposta JSON é fornecida imediatamente após a mineração para visualização dos dados coletados.
+
+## Configuração do Token GitHub
+
+### Como Gerar um Token GitHub:
+
+1. Acesse [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens)
+2. Clique em "Generate new token (classic)"
+3. Selecione os seguintes escopos:
+   - `repo` (acesso completo aos repositórios)
+   - `read:org` (leitura de dados da organização)
+   - `read:user` (leitura de dados do usuário)
+4. Gere o token e copie-o imediatamente
+
+### Configurando Múltiplos Tokens:
+
+Para evitar limitações de taxa da API do GitHub, você pode configurar múltiplos tokens. No arquivo `.env`, adicione-os separados por vírgulas:
+
+```
+GITHUB_TOKENS='token1,token2,token3'
+```
+
+A API automaticamente alternará entre os tokens quando um deles atingir o limite de requisições.
 
 ## Testando a API
 
