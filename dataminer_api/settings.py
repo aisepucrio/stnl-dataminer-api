@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,10 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-4#0!#$y$nhi83cpx_+z+-0r=b@li^csxtj=7adx!js5_#d18bt'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'github',
     'jira',
-    'features'
 ]
 
 MIDDLEWARE = [
@@ -80,17 +79,13 @@ WSGI_APPLICATION = 'dataminer_api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'aise-stone',
-        'USER': 'aise-stone',
-        'PASSWORD': '#St@n3L@b2@24!',
-        'HOST': 'opus.servehttp.com',
-        'PORT': '54321',
-        'OPTIONS': {
-            'options': '-c search_path=aisepucrio_stnl_django,aisepucrio_stnl_featuresmining,aisepucrio_stnl_jiramining,aisepucrio_stnl_ghmining'
-        },
-    }
+        'NAME': os.getenv('POSTGRES_DB'),
+        'USER': os.getenv('POSTGRES_USER'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'HOST': os.getenv('POSTGRES_HOST'),
+        'PORT': os.getenv('POSTGRES_PORT'),
+    },
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -139,3 +134,6 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+CELERY_RESULT_EXPIRES = 3600
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_TRACK_STARTED = True

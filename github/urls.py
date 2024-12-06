@@ -4,10 +4,10 @@ from .views import GitHubCommitViewSet, GitHubIssueViewSet, GitHubPullRequestVie
 
 router = DefaultRouter()
 router.register(r'commits', GitHubCommitViewSet, basename='commit')
-router.register(r'issues', GitHubIssueViewSet, basename='issue')
+router.register(r'issues', GitHubIssueViewSet, basename='github-issue')
 router.register(r'pull-requests', GitHubPullRequestViewSet, basename='pullrequest')
 router.register(r'branches', GitHubBranchViewSet, basename='branch')
 
 urlpatterns = [
-    path('github/', include(router.urls)),
+    path('github/', include(router.urls))
 ]
