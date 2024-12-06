@@ -1,4 +1,4 @@
-# API de Mineração de Dados de Desenvolvimento
+# Diggit
 
 ## Descrição
 
