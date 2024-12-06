@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Esperar pelo banco de dados
 echo "Waiting for database to be ready..."
 until nc -z db 5432; do
