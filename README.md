@@ -1,105 +1,90 @@
-
-# API de Mineração de Features
+# API de Mineração de Dados de Desenvolvimento
 
 ## Descrição
 
-Esta é uma API desenvolvida em Django para realizar a mineração de features em repositórios de código local. A API suporta a mineração de commits, documentação e código, e utiliza um subprocesso para executar um código Rust que realiza a mineração propriamente dita. Os resultados da mineração são armazenados em um banco de dados PostgreSQL.
+Esta é uma API desenvolvida em Django para realizar mineração e análise de dados de desenvolvimento de software, permitindo extrair informações valiosas de repositórios GitHub e Jira. A ferramenta possibilita o acompanhamento detalhado do ciclo de vida de projetos, incluindo análise de commits, pull requests, issues e branches, fornecendo insights importantes sobre o processo de desenvolvimento.
 
 ## Funcionalidades
 
-1. Mineração de Commits, Documentação e Código: Escolha quais aspectos do repositório deseja minerar.
-2. Integração com Rust: A mineração de features é realizada por um código Rust executado via subprocesso.
-3. Persistência de Dados: Os resultados da mineração são armazenados em um banco de dados PostgreSQL.
-4. API Modular e Documentada: Todos os endpoints são documentados usando DRF Spectacular.
+1. **Mineração do GitHub**: Extração de dados de commits, pull requests, issues e branches
+2. **Integração com Jira**: Coleta de dados de tickets e sprints
+3. **Análise Temporal**: Acompanhamento da evolução do projeto ao longo do tempo
+4. **API Documentada**: Endpoints documentados usando DRF Spectacular
 
 ## Requisitos
 
-- Python 3.10+
-- Django 4.x
-- PostgreSQL 12+
-- Rust (para compilar o minerador de features)
-- Git
+Antes de começar, você precisará instalar:
 
-## Instalação
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- [PostgreSQL](https://www.postgresql.org/download/)
+- [Git](https://git-scm.com/downloads)
 
-1. Clonar o Repositório
+## Instalação e Configuração
 
-    ```bash
-    git clone https://github.com/seu_usuario/dataminer-api.git
-    cd dataminer-api
-    ```
+1. **Clone o Repositório**
+   ```bash
+   git clone https://github.com/seu_usuario/dataminer-api.git
+   cd dataminer-api
+   ```
 
-2. Criar e Ativar o Ambiente Virtual
+2. **Configure o Arquivo .env**
+   
+   Crie um arquivo `.env` na raiz do projeto com as seguintes informações:
+   ```
+   GITHUB_TOKENS=seu_token_github
+   POSTGRES_DB=nome_do_banco
+   POSTGRES_USER=usuario_postgres
+   POSTGRES_PASSWORD=senha_postgres
+   POSTGRES_HOST=postgres
+   POSTGRES_PORT=5432
+   ```
 
-    ```bash
-    python -m venv venv-api
-    source venv-api/bin/activate  # No Windows: venv-api\Scripts\activate
-    ```
+3. **Verifique o Formato do Arquivo start.sh**
+   
+   Abra o arquivo `start.sh` em sua IDE e confirme que o formato de linha está como LF (isso geralmente é visível no canto inferior direito da IDE). Se estiver como CRLF, altere para LF.
 
-3. Instalar as Dependências
+4. **Inicie os Containers**
+   ```bash
+   docker-compose up --build
+   ```
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+## Utilizando a API
 
-4. Configurar o Banco de Dados
+A API oferece diversos endpoints para mineração de dados. Aqui estão alguns exemplos:
 
-    Edite o arquivo settings.py na seção DATABASES para incluir as credenciais do seu banco de dados PostgreSQL:
+### 1. Mineração de Commits
+```
+GET http://localhost:8000/api/github/commits/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
+```
 
-    ```python
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'mining_db',
-            'USER': 'seu_usuario',
-            'PASSWORD': 'sua_senha',
-            'HOST': 'localhost',
-            'PORT': '5432',
-        }
-    }
-    ```
+### 2. Mineração de Issues
+```
+GET http://localhost:8000/api/github/issues/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
+```
 
-5. Aplicar as Migrações
+### 3. Mineração de Pull Requests
+```
+GET http://localhost:8000/api/github/pull-requests/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
+```
 
-    ```bash
-    python manage.py makemigrations
-    python manage.py migrate
-    ```
+### 4. Mineração de Branches
+```
+GET http://localhost:8000/api/github/branches/?repo_name=esp8266/Arduino
+```
 
-6. Compilar o Código Rust
+## Testando a API
 
-    Certifique-se de que o Rust está instalado e depois compile o código de mineração:
+Para fazer um teste rápido da API, você pode utilizar o script `user_test.py` fornecido no repositório:
 
-    ```bash
-    cd caminho/para/o/projeto/rust
-    cargo build --release
-    ```
+```bash
+python user_test.py
+```
 
-    O binário resultante deve ser movido para o diretório do projeto Django ou acessível via PATH.
+Este script realizará uma série de requisições de teste para verificar o funcionamento da mineração de dados.
 
-7. Rodar o Servidor Django
+## Observações Importantes
 
-    ```bash
-    python manage.py runserver
-    ```
-
-## Passo a Passo Adicional para Integração com Docker
-
-Para a integração da biblioteca Rust no Docker, siga os passos abaixo:
-
-1. Acesse a pasta `features/features_mining_rust` e execute o seguinte comando para gerar o arquivo `.whl` da biblioteca:
-
-    ```bash
-    maturin build --release
-    ```
-
-    Esse comando criará um arquivo `.whl` compatível para instalação via pip.
-
-2. Inclua o arquivo `.whl` no processo de build do Docker. No `Dockerfile`, adicione as seguintes linhas para copiar e instalar o arquivo:
-
-    ```Dockerfile
-    COPY features/features_mining_rust/target/wheels/features_mining_rust-0.1.0-cp312-cp312-manylinux_2_34_x86_64.whl .
-    RUN pip install features_mining_rust-0.1.0-cp312-cp312-manylinux_2_34_x86_64.whl
-    ```
-
-3. **Observação Importante:** O arquivo `.whl` deve ser gerado em um ambiente Unix, pois o Docker também opera nesse tipo de ambiente. Caso o arquivo seja gerado em um sistema como o Windows, poderão ocorrer incompatibilidades que impedem o funcionamento adequado da biblioteca.
+- Certifique-se de que seu token do GitHub possui as permissões necessárias para acessar os repositórios desejados
+- O PostgreSQL deve estar rodando na porta padrão 5432
+- Todos os timestamps devem estar no formato ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)
