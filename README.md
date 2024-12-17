@@ -44,7 +44,11 @@ Before getting started, ensure you have the following installed:
 
    Open the `start.sh` file in your IDE and confirm that the line format is set to LF (this is usually visible at the bottom-right corner of the IDE). If it shows CRLF, change it to LF.
 
-4. **Start the Containers**
+4. **Check for Existing Database or Server Conflicts**
+
+   Ensure that no other database or server is already running on port 5432, as this will prevent the new database from being created and saving data correctly. Stop any conflicting processes before proceeding.
+
+5. **Start the Containers**
    ```bash
    docker-compose up --build
    ```
