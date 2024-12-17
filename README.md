@@ -1,123 +1,123 @@
 # Diggit
 
-## Descrição
+## Description
 
-Esta é uma API desenvolvida em Django para realizar mineração e análise de dados de desenvolvimento de software, permitindo extrair informações valiosas de repositórios GitHub e Jira. A ferramenta possibilita o acompanhamento detalhado do ciclo de vida de projetos, incluindo análise de commits, pull requests, issues e branches, fornecendo insights importantes sobre o processo de desenvolvimento.
+This is a Django-based API designed for mining and analyzing software development data, enabling the extraction of valuable insights from GitHub and Jira repositories. The tool provides detailed tracking of the project lifecycle, including commit analysis, pull requests, issues, and branches, offering critical insights into the development process.
 
-## Funcionalidades
+## Features
 
-1. **Mineração do GitHub**: Extração de dados de commits, pull requests, issues e branches
-2. **Integração com Jira**: Coleta de dados de tickets e sprints
-3. **Análise Temporal**: Acompanhamento da evolução do projeto ao longo do tempo
-4. **API Documentada**: Endpoints documentados usando DRF Spectacular
+1. **GitHub Mining**: Extract data from commits, pull requests, issues, and branches.
+2. **Jira Integration**: Collect ticket and sprint data.
+3. **Temporal Analysis**: Monitor project evolution over time.
+4. **Documented API**: Endpoints documented using DRF Spectacular.
 
-## Requisitos
+## Requirements
 
-Antes de começar, você precisará instalar:
+Before getting started, ensure you have the following installed:
 
 - [Docker](https://docs.docker.com/get-docker/)
 - [Docker Compose](https://docs.docker.com/compose/install/)
 - [PostgreSQL](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 
-## Instalação e Configuração
+## Installation and Configuration
 
-1. **Clone o Repositório**
+1. **Clone the Repository**
    ```bash
-   git clone https://github.com/seu_usuario/dataminer-api.git
+   git clone https://github.com/your_user/dataminer-api.git
    cd dataminer-api
    ```
 
-2. **Configure o Arquivo .env**
-   
-   Crie um arquivo `.env` na raiz do projeto com as seguintes informações:
+2. **Configure the .env File**
+
+   Create a `.env` file at the root of the project with the following information:
    ```
-   GITHUB_TOKENS=seu_token_github
-   POSTGRES_DB=nome_do_banco
-   POSTGRES_USER=usuario_postgres
-   POSTGRES_PASSWORD=senha_postgres
+   GITHUB_TOKENS=your_github_token
+   POSTGRES_DB=database_name
+   POSTGRES_USER=postgres_user
+   POSTGRES_PASSWORD=postgres_password
    POSTGRES_HOST=postgres
    POSTGRES_PORT=5432
    ```
 
-3. **Verifique o Formato do Arquivo start.sh**
-   
-   Abra o arquivo `start.sh` em sua IDE e confirme que o formato de linha está como LF (isso geralmente é visível no canto inferior direito da IDE). Se estiver como CRLF, altere para LF.
+3. **Verify the Line Format of `start.sh`**
 
-4. **Inicie os Containers**
+   Open the `start.sh` file in your IDE and confirm that the line format is set to LF (this is usually visible at the bottom-right corner of the IDE). If it shows CRLF, change it to LF.
+
+4. **Start the Containers**
    ```bash
    docker-compose up --build
    ```
 
-## Utilizando a API
+## Using the API
 
-A API oferece diversos endpoints para mineração de dados. Os exemplos abaixo utilizam o repositório esp8266/Arduino como demonstração, mas você pode substituir por qualquer repositório público do GitHub alterando o parâmetro `repo_name`. Da mesma forma, o intervalo de datas (`start_date` e `end_date`) pode ser ajustado conforme sua necessidade.
+The API provides various endpoints for data mining. The examples below use the `esp8266/Arduino` repository as a demonstration, but you can replace it with any public GitHub repository by adjusting the `repo_name` parameter. Similarly, the date range (`start_date` and `end_date`) can be adjusted as needed.
 
-### 1. Mineração de Commits
+### 1. Commit Mining
 ```
 GET http://localhost:8000/api/github/commits/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
 ```
 
-### 2. Mineração de Issues
+### 2. Issue Mining
 ```
 GET http://localhost:8000/api/github/issues/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
 ```
 
-### 3. Mineração de Pull Requests
+### 3. Pull Request Mining
 ```
 GET http://localhost:8000/api/github/pull-requests/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
 ```
 
-### 4. Mineração de Branches
+### 4. Branch Mining
 ```
 GET http://localhost:8000/api/github/branches/?repo_name=esp8266/Arduino
 ```
 
-## Armazenamento dos Dados
+## Data Storage
 
-Após a conclusão da mineração, os dados são:
+After mining is complete, the data is:
 
-1. **Salvos no PostgreSQL**: Você pode acessar os dados localmente usando as mesmas credenciais configuradas no arquivo `.env`. Por exemplo:
+1. **Stored in PostgreSQL**: You can access the data locally using the same credentials configured in the `.env` file. For example:
    ```bash
-   psql -h localhost -U seu_usuario -d nome_do_banco
+   psql -h localhost -U your_user -d database_name
    ```
 
-2. **Retornados como JSON**: Uma resposta JSON é fornecida imediatamente após a mineração para visualização dos dados coletados.
+2. **Returned as JSON**: A JSON response is immediately provided for viewing the collected data.
 
-## Configuração do Token GitHub
+## GitHub Token Configuration
 
-### Como Gerar um Token GitHub:
+### How to Generate a GitHub Token:
 
-1. Acesse [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens)
-2. Clique em "Generate new token (classic)"
-3. Selecione os seguintes escopos:
-   - `repo` (acesso completo aos repositórios)
-   - `read:org` (leitura de dados da organização)
-   - `read:user` (leitura de dados do usuário)
-4. Gere o token e copie-o imediatamente
+1. Go to [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens).
+2. Click on "Generate new token (classic)".
+3. Select the following scopes:
+   - `repo` (full access to repositories)
+   - `read:org` (read organization data)
+   - `read:user` (read user data)
+4. Generate the token and copy it immediately.
 
-### Configurando Múltiplos Tokens:
+### Configuring Multiple Tokens:
 
-Para evitar limitações de taxa da API do GitHub, você pode configurar múltiplos tokens. No arquivo `.env`, adicione-os separados por vírgulas:
+To avoid GitHub API rate limits, you can configure multiple tokens. In the `.env` file, add them separated by commas:
 
 ```
 GITHUB_TOKENS='token1,token2,token3'
 ```
 
-A API automaticamente alternará entre os tokens quando um deles atingir o limite de requisições.
+The API will automatically switch between tokens when one reaches its request limit.
 
-## Testando a API
+## Testing the API
 
-Para fazer um teste rápido da API, você pode utilizar o script `user_test.py` fornecido no repositório:
+To quickly test the API, you can use the `user_test.py` script provided in the repository:
 
 ```bash
 python user_test.py
 ```
 
-Este script realizará uma série de requisições de teste para verificar o funcionamento da mineração de dados.
+This script will make a series of test requests to verify the data mining functionality.
 
-## Observações Importantes
+## Important Notes
 
-- Certifique-se de que seu token do GitHub possui as permissões necessárias para acessar os repositórios desejados
-- O PostgreSQL deve estar rodando na porta padrão 5432
-- Todos os timestamps devem estar no formato ISO 8601 (YYYY-MM-DDTHH:mm:ssZ)
+- Ensure your GitHub token has the necessary permissions to access the desired repositories.
+- PostgreSQL must be running on the default port 5432.
+- All timestamps must be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ).
