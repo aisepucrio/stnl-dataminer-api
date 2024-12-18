@@ -84,18 +84,6 @@
 #         print(f"Delete issue status code: {response.status_code}")
 #         self.assertEqual(response.status_code, 204, f"Failed to delete issue {self.issue_id}")
 
-<<<<<<< HEAD
-    def test_collect_issue_types(self):
-        url = f"{self.live_server_url}/jira/issuetypes/collect/"
-        data = {
-            "jira_domain": self.jira_domain,
-            "jira_email": self.jira_email,
-            "jira_api_token": self.jira_api_token
-        }
-        response = requests.post(url, json=data)
-        print(f"Collect issue types status code: {response.status_code}")
-        self.assertEqual(response.status_code, 202, "Failed to retrieve issue types.")
-=======
 #     def test_collect_issue_types(self):
 #         url = f"{self.live_server_url}/jira/issuetypes/collect/"
 #         data = {
@@ -106,7 +94,6 @@
 #         response = requests.post(url, json=data)
 #         print(f"Collect issue types status code: {response.status_code}")
 #         self.assertEqual(response.status_code, 200, "Failed to retrieve issue types.")
->>>>>>> d7c93a2 (feat: Adicionando verificação de tasks no test.py)
 
 #     def test_list_issue_types(self):
 #         url = f"{self.live_server_url}/jira/issuetypes/"
@@ -124,78 +111,125 @@
 #         issuetype = response.json()
 #         self.assertIn("name", issuetype, "Name not found in issue type details.")
 
-<<<<<<< HEAD
-    def test_delete_issue_type(self):
-        url = f"{self.live_server_url}/jira/issuetypes/{self.issuetype_id}/delete/"
-        response = requests.delete(url)
-        print(f"Delete issue type status code: {response.status_code}")
-        self.assertEqual(response.status_code, 204, f"Failed to delete issue type {self.issuetype_id}")
+#    def test_delete_issue_type(self):
+#        url = f"{self.live_server_url}/jira/issuetypes/{self.issuetype_id}/delete/"
+#        response = requests.delete(url)
+#        print(f"Delete issue type status code: {response.status_code}")
+#        self.assertEqual(response.status_code, 204, f"Failed to delete issue type {self.issuetype_id}")
+#
+#    def test_task_status(self):
+#        # Start a task
+#        url = f"{self.live_server_url}/jira/issues/collect/"
+#        data = {
+#            "jira_domain": self.jira_domain,
+#            "project_key": self.project_key,
+#            "jira_email": self.jira_email,
+#            "jira_api_token": self.jira_api_token,
+#            "issuetypes": self.issuetypes,
+#            "start_date": self.start_date,
+#            "end_date": self.end_date
+#        }
+#        response = requests.post(url, json=data)
+#        self.assertEqual(response.status_code, 202, "Failed to start issue collection task")
+#
+#        # Extract the task ID from the response
+#        task_id = response.json().get("task_id")
+#        self.assertIsNotNone(task_id, "No task_id returned in response")
+#
+#        # Wait a bit to give the task time to start
+#        time.sleep(2)
+#
+#        # Check the task status
+#        status_url = f"{self.live_server_url}/jobs/{task_id}/status/"
+#        status_response = requests.get(status_url)
+#        print(f"Task status response: {status_response.json()}")
+#        self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status")
+#
+#        # Optionally, check that status is one of the expected states
+#        task_status = status_response.json().get("status")
+#        self.assertIn(task_status, ["PENDING", "STARTED", "SUCCESS", "FAILURE"])
+#
+#    def test_task_cancel(self):
+#        # Start a task
+#        url = f"{self.live_server_url}/jira/issues/collect/"
+#        data = {
+#            "jira_domain": self.jira_domain,
+#            "project_key": self.project_key,
+#            "jira_email": self.jira_email,
+#            "jira_api_token": self.jira_api_token,
+#            "issuetypes": self.issuetypes,
+#            "start_date": self.start_date,
+#            "end_date": self.end_date
+#        }
+#        response = requests.post(url, json=data)
+#        self.assertEqual(response.status_code, 202, "Failed to start issue collection task")
+#
+#        # Extract the task ID from the response
+#        task_id = response.json().get("task_id")
+#        self.assertIsNotNone(task_id, "No task_id returned in response")
+#
+#        # Attempt to cancel the task
+#        cancel_url = f"{self.live_server_url}/jobs/{task_id}/cancel/"
+#        cancel_response = requests.delete(cancel_url)
+#        print(f"Task cancel response: {cancel_response.json()}")
+#        self.assertEqual(cancel_response.status_code, 200, "Failed to cancel task")
+#
+#        # Verify task is marked as canceled
+#        status_url = f"{self.live_server_url}/jobs/{task_id}/status/"
+#        status_response = requests.get(status_url)
+#        self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status after canceling")
 
-    def test_task_status(self):
-        # Start a task
-        url = f"{self.live_server_url}/jira/issues/collect/"
-        data = {
-            "jira_domain": self.jira_domain,
-            "project_key": self.project_key,
-            "jira_email": self.jira_email,
-            "jira_api_token": self.jira_api_token,
-            "issuetypes": self.issuetypes,
-            "start_date": self.start_date,
-            "end_date": self.end_date
-        }
-        response = requests.post(url, json=data)
-        self.assertEqual(response.status_code, 202, "Failed to start issue collection task")
+#     def test_list_issues(self):
+#         url = f"{self.live_server_url}/jira/issues/"
+#         response = requests.get(url)
+#         print(f"List issues status code: {response.status_code}")
+#         self.assertEqual(response.status_code, 200, "Failed to list issues.")
+#         issues = response.json()
+#         self.assertTrue(len(issues) > 0, "No issues were retrieved.")
 
-        # Extract the task ID from the response
-        task_id = response.json().get("task_id")
-        self.assertIsNotNone(task_id, "No task_id returned in response")
+#     def test_issue_detail(self):
+#         url = f"{self.live_server_url}/jira/issues/{self.issue_id}/"
+#         response = requests.get(url)
+#         print(f"Issue detail status code: {response.status_code}")
+#         self.assertEqual(response.status_code, 200, "Failed to retrieve issue detail.")
+#         issue = response.json()
+#         self.assertIn("key", issue, "Key not found in issue details.")
 
-        # Wait a bit to give the task time to start
-        time.sleep(2)
+#     def test_delete_issue(self):
+#         url = f"{self.live_server_url}/jira/issues/{self.issue_id}/delete/"
+#         response = requests.delete(url)
+#         print(f"Delete issue status code: {response.status_code}")
+#         self.assertEqual(response.status_code, 204, f"Failed to delete issue {self.issue_id}")
 
-        # Check the task status
-        status_url = f"{self.live_server_url}/jobs/{task_id}/status/"
-        status_response = requests.get(status_url)
-        print(f"Task status response: {status_response.json()}")
-        self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status")
+#     def test_collect_issue_types(self):
+#         url = f"{self.live_server_url}/jira/issuetypes/collect/"
+#         data = {
+#             "jira_domain": self.jira_domain,
+#             "jira_email": self.jira_email,
+#             "jira_api_token": self.jira_api_token
+#         }
+#         response = requests.post(url, json=data)
+#         print(f"Collect issue types status code: {response.status_code}")
+#         self.assertEqual(response.status_code, 200, "Failed to retrieve issue types.")
 
-        # Optionally, check that status is one of the expected states
-        task_status = status_response.json().get("status")
-        self.assertIn(task_status, ["PENDING", "STARTED", "SUCCESS", "FAILURE"])
+#     def test_list_issue_types(self):
+#         url = f"{self.live_server_url}/jira/issuetypes/"
+#         response = requests.get(url)
+#         print(f"Issue types list status code: {response.status_code}")
+#         self.assertEqual(response.status_code, 200, "Failed to list issue types.")
+#         issuetypes = response.json()
+#         self.assertTrue(len(issuetypes) > 0, "No issue types were retrieved.")
 
-    def test_task_cancel(self):
-        # Start a task
-        url = f"{self.live_server_url}/jira/issues/collect/"
-        data = {
-            "jira_domain": self.jira_domain,
-            "project_key": self.project_key,
-            "jira_email": self.jira_email,
-            "jira_api_token": self.jira_api_token,
-            "issuetypes": self.issuetypes,
-            "start_date": self.start_date,
-            "end_date": self.end_date
-        }
-        response = requests.post(url, json=data)
-        self.assertEqual(response.status_code, 202, "Failed to start issue collection task")
+#     def test_issue_type_detail(self):
+#         url = f"{self.live_server_url}/jira/issuetypes/{self.issuetype_id}/"
+#         response = requests.get(url)
+#         print(f"Issue type detail status code: {response.status_code}")
+#         self.assertEqual(response.status_code, 200, "Failed to retrieve issue type detail.")
+#         issuetype = response.json()
+#         self.assertIn("name", issuetype, "Name not found in issue type details.")
 
-        # Extract the task ID from the response
-        task_id = response.json().get("task_id")
-        self.assertIsNotNone(task_id, "No task_id returned in response")
-
-        # Attempt to cancel the task
-        cancel_url = f"{self.live_server_url}/jobs/{task_id}/cancel/"
-        cancel_response = requests.delete(cancel_url)
-        print(f"Task cancel response: {cancel_response.json()}")
-        self.assertEqual(cancel_response.status_code, 200, "Failed to cancel task")
-
-        # Verify task is marked as canceled
-        status_url = f"{self.live_server_url}/jobs/{task_id}/status/"
-        status_response = requests.get(status_url)
-        self.assertEqual(status_response.status_code, 200, "Failed to retrieve task status after canceling")
-=======
 #     def test_delete_issue_type(self):
 #         url = f"{self.live_server_url}/jira/issuetypes/{self.issuetype_id}/delete/"
 #         response = requests.delete(url)
 #         print(f"Delete issue type status code: {response.status_code}")
 #         self.assertEqual(response.status_code, 204, f"Failed to delete issue type {self.issuetype_id}")
->>>>>>> d7c93a2 (feat: Adicionando verificação de tasks no test.py)
