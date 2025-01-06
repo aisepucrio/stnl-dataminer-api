@@ -11,13 +11,10 @@ class GitHubCommitViewSet(viewsets.ViewSet):
         end_date = request.query_params.get('end_date')
 
         # Inicia a tarefa e obtém o ID da tarefa
-        task = fetch_commits.apply_async(args=[repo_name, start_date, end_date])
-        result = AsyncResult(task.id)
-        data = result.get()  # Aguarda o término da tarefa para obter os dados minerados
+        task = fetch_commits.apply_async(args=[repo_name, start_date, end_date]) 
 
         return Response({
-            "task_id": task.id,
-            "data": data
+            "task_id": task.id
         }, status=status.HTTP_200_OK)
 
 class GitHubIssueViewSet(viewsets.ViewSet):
@@ -27,12 +24,9 @@ class GitHubIssueViewSet(viewsets.ViewSet):
         end_date = request.query_params.get('end_date')
 
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date])
-        result = AsyncResult(task.id)
-        data = result.get()
 
         return Response({
-            "task_id": task.id,
-            "data": data
+            "task_id": task.id
         }, status=status.HTTP_200_OK)
 
 class GitHubPullRequestViewSet(viewsets.ViewSet):
@@ -42,12 +36,9 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
         end_date = request.query_params.get('end_date')
 
         task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date])
-        result = AsyncResult(task.id)
-        data = result.get()
 
         return Response({
-            "task_id": task.id,
-            "data": data
+            "task_id": task.id
         }, status=status.HTTP_200_OK)
 
 class GitHubBranchViewSet(viewsets.ViewSet):
@@ -55,10 +46,7 @@ class GitHubBranchViewSet(viewsets.ViewSet):
         repo_name = request.query_params.get('repo_name')
 
         task = fetch_branches.apply_async(args=[repo_name])
-        result = AsyncResult(task.id)
-        data = result.get()
 
         return Response({
-            "task_id": task.id,
-            "data": data
+            "task_id": task.id
         }, status=status.HTTP_200_OK)
