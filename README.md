@@ -112,10 +112,10 @@ The API will automatically switch between tokens when one reaches its request li
 
 ## Testing the API
 
-To quickly test the API, you can use the `user_test.py` script provided in the repository:
+To quickly test the API, you can use the `example/user_test.py` script provided in the repository:
 
 ```bash
-python user_test.py
+python example/user_test.py
 ```
 
 This script will make a series of test requests to verify the data mining functionality.
