@@ -13,8 +13,11 @@ from celery import current_app
 class TaskStatusView(APIView):
     def get(self, request, task_id):
         task_result = AsyncResult(task_id, app=current_app)
-        
-        # Simplificado para mostrar apenas task_id e status
+
+        print(f'[Task Status Check] Current Celery App Name: {current_app.main}')
+        print(f'[Task Status Check] Broker URL: {current_app.conf.broker_url}')
+        print(f'[Task Status Check] Registered Tasks: {list(current_app.tasks.keys())}')
+    
         return Response({
             "task_id": task_id,
             "status": task_result.state

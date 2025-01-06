@@ -3,7 +3,10 @@ from django.db import models
 # Modelo para representar autores e committer dos commits
 class GitHubAuthor(models.Model):
     name = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(db_index=True)
+
+    class Meta:
+        unique_together = ['name', 'email']
 
     def __str__(self):
         return f"{self.name} <{self.email}>"
@@ -46,7 +49,7 @@ class GitHubModifiedFile(models.Model):
 # Modelo para representar um método dentro de um arquivo modificado
 class GitHubMethod(models.Model):
     modified_file = models.ForeignKey(GitHubModifiedFile, related_name="methods", on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=500)
     complexity = models.IntegerField(null=True)
     max_nesting = models.IntegerField(null=True)
 
