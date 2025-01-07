@@ -10,6 +10,7 @@ class GitHubAuthor(models.Model):
         return f"{self.name} <{self.email}>"
 
 class GitHubCommit(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     sha = models.CharField(max_length=40, unique=True)
     message = models.TextField()
     date = models.DateTimeField()
@@ -51,6 +52,7 @@ class GitHubMethod(models.Model):
         return f"Method {self.name} in File {self.modified_file.filename}"
 
 class GitHubIssue(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     issue_id = models.IntegerField(unique=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
@@ -63,6 +65,7 @@ class GitHubIssue(models.Model):
         return f"Issue {self.issue_id} - {self.title}"
 
 class GitHubPullRequest(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     pr_id = models.IntegerField(unique=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
@@ -77,6 +80,7 @@ class GitHubPullRequest(models.Model):
         return f"Pull Request {self.pr_id} - {self.title}"
 
 class GitHubBranch(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     name = models.CharField(max_length=100)
     sha = models.CharField(max_length=40)
 
