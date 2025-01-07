@@ -59,7 +59,7 @@ Before getting started, ensure you have the following installed:
    1. Open Docker Desktop and wait until it's fully initialized
    2. Run the command:
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 ## Using the API
