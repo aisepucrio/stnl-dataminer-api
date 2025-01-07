@@ -25,7 +25,7 @@ Before getting started, ensure you have the following installed:
 1. **Clone the Repository**
    ```bash
    git clone https://github.com/aisepucrio/stnl-dataminer-api.git
-   cd dataminer-api
+   cd stnl-dataminer-api
    ```
 
 2. **Configure a file named .env**
@@ -143,11 +143,11 @@ This script will make a series of test requests to verify the data mining functi
 - PostgreSQL must be running on the default port 5432.
 - All timestamps must be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ).
 
-## Usando a API
+## Using the API
 
-A API fornece vários endpoints para mineração de dados. Para testar os endpoints, recomendamos utilizar uma das seguintes ferramentas:
+The API provides various endpoints for data mining. To test the endpoints, we recommend using one of the following tools:
 
-- [Postman](https://www.postman.com/downloads/) - Interface gráfica popular para testes de API
-- [Bruno](https://www.usebruno.com/) - Alternativa open source ao Postman
+- [Postman](https://www.postman.com/downloads/) - Popular GUI for API testing
+- [Bruno](https://www.usebruno.com/) - Open source alternative to Postman
 
-Os exemplos abaixo usam o repositório `esp8266/Arduino` como demonstração...
+The examples below use the `esp8266/Arduino` repository as a demonstration...
