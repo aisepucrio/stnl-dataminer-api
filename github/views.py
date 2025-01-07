@@ -14,7 +14,11 @@ class GitHubCommitViewSet(viewsets.ViewSet):
         task = fetch_commits.apply_async(args=[repo_name, start_date, end_date]) 
 
         return Response({
-            "task_id": task.id
+            "task_id": task.id,
+            "message": "Task successfully initiated",
+            "instructions": "To check the task status, make a GET request to: "
+                          f"http://localhost:8000/jobs/{task.id}/",
+            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
         }, status=status.HTTP_200_OK)
 
 class GitHubIssueViewSet(viewsets.ViewSet):
