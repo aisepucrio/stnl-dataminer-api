@@ -29,7 +29,7 @@ Before getting started, ensure you have the following installed:
    ```
 
 2. **Configure a file named .env**
-
+   
    Create a file named `.env` (this is the complete filename, not a file extension) at the root of the project with the following information:
    ```
    GITHUB_TOKENS="your_github_token"
@@ -44,13 +44,13 @@ Before getting started, ensure you have the following installed:
    Note: For instructions on how to generate your GitHub token, see the "GitHub Token Configuration" section below (lines 107-115).
 
 3. **Verify the Line Format of `start.sh`**
-
+   
    Open the `start.sh` file in your IDE and confirm that the line format is set to LF (this is usually visible at the bottom-right corner of the IDE). If it shows CRLF, change it to LF.
 
 4. **Check for Existing Database or Server Conflicts**
-
+   
    Ensure that no other PostgreSQL instances are running on port 5432. To check and terminate existing instances:
-
+   
    1. Open Task Manager (Ctrl + Shift + Esc)
    2. Go to the "Processes" or "Details" tab
    3. Look for processes named "postgres" or "postgresql"
