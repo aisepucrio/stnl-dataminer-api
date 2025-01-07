@@ -98,10 +98,23 @@ GET http://localhost:8000/api/github/branches/?repo_name=esp8266/Arduino
 
 After mining is complete, the data is:
 
-1. **Stored in PostgreSQL**: You can access the data locally using the same credentials configured in the `.env` file. For example:
+1. **Stored in PostgreSQL**: You can access the data locally in two ways:
+   
+   a. Using the terminal with the same credentials configured in the `.env` file:
    ```bash
    psql -h localhost -U your_user -d database_name
    ```
+   
+   b. Using pgAdmin:
+   - Open pgAdmin
+   - Right-click on "Servers" > "Register" > "Server"
+   - In the "General" tab, give your connection a name
+   - In the "Connection" tab, fill in:
+     - Host: localhost
+     - Port: 5432
+     - Database: your POSTGRES_DB value from .env
+     - Username: your POSTGRES_USER value from .env
+     - Password: your POSTGRES_PASSWORD value from .env
 
 2. **Returned as JSON**: A JSON response is immediately provided for viewing the collected data.
 
