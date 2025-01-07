@@ -72,27 +72,55 @@ The API provides various endpoints for data mining. To test the endpoints, we re
 - [Postman](https://www.postman.com/downloads/) - Popular GUI for API testing
 - [Bruno](https://www.usebruno.com/) - Open source alternative to Postman
 
-The examples below use the `esp8266/Arduino` repository as a demonstration...
+### Basic Request Structure
 
-### 1. Commit Mining
+All requests follow the base format:
 ```
-GET http://localhost:8000/api/github/commits/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
-```
-
-### 2. Issue Mining
-```
-GET http://localhost:8000/api/github/issues/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
+http://localhost:8000/api/github/{endpoint}/?repo_name={owner}/{repository}&start_date={start_date}&end_date={end_date}
 ```
 
-### 3. Pull Request Mining
+Where:
+- `{endpoint}`: can be commits, issues, pull-requests, or branches
+- `{owner}`: repository owner/organization
+- `{repository}`: repository name
+- `{start_date}` and `{end_date}`: dates in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ)
+
+### Request Examples
+
+1. **Commit Mining**
 ```
-GET http://localhost:8000/api/github/pull-requests/?repo_name=esp8266/Arduino&start_date=2022-11-01T00:00:00Z&end_date=2023-12-29T00:00:00Z
+GET http://localhost:8000/api/github/commits/?repo_name=facebook/react&start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T00:00:00Z
 ```
 
-### 4. Branch Mining
+2. **Issue Mining**
 ```
-GET http://localhost:8000/api/github/branches/?repo_name=esp8266/Arduino
+GET http://localhost:8000/api/github/issues/?repo_name=tensorflow/tensorflow&start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T00:00:00Z
 ```
+
+3. **Pull Request Mining**
+```
+GET http://localhost:8000/api/github/pull-requests/?repo_name=kubernetes/kubernetes&start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T00:00:00Z
+```
+
+4. **Branch Mining**
+```
+GET http://localhost:8000/api/github/branches/?repo_name=django/django
+```
+
+### Query Parameters
+
+- `repo_name` (required): In the format `owner/repository` (e.g., `microsoft/vscode`)
+- `start_date` (optional): Initial date to filter data
+- `end_date` (optional): Final date to filter data
+- `per_page` (optional): Number of items per page (default: 100)
+- `page` (optional): Page number for pagination (default: 1)
+
+### Important Notes
+
+1. Dates must be in ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`
+2. The repository must be public or your token must have access to it
+3. For large repositories, consider using smaller date ranges to avoid timeout
+4. Branch mining doesn't require date parameters
 
 ## Data Storage
 
