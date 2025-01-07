@@ -32,7 +32,8 @@ Before getting started, ensure you have the following installed:
 
    Create a file named `.env` (this is the complete filename, not a file extension) at the root of the project with the following information:
    ```
-   GITHUB_TOKENS=your_github_token
+   GITHUB_TOKENS="your_github_token"
+   DJANGO_SUPERUSER_PASSWORD="your_superuser_password"
    POSTGRES_DB=database_name
    POSTGRES_USER=postgres_user
    POSTGRES_PASSWORD=postgres_password
