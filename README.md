@@ -50,7 +50,7 @@ Before getting started, ensure you have the following installed:
 
 5. **Start the Containers**
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 ## Using the API
