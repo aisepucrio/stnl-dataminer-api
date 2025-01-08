@@ -12,18 +12,68 @@ class GitHubMiner:
         self.headers = {'Accept': 'application/vnd.github.v3+json'}
         self.tokens = []
         self.current_token_index = 0
-        self.load_tokens() 
-        self.update_auth_header()  
+        
+        if not self.load_tokens():
+            raise Exception("Falha ao inicializar tokens do GitHub. Verifique suas credenciais.")
+        
+        self.update_auth_header()
+
+    def verify_token(self):
+        """Verifica se o token atual é válido e tem permissões adequadas"""
+        try:
+            url = "https://api.github.com/rate_limit"
+            response = requests.get(url, headers=self.headers)
+            
+            if response.status_code == 401:
+                print(f"Token inválido ou expirado: {self.tokens[self.current_token_index]}", flush=True)
+                if len(self.tokens) > 1:
+                    self.switch_token()
+                    return self.verify_token()  # Tenta novamente com o próximo token
+                return False
+            
+            if response.status_code == 403:
+                rate_limits = response.json().get("rate", {})
+                reset_time = rate_limits.get("reset")
+                if reset_time:
+                    reset_time = datetime.fromtimestamp(reset_time).strftime('%Y-%m-%d %H:%M:%S')
+                    print(f"Limite de requisições atingido. Reset em: {reset_time}", flush=True)
+                
+                if len(self.tokens) > 1:
+                    self.switch_token()
+                    return self.verify_token()  # Tenta novamente com o próximo token
+                return False
+
+            response.raise_for_status()
+            rate_limits = response.json().get("rate", {})
+            remaining = rate_limits.get("remaining", 0)
+            
+            if remaining < 100:  # Limite baixo de requisições
+                print(f"Atenção: Apenas {remaining} requisições restantes", flush=True)
+                if len(self.tokens) > 1:
+                    self.switch_token()
+                    return self.verify_token()
+            
+            return True
+
+        except Exception as e:
+            print(f"Erro ao verificar token: {e}", flush=True)
+            return False
 
     def load_tokens(self):
         """Carrega tokens do GitHub a partir de um arquivo .env ou variável de ambiente"""
         load_dotenv()
         tokens_str = os.getenv("GITHUB_TOKENS")
-        if tokens_str:
-            self.tokens = tokens_str.split(",")
-            print("Tokens carregados com sucesso.", flush=True)
-        else:
+        if not tokens_str:
             print("Nenhum token encontrado. Verifique se GITHUB_TOKENS está definido no .env", flush=True)
+            return False
+        
+        self.tokens = [token.strip() for token in tokens_str.split(",") if token.strip()]
+        if not self.tokens:
+            print("Nenhum token válido encontrado após processamento", flush=True)
+            return False
+        
+        print(f"Carregados {len(self.tokens)} tokens", flush=True)
+        return self.verify_token()
 
     def update_auth_header(self):
         """Atualiza o cabeçalho Authorization com o token atual"""
@@ -41,27 +91,10 @@ class GitHubMiner:
         if response.status_code == 403 and 'rate limit' in response.text.lower():
             print("Limite de requisições atingido. Alternando token.", flush=True)
             self.switch_token()
+            self.verify_token()  # Adicionada verificação do token após a troca
         else:
             remaining_requests = response.headers.get('X-RateLimit-Remaining', 'N/A')
             print(f"Requisições restantes para o token atual: {remaining_requests}", flush=True)
-
-    def print_remaining_requests(self):
-        """Exibe o número de requisições restantes no token atual"""
-        try:
-            url = "https://api.github.com/rate_limit"
-            response = requests.get(url, headers=self.headers)
-            response.raise_for_status()
-            rate_limits = response.json().get("rate", {})
-            remaining_requests = rate_limits.get("remaining", "N/A")
-            limit = rate_limits.get("limit", "N/A")
-            reset_time = rate_limits.get("reset", None)
-            
-            if reset_time:
-                reset_time = datetime.fromtimestamp(reset_time).strftime('%Y-%m-%d %H:%M:%S')
-            
-            print(f"Requisições restantes para o token atual: {remaining_requests}/{limit}, reset em {reset_time}", flush=True)
-        except Exception as e:
-            print(f"Erro ao obter informações de rate limit: {e}", flush=True)
 
     def project_root_directory(self):
         return os.getcwd()
@@ -132,6 +165,7 @@ class GitHubMiner:
                 db_commit, created = GitHubCommit.objects.update_or_create(
                     sha=commit.hash,
                     defaults={
+                        'repository': repo_name,
                         'message': commit.msg,
                         'date': commit.author_date,
                         'author': author,
@@ -233,7 +267,7 @@ class GitHubMiner:
             print(f"Erro ao acessar o repositório: {e}", flush=True)
             return []
         finally:
-            self.print_remaining_requests()
+            self.verify_token()
 
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
         url = f'https://api.github.com/repos/{repo_name}/issues'
@@ -254,6 +288,7 @@ class GitHubMiner:
                 GitHubIssue.objects.update_or_create(
                     issue_id=issue['id'],
                     defaults={
+                        'repository': repo_name,
                         'title': issue['title'],
                         'state': issue['state'],
                         'creator': issue['user']['login'],
@@ -269,7 +304,7 @@ class GitHubMiner:
             print(f"Erro ao acessar issues: {e}", flush=True)
             return []
         finally:
-            self.print_remaining_requests()
+            self.verify_token()
 
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
         url = f'https://api.github.com/repos/{repo_name}/pulls'
@@ -291,6 +326,7 @@ class GitHubMiner:
                 GitHubPullRequest.objects.update_or_create(
                     pr_id=pr['id'],
                     defaults={
+                        'repository': repo_name,
                         'title': pr['title'],
                         'state': pr['state'],
                         'creator': pr['user']['login'],
@@ -308,7 +344,7 @@ class GitHubMiner:
             print(f"Erro ao acessar pull requests: {e}", flush=True)
             return []
         finally:
-            self.print_remaining_requests()
+            self.verify_token()
 
     def get_branches(self, repo_name: str):
         url = f'https://api.github.com/repos/{repo_name}/branches'
@@ -324,7 +360,10 @@ class GitHubMiner:
             for branch in branches:
                 GitHubBranch.objects.update_or_create(
                     name=branch['name'],
-                    defaults={'sha': branch['commit']['sha']}
+                    defaults={
+                        'repository': repo_name,
+                        'sha': branch['commit']['sha']
+                    }
                 )
             print("Branches salvas no banco de dados e no JSON com sucesso.", flush=True)
             return branches
@@ -332,4 +371,4 @@ class GitHubMiner:
             print(f"Erro ao acessar branches: {e}", flush=True)
             return []
         finally:
-            self.print_remaining_requests()
+            self.verify_token()

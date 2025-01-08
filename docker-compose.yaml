@@ -22,6 +22,12 @@ services:
   worker:
     build: .
     command: celery -A dataminer_api worker --loglevel=info
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
     volumes:
       - .:/app
       - .env:/app/.env

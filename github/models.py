@@ -1,6 +1,4 @@
 from django.db import models
-
-# Modelo para representar autores e committer dos commits
 class GitHubAuthor(models.Model):
     name = models.CharField(max_length=255)
     email = models.EmailField(db_index=True)
@@ -11,14 +9,14 @@ class GitHubAuthor(models.Model):
     def __str__(self):
         return f"{self.name} <{self.email}>"
 
-# Modelo principal para representar um commit do GitHub
 class GitHubCommit(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     sha = models.CharField(max_length=40, unique=True)
     message = models.TextField()
     date = models.DateTimeField()
     author = models.ForeignKey(GitHubAuthor, related_name="author_commits", on_delete=models.SET_NULL, null=True)
     committer = models.ForeignKey(GitHubAuthor, related_name="committer_commits", on_delete=models.SET_NULL, null=True)
-    insertions = models.IntegerField(default=0)  # Adicionado valor padrão
+    insertions = models.IntegerField(default=0)  
     deletions = models.IntegerField(default=0)
     files_changed = models.IntegerField(default=0)
     in_main_branch = models.BooleanField(default=False)
@@ -30,7 +28,6 @@ class GitHubCommit(models.Model):
     def __str__(self):
         return f"Commit {self.sha}"
 
-# Modelo para representar um arquivo modificado em um commit específico
 class GitHubModifiedFile(models.Model):
     commit = models.ForeignKey(GitHubCommit, related_name="modified_files", on_delete=models.CASCADE)
     old_path = models.TextField(null=True)
@@ -45,8 +42,6 @@ class GitHubModifiedFile(models.Model):
     def __str__(self):
         return f"File {self.filename} in Commit {self.commit.sha}"
 
-
-# Modelo para representar um método dentro de um arquivo modificado
 class GitHubMethod(models.Model):
     modified_file = models.ForeignKey(GitHubModifiedFile, related_name="methods", on_delete=models.CASCADE)
     name = models.CharField(max_length=500)
@@ -55,11 +50,9 @@ class GitHubMethod(models.Model):
 
     def __str__(self):
         return f"Method {self.name} in File {self.modified_file.filename}"
-    
-
-# Modelos para Issues, Pull Requests e Branches, conforme a necessidade
 
 class GitHubIssue(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     issue_id = models.IntegerField(unique=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
@@ -71,8 +64,8 @@ class GitHubIssue(models.Model):
     def __str__(self):
         return f"Issue {self.issue_id} - {self.title}"
 
-
 class GitHubPullRequest(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     pr_id = models.IntegerField(unique=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
@@ -86,8 +79,8 @@ class GitHubPullRequest(models.Model):
     def __str__(self):
         return f"Pull Request {self.pr_id} - {self.title}"
 
-
 class GitHubBranch(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
     name = models.CharField(max_length=100)
     sha = models.CharField(max_length=40)
 

@@ -24,13 +24,13 @@ Before getting started, ensure you have the following installed:
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/your_user/dataminer-api.git
+   git clone https://github.com/aisepucrio/stnl-dataminer-api.git
    cd dataminer-api
    ```
 
-2. **Configure the .env File**
+2. **Configure a file named .env**
 
-   Create a `.env` file at the root of the project with the following information:
+   Create a file named `.env` (this is the complete filename, not a file extension) at the root of the project with the following information:
    ```
    GITHUB_TOKENS=your_github_token
    POSTGRES_DB=database_name
@@ -46,16 +46,30 @@ Before getting started, ensure you have the following installed:
 
 4. **Check for Existing Database or Server Conflicts**
 
-   Ensure that no other database or server is already running on port 5432, as this will prevent the new database from being created and saving data correctly. Stop any conflicting processes before proceeding.
+   Ensure that no other PostgreSQL instances are running on port 5432. To check and terminate existing instances:
+
+   1. Open Task Manager (Ctrl + Shift + Esc)
+   2. Go to the "Processes" or "Details" tab
+   3. Look for processes named "postgres" or "postgresql"
+   4. Select each PostgreSQL-related process
+   5. Click "End Task" or "End Process"
 
 5. **Start the Containers**
+   
+   1. Open Docker Desktop and wait until it's fully initialized
+   2. Run the command:
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 ## Using the API
 
-The API provides various endpoints for data mining. The examples below use the `esp8266/Arduino` repository as a demonstration, but you can replace it with any public GitHub repository by adjusting the `repo_name` parameter. Similarly, the date range (`start_date` and `end_date`) can be adjusted as needed.
+The API provides various endpoints for data mining. To test the endpoints, we recommend using one of the following tools:
+
+- [Postman](https://www.postman.com/downloads/) - Popular GUI for API testing
+- [Bruno](https://www.usebruno.com/) - Open source alternative to Postman
+
+The examples below use the `esp8266/Arduino` repository as a demonstration...
 
 ### 1. Commit Mining
 ```
@@ -125,3 +139,12 @@ This script will make a series of test requests to verify the data mining functi
 - Ensure your GitHub token has the necessary permissions to access the desired repositories.
 - PostgreSQL must be running on the default port 5432.
 - All timestamps must be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ).
+
+## Usando a API
+
+A API fornece vários endpoints para mineração de dados. Para testar os endpoints, recomendamos utilizar uma das seguintes ferramentas:
+
+- [Postman](https://www.postman.com/downloads/) - Interface gráfica popular para testes de API
+- [Bruno](https://www.usebruno.com/) - Alternativa open source ao Postman
+
+Os exemplos abaixo usam o repositório `esp8266/Arduino` como demonstração...

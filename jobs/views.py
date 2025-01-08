@@ -52,7 +52,6 @@ class TaskCancelView(APIView):
         task_result = AsyncResult(task_id, app=current_app)
 
         if task_result.state in ["PENDING", "STARTED"]:
-            # Cancela a task - em Celery, marcamos como revoked
             task_result.revoke(terminate=True)
             return Response({
                 "task_id": task_id,
