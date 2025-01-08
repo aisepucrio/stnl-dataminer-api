@@ -1,15 +1,15 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.http import HttpResponse
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-def home(request):
-    return HttpResponse("Bem-vindo à página inicial do DataMiner API!!!!!!!")
 
 urlpatterns = [
+    path('', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('admin/', admin.site.urls),
-    path('api/', include('github.urls')),
-    path('jira/', include('jira.urls')),
-    path('jobs/', include('jobs.urls')),
-    path('', home),  # Adiciona uma página inicial para a URL raiz
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('api/github/', include('github.urls')),
+    path('api/jira/', include('jira.urls')),
     path('api/jobs/', include('jobs.urls'))
 ]

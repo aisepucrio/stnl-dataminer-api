@@ -38,9 +38,11 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_spectacular',
+    'dataminer_api',
     'github',
     'jira',
-    'jobs'
+    'jobs',
 ]
 
 MIDDLEWARE = [
@@ -129,6 +131,17 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Diggit API',
+    'DESCRIPTION': 'A Django-based API designed for mining and analyzing software development data.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
@@ -141,4 +154,4 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_STORE_EAGER_RESULT = True
 CELERY_TRACK_STARTED = True
 CELERY_MAX_MEMORY_PER_CHILD = 1024*1024*2
-CELERY_CONCURRENCY = 4  
+CELERY_CONCURRENCY = 4
