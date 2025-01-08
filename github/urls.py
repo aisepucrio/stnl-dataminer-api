@@ -9,5 +9,5 @@ router.register(r'pull-requests', GitHubPullRequestViewSet, basename='pullreques
 router.register(r'branches', GitHubBranchViewSet, basename='branch')
 
 urlpatterns = [
-    path('github/', include(router.urls))
+    path('', include(router.urls))
 ]
