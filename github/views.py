@@ -5,6 +5,9 @@ from celery.result import AsyncResult
 from jobs.tasks import fetch_commits, fetch_issues, fetch_pull_requests, fetch_branches
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch
 from .serializers import GitHubCommitSerializer, GitHubIssueSerializer, GitHubPullRequestSerializer, GitHubBranchSerializer
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFilter, GitHubBranchFilter
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -61,7 +64,10 @@ class GitHubBranchViewSet(viewsets.ViewSet):
 class CommitListView(generics.ListAPIView):
     queryset = GitHubCommit.objects.all()
     serializer_class = GitHubCommitSerializer
-    filterset_fields = ['repository', 'author', 'date']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = GitHubCommitFilter
+    search_fields = ['message', 'author__name']
+    ordering_fields = ['date']
 
 class CommitDetailView(generics.RetrieveAPIView):
     queryset = GitHubCommit.objects.all()
@@ -71,7 +77,10 @@ class CommitDetailView(generics.RetrieveAPIView):
 class IssueListView(generics.ListAPIView):
     queryset = GitHubIssue.objects.all()
     serializer_class = GitHubIssueSerializer
-    filterset_fields = ['repository', 'state', 'creator']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = GitHubIssueFilter
+    search_fields = ['title', 'creator']
+    ordering_fields = ['created_at', 'updated_at']
 
 class IssueDetailView(generics.RetrieveAPIView):
     queryset = GitHubIssue.objects.all()
@@ -81,7 +90,10 @@ class IssueDetailView(generics.RetrieveAPIView):
 class PullRequestListView(generics.ListAPIView):
     queryset = GitHubPullRequest.objects.all()
     serializer_class = GitHubPullRequestSerializer
-    filterset_fields = ['repository', 'state', 'creator']
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = GitHubPullRequestFilter
+    search_fields = ['title', 'creator']
+    ordering_fields = ['created_at', 'updated_at']
 
 class PullRequestDetailView(generics.RetrieveAPIView):
     queryset = GitHubPullRequest.objects.all()
@@ -91,7 +103,8 @@ class PullRequestDetailView(generics.RetrieveAPIView):
 class BranchListView(generics.ListAPIView):
     queryset = GitHubBranch.objects.all()
     serializer_class = GitHubBranchSerializer
-    filterset_fields = ['repository', 'name']
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = GitHubBranchFilter
 
 class BranchDetailView(generics.RetrieveAPIView):
     queryset = GitHubBranch.objects.all()
