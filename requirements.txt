@@ -13,7 +13,9 @@ colorama==0.4.6
 customtkinter==5.2.2
 darkdetect==0.8.0
 Django==5.1
+django-filter==24.1
 djangorestframework==3.15.2
+drf-spectacular==0.27.1
 gitdb==4.0.11
 GitPython==3.1.43
 idna==3.7
@@ -43,4 +45,3 @@ tzdata==2024.1
 urllib3==2.2.2
 vine==5.1.0
 wcwidth==0.2.13
-drf-spectacular
