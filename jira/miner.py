@@ -3,7 +3,7 @@
 import requests
 from datetime import datetime
 from requests.auth import HTTPBasicAuth
-from .models import JiraIssueType, JiraIssue
+from .models import JiraIssue
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 
@@ -14,38 +14,6 @@ class JiraMiner:
         self.jira_api_token = jira_api_token
         self.auth = HTTPBasicAuth(self.jira_email, self.jira_api_token)
         self.headers = {"Accept": "application/json"}
-
-    def collect_issue_types(self):
-        url = f"https://{self.jira_domain}/rest/api/3/issuetype"
-        try:
-            response = requests.get(url, headers=self.headers, auth=self.auth)
-            if response.status_code != 200:
-                return {"error": f"Failed to fetch issue types: {response.status_code} - {response.text}"}
-            issuetypes_data = response.json()
-            
-            unique_issuetypes = {}
-            for issuetype in issuetypes_data:
-                name, untranslated_name = issuetype.get('name'), issuetype.get('untranslatedName')
-                if name and untranslated_name and untranslated_name not in unique_issuetypes:
-                    unique_issuetypes[untranslated_name] = {
-                        "issuetype_id": issuetype.get('id'),
-                        "name": untranslated_name,
-                        "domain": self.jira_domain,
-                        "description": issuetype.get('description', '')
-                    }
-            
-            for issuetype in unique_issuetypes.values():
-                JiraIssueType.objects.update_or_create(
-                    issuetype_id=issuetype['issuetype_id'],
-                    defaults={
-                        'name': issuetype['name'],
-                        'domain': issuetype['domain'],
-                        'description': issuetype['description']
-                    }
-                )
-            return {"status": "Issue types fetched and saved successfully"}
-        except Exception as e:
-            return {"error": f"Unexpected error: {str(e)}"}
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         max_results, start_at, total_collected = 100, 0, 0
@@ -92,6 +60,7 @@ class JiraMiner:
                     defaults={
                         'issue_key': issue_data['key'],
                         'issuetype': issue_data['fields']['issuetype']['name'],
+                        'issuetype_description': issue_data['fields']['issuetype']['description'],
                         'summary': issue_data['fields']['summary'],
                         'description': description,
                         'created': issue_data['fields']['created'],
