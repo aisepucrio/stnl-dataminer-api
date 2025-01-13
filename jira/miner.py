@@ -57,12 +57,17 @@ class JiraMiner:
             jql_query += f' AND ({issuetypes_jql})'
         
         # Validação do formato das datas
-        if start_date and end_date:
+        if start_date:
             try:
                 start_date_parsed = self.validate_and_parse_date(start_date)
-                end_date_parsed = self.validate_and_parse_date(end_date)
                 # Usa as datas no formato "yyyy-MM-dd HH:mm"
                 jql_query += f' AND created >= "{start_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
+            except ValueError as e:
+                return {"error": str(e)}
+        if end_date:
+            try:
+                end_date_parsed = self.validate_and_parse_date(end_date)
+                # Usa as datas no formato "yyyy-MM-dd HH:mm"
                 jql_query += f' AND created <= "{end_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
             except ValueError as e:
                 return {"error": str(e)}
@@ -85,7 +90,7 @@ class JiraMiner:
                 JiraIssue.objects.update_or_create(
                     issue_id=issue_data['id'],
                     defaults={
-                        'key': issue_data['key'],
+                        'issue_key': issue_data['key'],
                         'issuetype': issue_data['fields']['issuetype']['name'],
                         'summary': issue_data['fields']['summary'],
                         'description': description,
@@ -96,7 +101,6 @@ class JiraMiner:
                         'project': project_key,
                         'creator': issue_data['fields']['creator']['displayName'],
                         'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
-                        'reporter': issue_data['fields']['reporter']['displayName'] if issue_data['fields'].get('reporter') else None,
                         'all_fields': issue_data['fields']
                     }
                 )
@@ -178,8 +182,11 @@ class JiraMiner:
         issue_json['fields'] = updated_fields
         return issue_json
 
-    def validate_and_parse_date(self, date_string, date_format="%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(date_string, date_format)
-        except ValueError:
-            raise ValueError(f"Invalid date format for '{date_string}'. Expected format is '{date_format}'.")
+    def validate_and_parse_date(self, date_string):
+        formats = ["%Y-%m-%d", "%Y-%m-%d %H:%M"]
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_string, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"Invalid date format: {date_string}. Expected formats are: 'yyyy-MM-dd' or 'yyyy-MM-dd HH:mm'.")
