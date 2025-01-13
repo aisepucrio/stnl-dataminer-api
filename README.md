@@ -2,12 +2,12 @@
 
 ## Description
 
-This is a Django-based API designed for mining and analyzing software development data, enabling the extraction of valuable insights from GitHub and Jira repositories. The tool provides detailed tracking of the project lifecycle, including commit analysis, pull requests, issues, and branches, offering critical insights into the development process.
+This is a Django-based API designed for mining and analyzing software development data, enabling the extraction of valuable insights from GitHub repositories and Jira projects. The tool provides detailed tracking of the project lifecycle, including commit analysis, pull requests, issues, and branches, offering critical insights into the development process.
 
 ## Features
 
 1. **GitHub Mining**: Extract data from commits, pull requests, issues, and branches.
-2. **Jira Integration**: Collect ticket and sprint data.
+2. **Jira Mining**: Extract data from Jira issues.
 3. **Temporal Analysis**: Monitor project evolution over time.
 4. **Documented API**: Endpoints documented using DRF Spectacular.
 
@@ -64,6 +64,27 @@ Before getting started, ensure you have the following installed:
    ```bash
    docker compose up --build
    ```
+## GitHub Token Configuration
+
+### How to Generate a GitHub Token:
+
+1. Go to [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens).
+2. Click on "Generate new token (classic)".
+3. Select the following scopes:
+   - `repo` (full access to repositories)
+   - `read:org` (read organization data)
+   - `read:user` (read user data)
+4. Generate the token and copy it immediately.
+
+### Configuring Multiple Tokens:
+
+To avoid GitHub API rate limits, you can configure multiple tokens. In the `.env` file, add them separated by commas:
+
+```
+GITHUB_TOKENS='token1,token2,token3'
+```
+
+The API will automatically switch between tokens when one reaches its request limit.
 
 ## Using the API
 
@@ -72,7 +93,9 @@ The API provides various endpoints for data mining. To test the endpoints, we re
 - [Postman](https://www.postman.com/downloads/) - Popular GUI for API testing
 - [Bruno](https://www.usebruno.com/) - Open source alternative to Postman
 
-### Basic Request Structure
+### **GitHub Mining**
+
+#### Basic Request Structure
 
 All requests follow the base format:
 ```
@@ -85,7 +108,7 @@ Where:
 - `{repository}`: repository name
 - `{start_date}` and `{end_date}`: dates in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ)
 
-### Request Examples
+#### Request Examples
 
 1. **Commit Mining**
 ```
@@ -107,7 +130,7 @@ GET http://localhost:8000/api/github/pull-requests/?repo_name=kubernetes/kuberne
 GET http://localhost:8000/api/github/branches/?repo_name=django/django
 ```
 
-### Query Parameters
+#### Query Parameters
 
 - `repo_name` (required): In the format `owner/repository` (e.g., `microsoft/vscode`)
 - `start_date` (optional): Initial date to filter data
@@ -115,12 +138,153 @@ GET http://localhost:8000/api/github/branches/?repo_name=django/django
 - `per_page` (optional): Number of items per page (default: 100)
 - `page` (optional): Page number for pagination (default: 1)
 
-### Important Notes
+#### Important Notes
 
 1. Dates must be in ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`
 2. The repository must be public or your token must have access to it
 3. For large repositories, consider using smaller date ranges to avoid timeout
 4. Branch mining doesn't require date parameters
+
+### **Jira Mining**
+
+#### **1. Collect Issues (`POST`)**
+
+**Request**
+
+```http
+POST http://localhost:8000/api/jira/issues/collect/
+```
+- **Description:** Fetches all Jira issues saved in the database.
+
+**Request Body Parameters**
+
+The request body must be in JSON format, containing the following fields:
+
+- `jira_domain` (required): Your Jira domain, e.g., `yourcompany.atlassian.net`
+- `project_key` (required): The project key in Jira (e.g., `PROJ`)
+- `jira_email` (required): The email associated with your Jira account
+- `jira_api_token` (required): Your Jira API token
+- `issuetypes` (optional): A list of issue types to filter (e.g., `["Bug", "Task"]`)
+- `start_date` (optional): Start date in "yyy-MM--dd" format
+- `end_date` (optional): End date in "yyy-MM--dd" format
+
+**Request Example**
+
+```json
+Content-Type: application/json
+
+{
+    "jira_domain": "yourcompany.atlassian.net",
+    "project_key": "PROJ",
+    "jira_email": "user@example.com",
+    "jira_api_token": "your_api_token",
+    "issuetypes": ["Bug", "Task"],
+    "start_date": "2023-01-01",
+    "end_date": "2023-12-31"
+}
+```
+
+**Additional Testing Examples**
+
+Here are two real project examples from the domain `ecosystem.atlassian.net` that you can use for testing:
+
+1. **Project AO**:
+   - [Explore Issues](https://ecosystem.atlassian.net/jira/software/c/projects/AO/issues/?jql=project%20%3D%20%22AO%22%20ORDER%20BY%20created%20DESC)
+   - Example Request Body:
+     ```json
+     {
+         "jira_domain": "ecosystem.atlassian.net",
+         "project_key": "AO",
+         "jira_email": "user@example.com",
+         "jira_api_token": "your_api_token",
+         "issuetypes": ["Bug", "Documentation"],
+         "start_date": "2011-11-15",
+         "end_date": "2013-12-27"
+     }
+     ```
+
+2. **Project ACCESS**:
+   - [Explore Issues](https://ecosystem.atlassian.net/jira/software/c/projects/ACCESS/issues/?jql=project%20%3D%20%22ACCESS%22%20ORDER%20BY%20created%20DESC)
+   - Example Request Body:
+     ```json
+     {
+         "jira_domain": "ecosystem.atlassian.net",
+         "project_key": "ACCESS",
+         "jira_email": "user@example.com",
+         "jira_api_token": "your_api_token",
+         "issuetypes": ["Story", "Bug"],
+         "start_date": "2013-09-25",
+         "end_date": "2014-12-23"
+     }
+     ```
+
+Additionally, there are many other projects within the `ecosystem.atlassian.net` domain that can be mined. Explore them [here](https://ecosystem.atlassian.net).
+
+---
+
+#### **2. List Issues (`GET`)**
+
+**Request**
+
+```http
+GET http://localhost:8000/api/jira/issues/
+```
+- **Description:** Fetches all Jira issues saved in the database.
+
+---
+
+#### **3. Issue Details (`GET`)**
+
+**Request**
+
+```http
+GET http://localhost:8000/api/jira/issues/{issue_key}/
+```
+- **Description:** Fetches details for a specific Jira issue by its key.
+- **Path Parameter:**
+  - `issue_key` (required): The unique key of the issue (e.g., `PROJ-123`).
+
+**Request Example**
+
+```http
+GET http://localhost:8000/api/jira/issues/PROJ-123/
+```
+
+---
+
+#### **4. Delete Issue (`DELETE`)**
+
+**Request**
+
+```http
+DELETE http://localhost:8000/api/jira/issues/{issue_key}/delete/
+```
+
+- **Description:** Deletes a specific Jira issue by its key.
+- **Path Parameter:**
+  - `issue_key` (required): The unique key of the issue (e.g., `PROJ-123`).
+
+**Request Example**
+
+```http
+DELETE http://localhost:8000/api/jira/issues/PROJ-123/delete/
+```
+
+---
+
+#### **Important Notes**
+
+1. To generate a Jira API token, follow these steps:
+   - Go to [Jira API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+   - Click **Create API token**.
+   - Enter a label for your token (e.g., `My Jira Token`) and click **Create**.
+   - Copy the token displayed on the screen (it will not be shown again).
+   - Use this token in your API requests.
+2. Ensure that the Jira API token has the necessary permissions to access the specified project.
+3. The `project_key` must correspond to an existing project in the provided Jira domain.
+4. If `start_date` and `end_date` aren't specified, all available issues will be mined.
+5. If no `issuetypes` are specified, all issue types will be mined.
+6. Dates must be in 'yyy-MM-dd' format.
 
 ## Data Storage
 
@@ -146,28 +310,6 @@ After mining is complete, the data is:
 
 2. **Returned as JSON**: A JSON response is immediately provided for viewing the collected data.
 
-## GitHub Token Configuration
-
-### How to Generate a GitHub Token:
-
-1. Go to [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens).
-2. Click on "Generate new token (classic)".
-3. Select the following scopes:
-   - `repo` (full access to repositories)
-   - `read:org` (read organization data)
-   - `read:user` (read user data)
-4. Generate the token and copy it immediately.
-
-### Configuring Multiple Tokens:
-
-To avoid GitHub API rate limits, you can configure multiple tokens. In the `.env` file, add them separated by commas:
-
-```
-GITHUB_TOKENS='token1,token2,token3'
-```
-
-The API will automatically switch between tokens when one reaches its request limit.
-
 ## Testing the API
 
 To quickly test the API, you can use the `example/user_test.py` script provided in the repository:
@@ -182,13 +324,3 @@ This script will make a series of test requests to verify the data mining functi
 
 - Ensure your GitHub token has the necessary permissions to access the desired repositories.
 - PostgreSQL must be running on the default port 5432.
-- All timestamps must be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ).
-
-## Using the API
-
-The API provides various endpoints for data mining. To test the endpoints, we recommend using one of the following tools:
-
-- [Postman](https://www.postman.com/downloads/) - Popular GUI for API testing
-- [Bruno](https://www.usebruno.com/) - Open source alternative to Postman
-
-The examples below use the `esp8266/Arduino` repository as a demonstration...
