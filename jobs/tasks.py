@@ -147,42 +147,6 @@ def fetch_branches(self, repo_name):
         raise
 
 @shared_task(bind=True)
-def collect_issue_types_task(self, jira_domain, jira_email, jira_api_token):
-    self.update_state(
-        state='STARTED',
-        meta={
-            'operation': 'collect_issue_types',
-            'repository': jira_domain
-        }
-    )
-    try:
-        miner = JiraMiner(jira_domain, jira_email, jira_api_token)
-        issue_types = miner.collect_issue_types()
-        self.update_state(
-            state='SUCCESS',
-            meta={
-                'operation': 'collect_issue_types',
-                'repository': jira_domain,
-                'data': issue_types
-            }
-        )
-        return {
-            'operation': 'collect_issue_types',
-            'repository': jira_domain,
-            'data': issue_types
-        }
-    except Exception as e:
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'operation': 'collect_issue_types',
-                'repository': jira_domain,
-                'error': str(e)
-            }
-        )
-        raise
-
-@shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
     self.update_state(
         state='STARTED',
@@ -216,4 +180,4 @@ def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_ap
                 'error': str(e)
             }
         )
-        raise e
+        raise 
