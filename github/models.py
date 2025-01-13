@@ -44,7 +44,7 @@ class GitHubModifiedFile(models.Model):
 
 class GitHubMethod(models.Model):
     modified_file = models.ForeignKey(GitHubModifiedFile, related_name="methods", on_delete=models.CASCADE)
-    name = models.CharField(max_length=500)
+    name = models.TextField()
     complexity = models.IntegerField(null=True)
     max_nesting = models.IntegerField(null=True)
 
@@ -53,7 +53,7 @@ class GitHubMethod(models.Model):
 
 class GitHubIssue(models.Model):
     repository = models.CharField(max_length=255, db_index=True, default='')
-    issue_id = models.IntegerField(unique=True)
+    issue_id = models.BigIntegerField()
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
     creator = models.CharField(max_length=100)
@@ -66,7 +66,7 @@ class GitHubIssue(models.Model):
 
 class GitHubPullRequest(models.Model):
     repository = models.CharField(max_length=255, db_index=True, default='')
-    pr_id = models.IntegerField(unique=True)
+    pr_id = models.BigIntegerField(unique=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
     creator = models.CharField(max_length=100)
