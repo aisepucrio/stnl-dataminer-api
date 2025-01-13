@@ -41,12 +41,3 @@ class IssueDetailView(generics.RetrieveAPIView):
     queryset = JiraIssue.objects.all()
     serializer_class = JiraIssueSerializer
     lookup_field = 'issue_key'
-
-class IssueDeleteView(generics.DestroyAPIView):
-    queryset = JiraIssue.objects.all()
-    lookup_field = 'issue_key'
-    
-    def delete(self, request, *args, **kwargs):
-        issue = self.get_object()
-        self.perform_destroy(issue)
-        return Response({"status": "Issue deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
