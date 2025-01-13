@@ -282,9 +282,27 @@ class GitHubMiner:
                 response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             issues = response.json()
-            self.save_to_json(issues, f"{repo_name.replace('/', '_')}_issues.json")
-
+            
+            # Busca detalhes adicionais para cada issue
+            detailed_issues = []
             for issue in issues:
+                issue_number = issue['number']
+                
+                # Busca comentários da issue
+                comments_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/comments'
+                comments_response = requests.get(comments_url, headers=self.headers)
+                if comments_response.status_code == 403:
+                    self.handle_rate_limit(comments_response)
+                    comments_response = requests.get(comments_url, headers=self.headers)
+                comments = comments_response.json()
+                
+                # Adiciona os comentários à issue
+                issue['comments_data'] = [{'user': c['user']['login'], 'body': c['body'], 'created_at': c['created_at']} for c in comments]
+                detailed_issues.append(issue)
+
+            self.save_to_json(detailed_issues, f"{repo_name.replace('/', '_')}_issues.json")
+
+            for issue in detailed_issues:
                 GitHubIssue.objects.update_or_create(
                     issue_id=issue['id'],
                     defaults={
@@ -294,12 +312,12 @@ class GitHubMiner:
                         'creator': issue['user']['login'],
                         'created_at': issue['created_at'],
                         'updated_at': issue['updated_at'],
-                        'comments': issue['comments']
+                        'comments': issue['comments_data']
                     }
                 )
             print("Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
 
-            return issues
+            return detailed_issues
         except requests.exceptions.RequestException as e:
             print(f"Erro ao acessar issues: {e}", flush=True)
             return []
@@ -320,9 +338,44 @@ class GitHubMiner:
                 response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             pull_requests = response.json()
-            self.save_to_json(pull_requests, f"{repo_name.replace('/', '_')}_pull_requests.json")
-
+            
+            # Busca detalhes adicionais para cada PR
+            detailed_prs = []
             for pr in pull_requests:
+                pr_number = pr['number']
+                
+                # Busca detalhes completos do PR
+                pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
+                pr_response = requests.get(pr_url, headers=self.headers)
+                if pr_response.status_code == 403:
+                    self.handle_rate_limit(pr_response)
+                    pr_response = requests.get(pr_url, headers=self.headers)
+                pr_details = pr_response.json()
+                
+                # Busca commits do PR
+                commits_url = f'{pr_url}/commits'
+                commits_response = requests.get(commits_url, headers=self.headers)
+                if commits_response.status_code == 403:
+                    self.handle_rate_limit(commits_response)
+                    commits_response = requests.get(commits_url, headers=self.headers)
+                commits = commits_response.json()
+                
+                # Busca comentários do PR
+                comments_url = f'{pr_url}/comments'
+                comments_response = requests.get(comments_url, headers=self.headers)
+                if comments_response.status_code == 403:
+                    self.handle_rate_limit(comments_response)
+                    comments_response = requests.get(comments_url, headers=self.headers)
+                comments = comments_response.json()
+                
+                # Adiciona os detalhes ao PR
+                pr_details['commits_data'] = [{'sha': c['sha'], 'message': c['commit']['message']} for c in commits]
+                pr_details['comments_data'] = [{'user': c['user']['login'], 'body': c['body']} for c in comments]
+                detailed_prs.append(pr_details)
+
+            self.save_to_json(detailed_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
+
+            for pr in detailed_prs:
                 GitHubPullRequest.objects.update_or_create(
                     pr_id=pr['id'],
                     defaults={
@@ -333,13 +386,13 @@ class GitHubMiner:
                         'created_at': pr['created_at'],
                         'updated_at': pr['updated_at'],
                         'labels': [label['name'] for label in pr['labels']],
-                        'commits': [],
-                        'comments': []
+                        'commits': pr['commits_data'],
+                        'comments': pr['comments_data']
                     }
                 )
             print("Pull requests salvas no banco de dados e no JSON com sucesso.", flush=True)
 
-            return pull_requests
+            return detailed_prs
         except requests.exceptions.RequestException as e:
             print(f"Erro ao acessar pull requests: {e}", flush=True)
             return []
