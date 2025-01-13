@@ -1,6 +1,7 @@
 # miner.py
 
 import requests
+from datetime import datetime
 from requests.auth import HTTPBasicAuth
 from .models import JiraIssueType, JiraIssue
 from django.utils.dateparse import parse_datetime
@@ -11,6 +12,7 @@ class JiraMiner:
         self.jira_domain = jira_domain
         self.jira_email = jira_email
         self.jira_api_token = jira_api_token
+        self.auth = HTTPBasicAuth(self.jira_email, self.jira_api_token)
         self.headers = {"Accept": "application/json"}
 
     def collect_issue_types(self):
@@ -54,12 +56,22 @@ class JiraMiner:
             issuetypes_jql = " OR ".join([f'issuetype="{issuetype}"' for issuetype in issuetypes])
             jql_query += f' AND ({issuetypes_jql})'
         
-        if start_date and end_date:
+        # Validação do formato das datas
+        if start_date:
             try:
-                start_date, end_date = parse_datetime(start_date), parse_datetime(end_date)
-                jql_query += f' AND created >= "{start_date}" AND created <= "{end_date}"'
-            except ValueError:
-                return {"error": "Invalid date format. Use ISO 8601 format."}
+                start_date_parsed = self.validate_and_parse_date(start_date)
+                # Usa as datas no formato "yyyy-MM-dd HH:mm"
+                jql_query += f' AND created >= "{start_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
+            except ValueError as e:
+                return {"error": str(e)}
+        if end_date:
+            try:
+                end_date_parsed = self.validate_and_parse_date(end_date)
+                # Usa as datas no formato "yyyy-MM-dd HH:mm"
+                jql_query += f' AND created <= "{end_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
+            except ValueError as e:
+                return {"error": str(e)}
+
 
         encoded_jql = quote(jql_query)
         while True:
@@ -73,12 +85,12 @@ class JiraMiner:
                 break
 
             for issue_data in issues:
-                description = self.extract_description_text(issue_data['fields'].get('description', ''))
+                description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
                 JiraIssue.objects.update_or_create(
                     issue_id=issue_data['id'],
                     defaults={
-                        'key': issue_data['key'],
+                        'issue_key': issue_data['key'],
                         'issuetype': issue_data['fields']['issuetype']['name'],
                         'summary': issue_data['fields']['summary'],
                         'description': description,
@@ -89,7 +101,6 @@ class JiraMiner:
                         'project': project_key,
                         'creator': issue_data['fields']['creator']['displayName'],
                         'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
-                        'reporter': issue_data['fields']['reporter']['displayName'] if issue_data['fields'].get('reporter') else None,
                         'all_fields': issue_data['fields']
                     }
                 )
@@ -102,9 +113,8 @@ class JiraMiner:
 
     def get_custom_fields_mapping(self, jira_domain, jira_email, jira_api_token):
         url = f"https://{jira_domain}/rest/api/3/field"
-        auth = HTTPBasicAuth(jira_email, jira_api_token)
         
-        response = requests.get(url, auth=auth)
+        response = requests.get(url, auth=self.auth)
         if response.status_code != 200:
             raise Exception(f"Failed to get custom fields: {response.status_code} - {response.text}")
         
@@ -118,21 +128,41 @@ class JiraMiner:
                 custom_fields_mapping[field_id] = field_name
         
         return custom_fields_mapping
-
-    def extract_description_text(self, description):
-        if 'content' not in description:
+    
+    def extract_words_from_description(self, description):
+        """
+        Extrai todas as palavras da descrição de uma issue do Jira, lidando com casos em que o campo é vazio ou inexistente.
+        
+        Args:
+            description (dict): O JSON representando a descrição da issue.
+            
+        Returns:
+            str: Uma string contendo todas as palavras extraídas, separadas por espaço. Retorna uma string vazia se o campo não existir ou for vazio.
+        """
+        if not description or "content" not in description:
+            # Retorna vazio se a descrição for None, vazia ou não contiver o campo "content"
             return ""
-        
-        paragraphs = description['content']
-        text_parts = []
-        
-        for paragraph in paragraphs:
-            if 'content' in paragraph:
-                for content in paragraph['content']:
-                    if 'text' in content:
-                        text_parts.append(content['text'])
-        
-        return "\n".join(text_parts)
+
+        words = []
+
+        def traverse_content(content):
+            if isinstance(content, list):
+                for item in content:
+                    traverse_content(item)
+            elif isinstance(content, dict):
+                # Se o conteúdo for um dicionário, verificamos se ele contém a chave "text"
+                if "text" in content and isinstance(content["text"], str):
+                    words.append(content["text"])
+                # Continuar a travessia em outras chaves
+                if "content" in content:
+                    traverse_content(content["content"])
+
+        # Inicia a travessia da estrutura de "content" na descrição
+        traverse_content(description.get("content", []))
+
+        # Retorna as palavras concatenadas em uma única string
+        return " ".join(words)
+
 
     def replace_custom_fields_with_names(self, issue_json, custom_fields_mapping):
         if 'fields' not in issue_json:
@@ -151,3 +181,12 @@ class JiraMiner:
         
         issue_json['fields'] = updated_fields
         return issue_json
+
+    def validate_and_parse_date(self, date_string):
+        formats = ["%Y-%m-%d", "%Y-%m-%d %H:%M"]
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_string, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"Invalid date format: {date_string}. Expected formats are: 'yyyy-MM-dd' or 'yyyy-MM-dd HH:mm'.")

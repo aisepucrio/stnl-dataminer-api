@@ -18,18 +18,17 @@ class JiraIssueType(models.Model):
 
 class JiraIssue(models.Model):
     issue_id = models.CharField(max_length=100, unique=True, primary_key=True)
-    key = models.CharField(max_length=100)
+    issue_key = models.CharField(max_length=100)
     issuetype = models.CharField(max_length=100)
-    summary = models.TextField()
-    description = models.TextField(null=True, blank=True)
+    project = models.CharField(max_length=100)
+    priority = models.CharField(max_length=50, null=True, blank=True)
+    status = models.CharField(max_length=50)
+    assignee = models.CharField(max_length=100, null=True, blank=True)
+    creator = models.CharField(max_length=100)
     created = models.DateTimeField()
     updated = models.DateTimeField()
-    status = models.CharField(max_length=50)
-    priority = models.CharField(max_length=50, null=True, blank=True)
-    project = models.CharField(max_length=100)
-    creator = models.CharField(max_length=100)
-    assignee = models.CharField(max_length=100, null=True, blank=True)
-    reporter = models.CharField(max_length=100, null=True, blank=True)
+    summary = models.TextField()
+    description = models.TextField(null=True, blank=True)
     all_fields = models.JSONField(null=True, blank=True)
 
     class Meta:
