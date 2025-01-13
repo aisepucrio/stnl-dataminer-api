@@ -165,8 +165,8 @@ The request body must be in JSON format, containing the following fields:
 - `jira_email` (required): The email associated with your Jira account
 - `jira_api_token` (required): Your Jira API token
 - `issuetypes` (optional): A list of issue types to filter (e.g., `["Bug", "Task"]`)
-- `start_date` (optional): Start date in "yyy-MM--dd" format
-- `end_date` (optional): End date in "yyy-MM--dd" format
+- `start_date` (optional): Start date in "yyyy-MM-dd" or "yyyy-MM-dd HH:mm" format.
+- `end_date` (optional): End date in "yyyy-MM-dd" or "yyyy-MM-dd HH:mm" format.
 
 **Request Example**
 
@@ -284,7 +284,7 @@ DELETE http://localhost:8000/api/jira/issues/PROJ-123/delete/
 3. The `project_key` must correspond to an existing project in the provided Jira domain.
 4. If `start_date` and `end_date` aren't specified, all available issues will be mined.
 5. If no `issuetypes` are specified, all issue types will be mined.
-6. Dates must be in 'yyy-MM-dd' format.
+6. Dates must be in "yyyy-MM-dd" or "yyyy-MM-dd HH:mm" format.
 
 ## Data Storage
 
