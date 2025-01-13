@@ -35,7 +35,11 @@ class GitHubIssueViewSet(viewsets.ViewSet):
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date])
 
         return Response({
-            "task_id": task.id
+            "task_id": task.id,
+            "message": "Task successfully initiated",
+            "instructions": "To check the task status, make a GET request to: "
+                          f"http://localhost:8000/jobs/{task.id}/",
+            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
         }, status=status.HTTP_200_OK)
 
 class GitHubPullRequestViewSet(viewsets.ViewSet):
@@ -47,7 +51,11 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
         task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date])
 
         return Response({
-            "task_id": task.id
+            "task_id": task.id,
+            "message": "Task successfully initiated",
+            "instructions": "To check the task status, make a GET request to: "
+                          f"http://localhost:8000/jobs/{task.id}/",
+            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
         }, status=status.HTTP_200_OK)
 
 class GitHubBranchViewSet(viewsets.ViewSet):
@@ -57,7 +65,11 @@ class GitHubBranchViewSet(viewsets.ViewSet):
         task = fetch_branches.apply_async(args=[repo_name])
 
         return Response({
-            "task_id": task.id
+            "task_id": task.id,
+            "message": "Task successfully initiated",
+            "instructions": "To check the task status, make a GET request to: "
+                          f"http://localhost:8000/jobs/{task.id}/",
+            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
         }, status=status.HTTP_200_OK)
 
 # Novas views genéricas para consulta
