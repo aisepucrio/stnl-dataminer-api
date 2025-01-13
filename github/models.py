@@ -44,7 +44,7 @@ class GitHubModifiedFile(models.Model):
 
 class GitHubMethod(models.Model):
     modified_file = models.ForeignKey(GitHubModifiedFile, related_name="methods", on_delete=models.CASCADE)
-    name = models.CharField(max_length=500)
+    name = models.TextField()
     complexity = models.IntegerField(null=True)
     max_nesting = models.IntegerField(null=True)
 
