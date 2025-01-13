@@ -216,4 +216,4 @@ def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_ap
                 'error': str(e)
             }
         )
-        raise
+        raise e
