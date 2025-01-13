@@ -40,11 +40,11 @@ class IssueListView(generics.ListAPIView):
 class IssueDetailView(generics.RetrieveAPIView):
     queryset = JiraIssue.objects.all()
     serializer_class = JiraIssueSerializer
-    lookup_field = 'issue_id'
+    lookup_field = 'issue_key'
 
 class IssueDeleteView(generics.DestroyAPIView):
     queryset = JiraIssue.objects.all()
-    lookup_field = 'issue_id'
+    lookup_field = 'issue_key'
     
     def delete(self, request, *args, **kwargs):
         issue = self.get_object()
