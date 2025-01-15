@@ -19,9 +19,10 @@ class APIMetrics:
     
     def update_rate_limit(self, headers):
         """Updates rate limit information based on response headers"""
+        # Para a Search API
         self.rate_limit_remaining = headers.get('X-RateLimit-Remaining')
         self.rate_limit_reset = headers.get('X-RateLimit-Reset')
-        self.rate_limit_limit = headers.get('X-RateLimit-Limit')
+        self.rate_limit_limit = headers.get('X-RateLimit-Limit', 30)  # Search API tem limite de 30/minuto
         
         if self.rate_limit_limit and self.rate_limit_remaining:
             self.requests_used = int(self.rate_limit_limit) - int(self.rate_limit_remaining)
@@ -73,7 +74,7 @@ def fetch_prs_with_pagination(repo, start_date, end_date, token):
     base_url = "https://api.github.com/search/issues"
     
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json"
     }
     
@@ -93,6 +94,8 @@ def fetch_prs_with_pagination(repo, start_date, end_date, token):
         
         try:
             print(f"\n[Page {page}] Starting search...")
+            print(f'URL: {base_url}\nParams: {params}\nHeaders: {headers}\n')
+            print(f'Full URL: {base_url}?q={query}&per_page=100&page={page}')
             response = requests.get(base_url, params=params, headers=headers)
             metrics.total_requests += 1
             metrics.pages_processed += 1
@@ -207,31 +210,48 @@ def validate_token(token):
     """Validates GitHub token and shows rate limit info"""
     url = "https://api.github.com/rate_limit"
     headers = {
-        "Authorization": f"Bearer {token}",
+        "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json"
     }
     
     try:
         response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            core_rate = data['resources']['core']
-            search_rate = data['resources']['search']
+        
+        if response.status_code == 401:
+            print("Erro de autenticação: Token inválido ou mal formatado")
+            return False
             
-            print("\n=== GitHub API Token Status ===")
-            print(f"Search API Limit: {search_rate['limit']}")
-            print(f"Search API Remaining: {search_rate['remaining']}")
-            print(f"Core API Limit: {core_rate['limit']}")
-            print(f"Core API Remaining: {core_rate['remaining']}")
+        if response.status_code != 200:
+            print(f"Erro na API: {response.status_code}")
+            print(f"Resposta: {response.text}")
+            return False
             
-            if search_rate['limit'] < 30:
-                print("\nWARNING: Token appears to be unauthorized or invalid!")
-                print("Authenticated tokens should have 5000 requests/hour limit")
-                return False
+        data = response.json()
+        
+        # Acessando os dados corretos da estrutura
+        rate = data['resources']['core']  # Mudança aqui
+        search = data['resources']['search']  # Mudança aqui
+        
+        print("\n=== GitHub API Token Status ===")
+        print("Core API:")
+        print(f"  Limite total: {rate['limit']}")
+        print(f"  Restantes: {rate['remaining']}")
+        print(f"  Reset em: {datetime.fromtimestamp(rate['reset']).strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        print("\nSearch API:")
+        print(f"  Limite total: {search['limit']}")
+        print(f"  Restantes: {search['remaining']}")
+        print(f"  Reset em: {datetime.fromtimestamp(search['reset']).strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        if rate['limit'] < 1000:
+            print("\nAVISO: Token parece não estar autenticado ou é inválido!")
+            print("Tokens autenticados devem ter limite de 5000 requisições/hora")
+            return False
                 
-            return True
+        return True
+        
     except Exception as e:
-        print(f"Error validating token: {e}")
+        print(f"Erro ao validar token: {e}")
         return False
 
 def main():
@@ -239,16 +259,19 @@ def main():
     load_dotenv()
     
     # Configuration
-    repo = "grafana/grafana"
+    repo = "elastic/elasticsearch"
     start_date = "2024-01-01"
-    end_date = "2024-01-20"
-    output_file = "grafana_prs.json"
-    token = os.getenv("GITHUB_TOKENS")
+    end_date = "2025-01-15"
+    output_file = f"{repo.split('/')[1]}_prs.json"
+    token = os.getenv("GITHUB_TOKENS").strip('"')
     
     if not token:
         print("ERROR: GitHub token not found in environment variables!")
         return
-        
+    
+    # Para debug - mostra o token sem as aspas
+    print(f"Token lido (início/fim): {token[:5]}...{token[-5:]}")
+    
     # Validate token before starting
     print("Validating GitHub token...")
     if not validate_token(token):
