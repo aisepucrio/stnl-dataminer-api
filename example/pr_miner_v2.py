@@ -84,7 +84,7 @@ def fetch_prs_with_pagination(repo, start_date, end_date, token):
     
     while has_more_pages:
         request_start = time.time()
-        query = f"repo:{repo} is:pr created:{start_date}..{end_date}"
+        query = f"repo:{repo} is:pr created:{start_date}..{end_date} label:>test"
         
         params = {
             'q': query,
@@ -276,8 +276,8 @@ def main():
     
     # Configuration
     repo = "elastic/elasticsearch"
-    start_date = "2024-01-01"
-    end_date = "2025-01-15"
+    start_date = "2024-01-09"
+    end_date = "2024-01-16"
     output_file = f"{repo.split('/')[1]}_prs.json"
     token = os.getenv("GITHUB_TOKENS").strip('"')
     
