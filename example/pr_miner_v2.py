@@ -1,6 +1,6 @@
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import os
 from dotenv import load_dotenv
@@ -254,6 +254,22 @@ def validate_token(token):
         print(f"Erro ao validar token: {e}")
         return False
 
+def split_date_range(start_date, end_date, interval_days=7):
+    """
+    Divide o intervalo de datas em períodos menores
+    """
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    
+    current = start
+    while current < end:
+        interval_end = min(current + timedelta(days=interval_days), end)
+        yield (
+            current.strftime("%Y-%m-%d"),
+            interval_end.strftime("%Y-%m-%d")
+        )
+        current = interval_end + timedelta(days=1)
+
 def main():
     # Load environment variables
     load_dotenv()
@@ -282,14 +298,44 @@ def main():
     print(f"\nStarting PR extraction for {repo}")
     print(f"Period: {start_date} to {end_date}")
     
-    # Fetch PRs with metrics
-    prs, metrics = fetch_prs_with_pagination(repo, start_date, end_date, token)
+    all_prs = []
+    total_metrics = APIMetrics()
     
-    # Save results with all necessary parameters
-    save_json(prs, metrics, output_file, repo, start_date, end_date)
+    print(f"\nIniciando extração de PRs para {repo}")
+    print(f"Período total: {start_date} até {end_date}")
+    
+    # Dividir em períodos menores
+    for period_start, period_end in split_date_range(start_date, end_date):
+        print(f"\nProcessando período: {period_start} até {period_end}")
+        
+        period_prs, period_metrics = fetch_prs_with_pagination(
+            repo, period_start, period_end, token
+        )
+        
+        all_prs.extend(period_prs)
+        total_metrics.total_prs_collected += period_metrics.total_prs_collected
+        total_metrics.total_requests += period_metrics.total_requests
+        total_metrics.pages_processed += period_metrics.pages_processed
+        
+        # Atualizar métricas da API
+        total_metrics.rate_limit_remaining = period_metrics.rate_limit_remaining
+        total_metrics.rate_limit_limit = period_metrics.rate_limit_limit
+        total_metrics.requests_used = period_metrics.requests_used
+        
+        print(f"PRs encontrados neste período: {len(period_prs)}")
+        
+        # Verificar limite de API e aguardar se necessário
+        if period_metrics.rate_limit_remaining and int(period_metrics.rate_limit_remaining) < 5:
+            reset_time = datetime.fromtimestamp(int(period_metrics.rate_limit_reset))
+            wait_time = (reset_time - datetime.now()).total_seconds() + 10
+            print(f"\nAguardando reset do limite de API: {wait_time:.0f} segundos")
+            time.sleep(max(0, wait_time))
+    
+    # Salvar todos os resultados
+    save_json(all_prs, total_metrics, output_file, repo, start_date, end_date)
     
     # Print final report
-    report = metrics.generate_report()
+    report = total_metrics.generate_report()
     print("\nExtraction Complete!")
     print("=== Final Report ===")
     print(f"Total PRs collected: {report['total_prs_collected']}")
