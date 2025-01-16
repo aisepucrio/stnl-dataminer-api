@@ -66,6 +66,7 @@ class GitHubIssue(models.Model):
 
 class GitHubPullRequest(models.Model):
     repository = models.CharField(max_length=255, db_index=True, default='')
+    number = models.IntegerField(unique=True, null=True)
     pr_id = models.BigIntegerField(unique=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=20)
@@ -75,7 +76,7 @@ class GitHubPullRequest(models.Model):
     labels = models.JSONField(default=list)
     commits = models.JSONField(default=list)
     comments = models.JSONField(default=list)
-
+    
     def __str__(self):
         return f"Pull Request {self.pr_id} - {self.title}"
 
