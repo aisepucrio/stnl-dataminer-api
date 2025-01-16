@@ -65,18 +65,23 @@ class GitHubIssue(models.Model):
         return f"Issue {self.issue_id} - {self.title}"
 
 class GitHubPullRequest(models.Model):
-    repository = models.CharField(max_length=255, db_index=True, default='')
-    number = models.IntegerField(unique=True, null=True)
-    pr_id = models.BigIntegerField(unique=True)
+    pr_id = models.IntegerField(primary_key=True)
+    repository = models.CharField(max_length=255)
+    number = models.IntegerField(null=True)
     title = models.CharField(max_length=255)
-    state = models.CharField(max_length=20)
-    creator = models.CharField(max_length=100)
+    state = models.CharField(max_length=50)
+    creator = models.CharField(max_length=255)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
+    closed_at = models.DateTimeField(null=True)
+    merged_at = models.DateTimeField(null=True)
     labels = models.JSONField(default=list)
     commits = models.JSONField(default=list)
     comments = models.JSONField(default=list)
-    
+
+    class Meta:
+        db_table = 'github_pull_requests'
+
     def __str__(self):
         return f"Pull Request {self.pr_id} - {self.title}"
 

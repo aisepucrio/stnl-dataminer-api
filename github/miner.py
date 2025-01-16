@@ -515,11 +515,6 @@ class GitHubMiner:
 
             print("[PRS] Atualizando banco de dados...", flush=True)
             for pr in all_prs:
-                author, _ = GitHubAuthor.objects.get_or_create(
-                    name=pr['user']['login'],
-                )
-
-                # Cria ou atualiza o PR
                 GitHubPullRequest.objects.update_or_create(
                     pr_id=pr['id'],
                     defaults={
@@ -527,11 +522,11 @@ class GitHubMiner:
                         'number': pr['number'],
                         'title': pr['title'],
                         'state': pr['state'],
+                        'creator': pr['user']['login'],
                         'created_at': pr['created_at'],
                         'updated_at': pr['updated_at'],
-                        'closed_at': pr['closed_at'],
-                        'merged_at': pr['merged_at'],
-                        'author': author,
+                        'closed_at': pr.get('closed_at'),
+                        'merged_at': pr.get('merged_at'),
                         'labels': [label['name'] for label in pr['labels']],
                         'commits': pr['commits_data'],
                         'comments': pr['comments_data']
