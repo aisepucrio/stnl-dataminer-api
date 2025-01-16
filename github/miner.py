@@ -513,6 +513,7 @@ class GitHubMiner:
                     pr_id=pr['id'],
                     defaults={
                         'repository': repo_name,
+                        'number': pr['number'],
                         'title': pr['title'],
                         'state': pr['state'],
                         'creator': pr['user']['login'],
