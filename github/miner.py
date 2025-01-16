@@ -324,23 +324,31 @@ class GitHubMiner:
             self.verify_token()
 
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
+        print(f"\n[ISSUES] Iniciando extração de issues para {repo_name}", flush=True)
+        print(f"[ISSUES] Período: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+
         url = f'https://api.github.com/repos/{repo_name}/issues'
         params = {
             'since': start_date,
             'until': end_date
         }
         try:
+            print("[ISSUES] Fazendo requisição inicial...", flush=True)
             response = requests.get(url, headers=self.headers, params=params)
             if response.status_code == 403:
+                print("[ISSUES] Rate limit atingido, alternando token...", flush=True)
                 self.handle_rate_limit(response)
                 response = requests.get(url, headers=self.headers, params=params)
             response.raise_for_status()
             issues = response.json()
             
+            print(f"[ISSUES] Encontradas {len(issues)} issues para processamento", flush=True)
+            
             # Busca detalhes adicionais para cada issue
             detailed_issues = []
-            for issue in issues:
+            for index, issue in enumerate(issues, 1):
                 issue_number = issue['number']
+                print(f"\n[ISSUES] Processando issue #{issue_number} ({index}/{len(issues)})", flush=True)
                 
                 # Dados adicionais para coletar da issue
                 issue_details = {
@@ -367,6 +375,7 @@ class GitHubMiner:
                 }
 
                 # Buscar eventos da timeline
+                print(f"[ISSUES] Buscando timeline para issue #{issue_number}...", flush=True)
                 timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
                 headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
                 timeline_response = requests.get(timeline_url, headers=headers)
@@ -379,8 +388,10 @@ class GitHubMiner:
                         'assignee': event.get('assignee', {}).get('login') if event.get('assignee') else None,
                         'label': event.get('label', {}).get('name') if event.get('label') else None
                     } for event in timeline_events]
+                    print(f"[ISSUES] {len(timeline_events)} eventos de timeline encontrados", flush=True)
 
                 # Buscar comentários com informações expandidas
+                print(f"[ISSUES] Buscando comentários para issue #{issue_number}...", flush=True)
                 comments_response = requests.get(f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/comments', 
                                               headers=self.headers)
                 if comments_response.status_code == 200:
@@ -394,10 +405,12 @@ class GitHubMiner:
                         'author_association': c['author_association'],
                         'reactions': c.get('reactions', {})
                     } for c in comments]
+                    print(f"[ISSUES] {len(comments)} comentários encontrados", flush=True)
 
                 detailed_issues.append(issue_details)
 
                 # Atualização do modelo GitHubIssue
+                print(f"[ISSUES] Salvando issue #{issue_number} no banco de dados...", flush=True)
                 GitHubIssue.objects.update_or_create(
                     issue_id=issue_details['id'],
                     defaults={
@@ -422,13 +435,15 @@ class GitHubMiner:
                     }
                 )
 
+            print("\n[ISSUES] Salvando dados em JSON...", flush=True)
             self.save_to_json(detailed_issues, f"{repo_name.replace('/', '_')}_issues.json")
-
-            print("Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
+            print(f"[ISSUES] Total de issues processadas: {len(detailed_issues)}", flush=True)
+            print("[ISSUES] Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
 
             return detailed_issues
+
         except requests.exceptions.RequestException as e:
-            print(f"Erro ao acessar issues: {e}", flush=True)
+            print(f"[ISSUES] Erro ao acessar issues: {e}", flush=True)
             return []
         finally:
             self.verify_token()
