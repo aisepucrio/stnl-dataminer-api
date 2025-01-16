@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv
 from git import Repo, GitCommandError
 from pydriller import Repository
-from datetime import datetime
+from datetime import datetime, timedelta
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod
 import time
 
@@ -368,105 +368,139 @@ class GitHubMiner:
         finally:
             self.verify_token()
 
-    def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
-        base_url = "https://api.github.com/search/issues"
-        all_prs = []
-        page = 1
-        has_more_pages = True
+    def split_date_range(self, start_date, end_date, interval_days=1):
+        """
+        Divide o intervalo de datas em períodos menores
+        
+        Args:
+            start_date (str): Data inicial no formato ISO8601 (YYYY-MM-DDTHH:MM:SSZ)
+            end_date (str): Data final no formato ISO8601 (YYYY-MM-DDTHH:MM:SSZ)
+            interval_days (int): Número de dias por intervalo
+            
+        Returns:
+            generator: Gera tuplas de (data_inicio, data_fim) para cada intervalo
+        """
+        if not start_date or not end_date:
+            yield (start_date, end_date)
+            return
 
+        # Remove o 'Z' do final e converte para datetime
+        start = datetime.strptime(start_date.rstrip('Z'), "%Y-%m-%dT%H:%M:%S")
+        end = datetime.strptime(end_date.rstrip('Z'), "%Y-%m-%dT%H:%M:%S")
+        
+        current = start
+        while current < end:
+            interval_end = min(current + timedelta(days=interval_days), end)
+            yield (
+                current.strftime("%Y-%m-%d"),
+                interval_end.strftime("%Y-%m-%d")
+            )
+            current = interval_end + timedelta(days=1)
+
+    def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
+        all_prs = []
+        
         print(f"\nIniciando extração de PRs para {repo_name}", flush=True)
-        print(f"Período: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+        print(f"Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
 
         try:
-            while has_more_pages:
-                # Constrói a query de busca
-                query = f"repo:{repo_name} is:pr"
-                if start_date:
-                    query += f" created:{start_date}"
-                if end_date:
-                    query += f"..{end_date}"
+            # Divide o período em intervalos menores
+            for period_start, period_end in self.split_date_range(start_date, end_date):
+                print(f"\nProcessando período: {period_start} até {period_end}", flush=True)
+                
+                base_url = "https://api.github.com/search/issues"
+                page = 1
+                has_more_pages = True
 
-                params = {
-                    'q': query,
-                    'per_page': 100,
-                    'page': page
-                }
+                while has_more_pages:
+                    # Constrói a query de busca
+                    query = f"repo:{repo_name} is:pr"
+                    if period_start:
+                        query += f" created:{period_start}"
+                    if period_end:
+                        query += f"..{period_end}"
 
-                print(f"\n[Página {page}] Iniciando busca...", flush=True)
-                print(f"Query: {query}", flush=True)
+                    params = {
+                        'q': query,
+                        'per_page': 100,
+                        'page': page
+                    }
 
-                # Faz a requisição
-                response = requests.get(base_url, params=params, headers=self.headers)
+                    print(f"\n[Página {page}] Iniciando busca...", flush=True)
+                    print(f"Query: {query}", flush=True)
 
-                if response.status_code == 403:
-                    print("Rate limit atingido, alternando token...", flush=True)
-                    self.handle_rate_limit(response)
+                    # Faz a requisição
                     response = requests.get(base_url, params=params, headers=self.headers)
 
-                response.raise_for_status()
-                data = response.json()
+                    if response.status_code == 403:
+                        print("Rate limit atingido, alternando token...", flush=True)
+                        self.handle_rate_limit(response)
+                        response = requests.get(base_url, params=params, headers=self.headers)
 
-                if not data['items']:
-                    print("Nenhum PR encontrado nesta página.", flush=True)
-                    break
+                    response.raise_for_status()
+                    data = response.json()
 
-                print(f"[Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
+                    if not data['items']:
+                        print("Nenhum PR encontrado nesta página.", flush=True)
+                        break
 
-                # Processa cada PR encontrado
-                for pr in data['items']:
-                    pr_number = pr['number']
-                    print(f"\nProcessando PR #{pr_number}...", flush=True)
-                    
-                    # Busca detalhes completos do PR
-                    pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
-                    pr_response = requests.get(pr_url, headers=self.headers)
-                    if pr_response.status_code == 403:
-                        self.handle_rate_limit(pr_response)
+                    print(f"[Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
+
+                    # Processa cada PR encontrado
+                    for pr in data['items']:
+                        pr_number = pr['number']
+                        print(f"\nProcessando PR #{pr_number}...", flush=True)
+                        
+                        # Busca detalhes completos do PR
+                        pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
                         pr_response = requests.get(pr_url, headers=self.headers)
-                    pr_details = pr_response.json()
-                    
-                    # Busca commits do PR
-                    print(f"Buscando commits do PR #{pr_number}...", flush=True)
-                    commits_url = f'{pr_url}/commits'
-                    commits_response = requests.get(commits_url, headers=self.headers)
-                    if commits_response.status_code == 403:
-                        self.handle_rate_limit(commits_response)
+                        if pr_response.status_code == 403:
+                            self.handle_rate_limit(pr_response)
+                            pr_response = requests.get(pr_url, headers=self.headers)
+                        pr_details = pr_response.json()
+                        
+                        # Busca commits do PR
+                        print(f"Buscando commits do PR #{pr_number}...", flush=True)
+                        commits_url = f'{pr_url}/commits'
                         commits_response = requests.get(commits_url, headers=self.headers)
-                    commits = commits_response.json()
-                    
-                    # Busca comentários do PR
-                    print(f"Buscando comentários do PR #{pr_number}...", flush=True)
-                    comments_url = f'{pr_url}/comments'
-                    comments_response = requests.get(comments_url, headers=self.headers)
-                    if comments_response.status_code == 403:
-                        self.handle_rate_limit(comments_response)
+                        if commits_response.status_code == 403:
+                            self.handle_rate_limit(commits_response)
+                            commits_response = requests.get(commits_url, headers=self.headers)
+                        commits = commits_response.json()
+                        
+                        # Busca comentários do PR
+                        print(f"Buscando comentários do PR #{pr_number}...", flush=True)
+                        comments_url = f'{pr_url}/comments'
                         comments_response = requests.get(comments_url, headers=self.headers)
-                    comments = comments_response.json()
+                        if comments_response.status_code == 403:
+                            self.handle_rate_limit(comments_response)
+                            comments_response = requests.get(comments_url, headers=self.headers)
+                        comments = comments_response.json()
 
-                    # Estrutura os dados do PR
-                    processed_pr = {
-                        'id': pr_details['id'],
-                        'number': pr_details['number'],
-                        'title': pr_details['title'],
-                        'state': pr_details['state'],
-                        'created_at': pr_details['created_at'],
-                        'updated_at': pr_details['updated_at'],
-                        'closed_at': pr_details.get('closed_at'),
-                        'merged_at': pr_details.get('merged_at'),
-                        'user': pr_details['user'],
-                        'labels': pr_details['labels'],
-                        'commits_data': [{'sha': c['sha'], 'message': c['commit']['message']} for c in commits],
-                        'comments_data': [{'user': c['user']['login'], 'body': c['body']} for c in comments]
-                    }
-                    all_prs.append(processed_pr)
+                        # Estrutura os dados do PR
+                        processed_pr = {
+                            'id': pr_details['id'],
+                            'number': pr_details['number'],
+                            'title': pr_details['title'],
+                            'state': pr_details['state'],
+                            'created_at': pr_details['created_at'],
+                            'updated_at': pr_details['updated_at'],
+                            'closed_at': pr_details.get('closed_at'),
+                            'merged_at': pr_details.get('merged_at'),
+                            'user': pr_details['user'],
+                            'labels': pr_details['labels'],
+                            'commits_data': [{'sha': c['sha'], 'message': c['commit']['message']} for c in commits],
+                            'comments_data': [{'user': c['user']['login'], 'body': c['body']} for c in comments]
+                        }
+                        all_prs.append(processed_pr)
 
-                if len(data['items']) < 100:
-                    has_more_pages = False
-                else:
-                    page += 1
+                    if len(data['items']) < 100:
+                        has_more_pages = False
+                    else:
+                        page += 1
 
-                print(f"\nProgresso: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
-                time.sleep(1)  # Rate limiting
+                    print(f"\nProgresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
+                    time.sleep(1)  # Rate limiting
 
             # Salva no JSON e no banco de dados
             print("\nSalvando dados...", flush=True)
@@ -492,7 +526,6 @@ class GitHubMiner:
 
             print(f"\nExtração concluída!", flush=True)
             print(f"Total de PRs coletados: {len(all_prs)}", flush=True)
-            print(f"Total de páginas processadas: {page}", flush=True)
             return all_prs
 
         except requests.exceptions.RequestException as e:
