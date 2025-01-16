@@ -95,20 +95,15 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None):
             }
         )
         return {
-            'operation': 'fetch_pull_requests',
-            'repository': repo_name,
+            'status': 'success',
             'data': pull_requests
         }
     except Exception as e:
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'operation': 'fetch_pull_requests',
-                'repository': repo_name,
-                'error': str(e)
-            }
-        )
-        raise
+        return {
+            'status': 'error',
+            'error_type': type(e).__name__,
+            'error_message': str(e)
+        }
 
 @shared_task(bind=True)
 def fetch_branches(self, repo_name):

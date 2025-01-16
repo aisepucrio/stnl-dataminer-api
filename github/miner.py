@@ -6,6 +6,50 @@ from git import Repo, GitCommandError
 from pydriller import Repository
 from datetime import datetime
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod
+import time
+
+class APIMetrics:
+    def __init__(self):
+        self.execution_start = time.time()
+        self.total_requests = 0
+        self.total_prs_collected = 0
+        self.pages_processed = 0
+        self.rate_limit_remaining = None
+        self.rate_limit_reset = None
+        self.rate_limit_limit = None
+        self.requests_used = None
+        self.average_time_per_request = 0
+    
+    def update_rate_limit(self, headers):
+        """Updates rate limit information based on response headers"""
+        self.rate_limit_remaining = headers.get('X-RateLimit-Remaining')
+        self.rate_limit_reset = headers.get('X-RateLimit-Reset')
+        self.rate_limit_limit = headers.get('X-RateLimit-Limit', 30)
+        
+        if self.rate_limit_limit and self.rate_limit_remaining:
+            self.requests_used = int(self.rate_limit_limit) - int(self.rate_limit_remaining)
+        
+        if self.total_requests > 0:
+            total_time = time.time() - self.execution_start
+            self.average_time_per_request = total_time / self.total_requests
+
+    def format_reset_time(self):
+        """Converte o timestamp Unix para formato legível"""
+        if self.rate_limit_reset:
+            try:
+                reset_time = datetime.fromtimestamp(int(self.rate_limit_reset))
+                return reset_time.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                return "Unknown"
+        return "Unknown"
+
+    def get_execution_time(self):
+        """Calculate execution time metrics"""
+        total_time = time.time() - self.execution_start
+        return {
+            "seconds": round(total_time, 2),
+            "formatted": f"{int(total_time // 60)}min {int(total_time % 60)}s"
+        }
 
 class GitHubMiner:
     def __init__(self):
@@ -325,57 +369,112 @@ class GitHubMiner:
             self.verify_token()
 
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
-        url = f'https://api.github.com/repos/{repo_name}/pulls'
-        params = {
-            'state': 'all',
-            'since': start_date,
-            'until': end_date
-        }
+        base_url = "https://api.github.com/search/issues"
+        all_prs = []
+        page = 1
+        has_more_pages = True
+
+        print(f"\nIniciando extração de PRs para {repo_name}", flush=True)
+        print(f"Período: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+
         try:
-            response = requests.get(url, headers=self.headers, params=params)
-            if response.status_code == 403:
-                self.handle_rate_limit(response)
-                response = requests.get(url, headers=self.headers, params=params)
-            response.raise_for_status()
-            pull_requests = response.json()
-            
-            # Busca detalhes adicionais para cada PR
-            detailed_prs = []
-            for pr in pull_requests:
-                pr_number = pr['number']
-                
-                # Busca detalhes completos do PR
-                pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
-                pr_response = requests.get(pr_url, headers=self.headers)
-                if pr_response.status_code == 403:
-                    self.handle_rate_limit(pr_response)
+            while has_more_pages:
+                # Constrói a query de busca
+                query = f"repo:{repo_name} is:pr"
+                if start_date:
+                    query += f" created:{start_date}"
+                if end_date:
+                    query += f"..{end_date}"
+
+                params = {
+                    'q': query,
+                    'per_page': 100,
+                    'page': page
+                }
+
+                print(f"\n[Página {page}] Iniciando busca...", flush=True)
+                print(f"Query: {query}", flush=True)
+
+                # Faz a requisição
+                response = requests.get(base_url, params=params, headers=self.headers)
+
+                if response.status_code == 403:
+                    print("Rate limit atingido, alternando token...", flush=True)
+                    self.handle_rate_limit(response)
+                    response = requests.get(base_url, params=params, headers=self.headers)
+
+                response.raise_for_status()
+                data = response.json()
+
+                if not data['items']:
+                    print("Nenhum PR encontrado nesta página.", flush=True)
+                    break
+
+                print(f"[Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
+
+                # Processa cada PR encontrado
+                for pr in data['items']:
+                    pr_number = pr['number']
+                    print(f"\nProcessando PR #{pr_number}...", flush=True)
+                    
+                    # Busca detalhes completos do PR
+                    pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
                     pr_response = requests.get(pr_url, headers=self.headers)
-                pr_details = pr_response.json()
-                
-                # Busca commits do PR
-                commits_url = f'{pr_url}/commits'
-                commits_response = requests.get(commits_url, headers=self.headers)
-                if commits_response.status_code == 403:
-                    self.handle_rate_limit(commits_response)
+                    if pr_response.status_code == 403:
+                        self.handle_rate_limit(pr_response)
+                        pr_response = requests.get(pr_url, headers=self.headers)
+                    pr_details = pr_response.json()
+                    
+                    # Busca commits do PR
+                    print(f"Buscando commits do PR #{pr_number}...", flush=True)
+                    commits_url = f'{pr_url}/commits'
                     commits_response = requests.get(commits_url, headers=self.headers)
-                commits = commits_response.json()
-                
-                # Busca comentários do PR
-                comments_url = f'{pr_url}/comments'
-                comments_response = requests.get(comments_url, headers=self.headers)
-                if comments_response.status_code == 403:
-                    self.handle_rate_limit(comments_response)
+                    if commits_response.status_code == 403:
+                        self.handle_rate_limit(commits_response)
+                        commits_response = requests.get(commits_url, headers=self.headers)
+                    commits = commits_response.json()
+                    
+                    # Busca comentários do PR
+                    print(f"Buscando comentários do PR #{pr_number}...", flush=True)
+                    comments_url = f'{pr_url}/comments'
                     comments_response = requests.get(comments_url, headers=self.headers)
-                comments = comments_response.json()
-                
-                # Adiciona os detalhes ao PR
-                pr_details['commits_data'] = [{'sha': c['sha'], 'message': c['commit']['message']} for c in commits]
-                pr_details['comments_data'] = [{'user': c['user']['login'], 'body': c['body']} for c in comments]
-                detailed_prs.append(pr_details)
+                    if comments_response.status_code == 403:
+                        self.handle_rate_limit(comments_response)
+                        comments_response = requests.get(comments_url, headers=self.headers)
+                    comments = comments_response.json()
 
-            self.save_to_json(detailed_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
+                    # Estrutura os dados do PR
+                    processed_pr = {
+                        'id': pr_details['id'],
+                        'number': pr_details['number'],
+                        'title': pr_details['title'],
+                        'state': pr_details['state'],
+                        'created_at': pr_details['created_at'],
+                        'updated_at': pr_details['updated_at'],
+                        'closed_at': pr_details.get('closed_at'),
+                        'merged_at': pr_details.get('merged_at'),
+                        'user': pr_details['user'],
+                        'labels': pr_details['labels'],
+                        'commits_data': [{'sha': c['sha'], 'message': c['commit']['message']} for c in commits],
+                        'comments_data': [{'user': c['user']['login'], 'body': c['body']} for c in comments]
+                    }
+                    all_prs.append(processed_pr)
 
-            for pr in detailed_prs:
+                if len(data['items']) < 100:
+                    has_more_pages = False
+                else:
+                    page += 1
+
+                print(f"\nProgresso: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
+                time.sleep(1)  # Rate limiting
+
+            # Salva no JSON e no banco de dados
+            print("\nSalvando dados...", flush=True)
+            self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
+
+            # Atualiza o banco de dados
+            print("Atualizando banco de dados...", flush=True)
+            for pr in all_prs:
                 GitHubPullRequest.objects.update_or_create(
                     pr_id=pr['id'],
                     defaults={
@@ -390,9 +489,12 @@ class GitHubMiner:
                         'comments': pr['comments_data']
                     }
                 )
-            print("Pull requests salvas no banco de dados e no JSON com sucesso.", flush=True)
 
-            return detailed_prs
+            print(f"\nExtração concluída!", flush=True)
+            print(f"Total de PRs coletados: {len(all_prs)}", flush=True)
+            print(f"Total de páginas processadas: {page}", flush=True)
+            return all_prs
+
         except requests.exceptions.RequestException as e:
             print(f"Erro ao acessar pull requests: {e}", flush=True)
             return []
