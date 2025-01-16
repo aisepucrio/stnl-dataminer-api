@@ -335,6 +335,7 @@ class GitHubMiner:
         try:
             print("[ISSUES] Fazendo requisição inicial...", flush=True)
             response = requests.get(url, headers=self.headers, params=params)
+            print(f"[ISSUES] Full URL: {response.url}", flush=True)
             if response.status_code == 403:
                 print("[ISSUES] Rate limit atingido, alternando token...", flush=True)
                 self.handle_rate_limit(response)
