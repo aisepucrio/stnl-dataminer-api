@@ -342,33 +342,88 @@ class GitHubMiner:
             for issue in issues:
                 issue_number = issue['number']
                 
-                # Busca comentários da issue
-                comments_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/comments'
-                comments_response = requests.get(comments_url, headers=self.headers)
-                if comments_response.status_code == 403:
-                    self.handle_rate_limit(comments_response)
-                    comments_response = requests.get(comments_url, headers=self.headers)
-                comments = comments_response.json()
-                
-                # Adiciona os comentários à issue
-                issue['comments_data'] = [{'user': c['user']['login'], 'body': c['body'], 'created_at': c['created_at']} for c in comments]
-                detailed_issues.append(issue)
+                # Dados adicionais para coletar da issue
+                issue_details = {
+                    'id': issue['id'],
+                    'number': issue_number,
+                    'title': issue['title'],
+                    'state': issue['state'],
+                    'locked': issue['locked'],
+                    'assignees': [assignee['login'] for assignee in issue['assignees']],
+                    'labels': [label['name'] for label in issue['labels']],
+                    'milestone': issue['milestone']['title'] if issue['milestone'] else None,
+                    'created_at': issue['created_at'],
+                    'updated_at': issue['updated_at'],
+                    'closed_at': issue['closed_at'],
+                    'author_association': issue['author_association'],
+                    'body': issue['body'],
+                    'reactions': {
+                        'total_count': issue['reactions']['total_count'],
+                        'url': issue['reactions']['url']
+                    },
+                    'is_pull_request': 'pull_request' in issue,
+                    'timeline_events': [],
+                    'comments_data': []
+                }
+
+                # Buscar eventos da timeline
+                timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
+                headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
+                timeline_response = requests.get(timeline_url, headers=headers)
+                if timeline_response.status_code == 200:
+                    timeline_events = timeline_response.json()
+                    issue_details['timeline_events'] = [{
+                        'event': event.get('event'),
+                        'actor': event.get('actor', {}).get('login') if event.get('actor') else None,
+                        'created_at': event.get('created_at'),
+                        'assignee': event.get('assignee', {}).get('login') if event.get('assignee') else None,
+                        'label': event.get('label', {}).get('name') if event.get('label') else None
+                    } for event in timeline_events]
+
+                # Buscar comentários com informações expandidas
+                comments_response = requests.get(f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/comments', 
+                                              headers=self.headers)
+                if comments_response.status_code == 200:
+                    comments = comments_response.json()
+                    issue_details['comments_data'] = [{
+                        'id': c['id'],
+                        'user': c['user']['login'],
+                        'body': c['body'],
+                        'created_at': c['created_at'],
+                        'updated_at': c['updated_at'],
+                        'author_association': c['author_association'],
+                        'reactions': c.get('reactions', {})
+                    } for c in comments]
+
+                detailed_issues.append(issue_details)
+
+                # Atualização do modelo GitHubIssue
+                GitHubIssue.objects.update_or_create(
+                    issue_id=issue_details['id'],
+                    defaults={
+                        'repository': repo_name,
+                        'number': issue_details['number'],
+                        'title': issue_details['title'],
+                        'state': issue_details['state'],
+                        'creator': issue['user']['login'],
+                        'assignees': issue_details['assignees'],
+                        'labels': issue_details['labels'],
+                        'milestone': issue_details['milestone'],
+                        'locked': issue_details['locked'],
+                        'created_at': issue_details['created_at'],
+                        'updated_at': issue_details['updated_at'],
+                        'closed_at': issue_details['closed_at'],
+                        'body': issue_details['body'],
+                        'comments': issue_details['comments_data'],
+                        'timeline_events': issue_details['timeline_events'],
+                        'is_pull_request': issue_details['is_pull_request'],
+                        'author_association': issue_details['author_association'],
+                        'reactions': issue_details['reactions']
+                    }
+                )
 
             self.save_to_json(detailed_issues, f"{repo_name.replace('/', '_')}_issues.json")
 
-            for issue in detailed_issues:
-                GitHubIssue.objects.update_or_create(
-                    issue_id=issue['id'],
-                    defaults={
-                        'repository': repo_name,
-                        'title': issue['title'],
-                        'state': issue['state'],
-                        'creator': issue['user']['login'],
-                        'created_at': issue['created_at'],
-                        'updated_at': issue['updated_at'],
-                        'comments': issue['comments_data']
-                    }
-                )
             print("Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
 
             return detailed_issues
