@@ -84,7 +84,7 @@ def fetch_prs_with_pagination(repo, start_date, end_date, token):
     
     while has_more_pages:
         request_start = time.time()
-        query = f"repo:{repo} is:pr created:{start_date}..{end_date} label:>test"
+        query = f"repo:{repo} is:pr created:{start_date}..{end_date}"
         
         params = {
             'q': query,
@@ -287,7 +287,7 @@ def validate_token(token):
         print(f"Erro ao validar token: {e}")
         return False
 
-def split_date_range(start_date, end_date, interval_days=7):
+def split_date_range(start_date, end_date, interval_days=1):
     """
     Divide o intervalo de datas em períodos menores
     """
@@ -307,11 +307,19 @@ def main():
     # Load environment variables
     load_dotenv()
     
-    # Configuration
-    repo = "elastic/elasticsearch"
-    start_date = "2024-01-09"
-    end_date = "2024-01-16"
-    output_file = f"{repo.split('/')[1]}_prs.json"
+    # Configuração centralizada
+    config = {
+        "repo": "elastic/elasticsearch",
+        "start_date": "2024-01-09",
+        "end_date": "2024-01-16",
+        "interval_days": 1, 
+        "query_template": "repo:{repo} is:pr created:{start_date}..{end_date} label:>test",
+        "output_file": None  
+    }
+    
+    # Gerar nome do arquivo de saída baseado no repositório
+    config["output_file"] = f"{config['repo'].split('/')[1]}_prs.json"
+    
     token = os.getenv("GITHUB_TOKENS").strip('"')
     
     if not token:
@@ -328,21 +336,25 @@ def main():
         print("Please check your token and make sure it has the necessary permissions")
         return
     
-    print(f"\nStarting PR extraction for {repo}")
-    print(f"Period: {start_date} to {end_date}")
+    print(f"\nStarting PR extraction for {config['repo']}")
+    print(f"Period: {config['start_date']} to {config['end_date']}")
     
     all_prs = []
     total_metrics = APIMetrics()
     
-    print(f"\nIniciando extração de PRs para {repo}")
-    print(f"Período total: {start_date} até {end_date}")
+    print(f"\nIniciando extração de PRs para {config['repo']}")
+    print(f"Período total: {config['start_date']} até {config['end_date']}")
     
-    # Dividir em períodos menores
-    for period_start, period_end in split_date_range(start_date, end_date):
+    # Dividir em períodos menores usando o interval_days da config
+    for period_start, period_end in split_date_range(
+        config['start_date'], 
+        config['end_date'], 
+        config['interval_days']
+    ):
         print(f"\nProcessando período: {period_start} até {period_end}")
         
         period_prs, period_metrics = fetch_prs_with_pagination(
-            repo, period_start, period_end, token
+            config['repo'], period_start, period_end, token
         )
         
         all_prs.extend(period_prs)
@@ -365,7 +377,8 @@ def main():
             time.sleep(max(0, wait_time))
     
     # Salvar todos os resultados
-    save_json(all_prs, total_metrics, output_file, repo, start_date, end_date)
+    save_json(all_prs, total_metrics, config['output_file'], config['repo'], 
+             config['start_date'], config['end_date'])
     
     # Print final report
     report = total_metrics.generate_report()
