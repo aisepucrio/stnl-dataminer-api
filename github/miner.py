@@ -514,7 +514,29 @@ class GitHubMiner:
             self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
 
             print("[PRS] Atualizando banco de dados...", flush=True)
-            # ... atualização do banco de dados ...
+            for pr in all_prs:
+                author, _ = GitHubAuthor.objects.get_or_create(
+                    name=pr['user']['login'],
+                )
+
+                # Cria ou atualiza o PR
+                GitHubPullRequest.objects.update_or_create(
+                    pr_id=pr['id'],
+                    defaults={
+                        'repository': repo_name,
+                        'number': pr['number'],
+                        'title': pr['title'],
+                        'state': pr['state'],
+                        'created_at': pr['created_at'],
+                        'updated_at': pr['updated_at'],
+                        'closed_at': pr['closed_at'],
+                        'merged_at': pr['merged_at'],
+                        'author': author,
+                        'labels': [label['name'] for label in pr['labels']],
+                        'commits': pr['commits_data'],
+                        'comments': pr['comments_data']
+                    }
+                )
 
             print(f"\n[PRS] Extração concluída!", flush=True)
             print(f"[PRS] Total de PRs coletados: {len(all_prs)}", flush=True)
