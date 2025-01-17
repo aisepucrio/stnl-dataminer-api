@@ -229,8 +229,72 @@ Additionally, there are many other projects within the `ecosystem.atlassian.net`
 ```http
 GET http://localhost:8000/api/jira/issues/
 ```
-- **Description:** Fetches all Jira issues saved in the database.
 
+- **Description:** Fetches all Jira issues saved in the database. The endpoint supports multiple filters to narrow down the results based on various criteria.
+
+**Available Filters**
+You can apply the following query parameters to filter the issues:
+
+1. **Date Filters**:
+   - `created_after`: Fetch issues created on or after a specific date (e.g., `2023-01-01T00:00:00Z`).
+   - `created_before`: Fetch issues created on or before a specific date (e.g., `2023-12-31T23:59:59Z`).
+   - `updated_after`: Fetch issues updated on or after a specific date.
+   - `updated_before`: Fetch issues updated on or before a specific date.
+
+2. **Text Search**:
+   - `summary`: Search for issues whose summaries contain a specific term (case-insensitive).
+   - `description`: Search for issues whose descriptions contain a specific term (case-insensitive).
+   - `creator`: Search for issues created by a specific user (case-insensitive).
+   - `assignee`: Search for issues assigned to a specific user (case-insensitive).
+
+3. **Exact Match Filters**:
+   - `status`: Filter issues by their status (e.g., `Open`, `Closed`).
+   - `project`: Filter issues by the project key (e.g., `PROJ`).
+   - `priority`: Filter issues by their priority (e.g., `High`, `Low`).
+   - `issuetype`: Filter issues by their type (e.g., `Bug`, `Task`).
+
+4. **Ordering**:
+   - Use the `ordering` parameter to sort the results by specific fields. Available fields:
+     - `created`
+     - `updated`
+     - `priority`
+     - `status`
+
+   Example: `?ordering=created` or `?ordering=-updated` (descending order).
+
+**Request Examples**
+
+1. **Fetch all issues in the database**:
+
+```http
+GET http://localhost:8000/api/jira/issues/
+```
+
+2. **Fetch issues created after a specific date**:
+```http
+GET http://localhost:8000/api/jira/issues/?created_after=2023-01-01
+```
+
+3. **Search for issues containing "login" in the summary**:
+```http
+GET http://localhost:8000/api/jira/issues/?summary=login
+```
+
+4. **Filter issues assigned to a specific user**:
+```http
+GET http://localhost:8000/api/jira/issues/?assignee=johndoe
+```
+
+5. **Combine filters**:
+Fetch issues from the project `PROJ` with status `Open`, created after `2023-01-01`:
+```http
+GET http://localhost:8000/api/jira/issues/?project=PROJ&status=Open&created_after=2023-01-01
+```
+
+6. **Order issues by priority**:
+```http
+GET http://localhost:8000/api/jira/issues/?ordering=priority
+```
 ---
 
 #### **3. Issue Details (`GET`)**
@@ -252,26 +316,6 @@ GET http://localhost:8000/api/jira/issues/PROJ-123/
 
 ---
 
-#### **4. Delete Issue (`DELETE`)**
-
-**Request**
-
-```http
-DELETE http://localhost:8000/api/jira/issues/{issue_key}/delete/
-```
-
-- **Description:** Deletes a specific Jira issue by its key.
-- **Path Parameter:**
-  - `issue_key` (required): The unique key of the issue (e.g., `PROJ-123`).
-
-**Request Example**
-
-```http
-DELETE http://localhost:8000/api/jira/issues/PROJ-123/delete/
-```
-
----
-
 #### **Important Notes**
 
 1. To generate a Jira API token, follow these steps:
@@ -285,6 +329,7 @@ DELETE http://localhost:8000/api/jira/issues/PROJ-123/delete/
 4. If `start_date` and `end_date` aren't specified, all available issues will be mined.
 5. If no `issuetypes` are specified, all issue types will be mined.
 6. Dates must be in "yyyy-MM-dd" or "yyyy-MM-dd HH:mm" format.
+7. The start and end dates provided by the user during the request are interpreted in the timezone of the Jira project being mined.
 
 ## Data Storage
 
@@ -320,7 +365,6 @@ python example/user_test.py
 
 This script will make a series of test requests to verify the data mining functionality.
 
-## Important Notes
+## Important Note
 
-- Ensure your GitHub token has the necessary permissions to access the desired repositories.
 - PostgreSQL must be running on the default port 5432.
