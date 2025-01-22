@@ -579,6 +579,7 @@ class GitHubMiner:
 
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
         all_prs = []
+        metrics = APIMetrics()  # Adiciona métricas
         
         print(f"\n[PRS] Iniciando extração de PRs para {repo_name}", flush=True)
         print(f"[PRS] Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
@@ -608,11 +609,24 @@ class GitHubMiner:
                     print(f"[PRS] Query: {query}", flush=True)
 
                     response = requests.get(base_url, params=params, headers=self.headers)
+                    metrics.total_requests += 1
+                    metrics.update_rate_limit(response.headers, endpoint_type='search')
+
+                    # Log das informações de limite
+                    print("\n=== Status do Rate Limit (Search API) ===")
+                    print(f"Limite total: {metrics.search_limit_limit}")
+                    print(f"Requisições restantes: {metrics.search_limit_remaining}")
+                    print(f"Reset em: {metrics.format_reset_time('search')}")
+                    print(f"Requisições utilizadas: {metrics.requests_used}")
+                    print("===========================\n")
 
                     if response.status_code == 403:
-                        print("[PRS] Rate limit atingido, alternando token...", flush=True)
-                        self.handle_rate_limit(response)
+                        print("[PRS] Rate limit atingido, aguardando reset...", flush=True)
+                        self.wait_for_rate_limit_reset('search')
+                        # Tentar novamente após esperar
                         response = requests.get(base_url, params=params, headers=self.headers)
+                        if response.status_code != 200:
+                            raise RuntimeError(f"Erro após aguardar reset: {response.status_code}")
 
                     response.raise_for_status()
                     data = response.json()
@@ -623,53 +637,128 @@ class GitHubMiner:
 
                     print(f"[PRS] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
 
-                    for pr in data['items']:
-                        pr_number = pr['number']
-                        print(f"\n[PRS] Processando PR #{pr_number}...", flush=True)
-                        
-                        print(f"[PRS] Buscando detalhes do PR #{pr_number}...", flush=True)
-                        pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
-                        pr_response = requests.get(pr_url, headers=self.headers)
-                        if pr_response.status_code == 403:
-                            print("[PRS] Rate limit atingido, alternando token...", flush=True)
-                            self.handle_rate_limit(pr_response)
-                            pr_response = requests.get(pr_url, headers=self.headers)
-                        pr_details = pr_response.json()
-                        
-                        print(f"[PRS] Buscando commits do PR #{pr_number}...", flush=True)
-                        commits_url = f'{pr_url}/commits'
-                        commits_response = requests.get(commits_url, headers=self.headers)
-                        if commits_response.status_code == 403:
-                            print("[PRS] Rate limit atingido, alternando token...", flush=True)
-                            self.handle_rate_limit(commits_response)
-                            commits_response = requests.get(commits_url, headers=self.headers)
-                        commits = commits_response.json()
-                        
-                        print(f"[PRS] Buscando comentários do PR #{pr_number}...", flush=True)
-                        comments_url = f'{pr_url}/comments'
-                        comments_response = requests.get(comments_url, headers=self.headers)
-                        if comments_response.status_code == 403:
-                            print("[PRS] Rate limit atingido, alternando token...", flush=True)
-                            self.handle_rate_limit(comments_response)
-                            comments_response = requests.get(comments_url, headers=self.headers)
-                        comments = comments_response.json()
+                    for pr in data.get('items', []):
+                        try:
+                            pr_number = pr.get('number')
+                            if not pr_number:
+                                print("[PRS] PR sem número válido, pulando...", flush=True)
+                                continue
 
-                        # Estrutura os dados do PR
-                        processed_pr = {
-                            'id': pr_details['id'],
-                            'number': pr_details['number'],
-                            'title': pr_details['title'],
-                            'state': pr_details['state'],
-                            'created_at': pr_details['created_at'],
-                            'updated_at': pr_details['updated_at'],
-                            'closed_at': pr_details.get('closed_at'),
-                            'merged_at': pr_details.get('merged_at'),
-                            'user': pr_details['user'],
-                            'labels': pr_details['labels'],
-                            'commits_data': [{'sha': c['sha'], 'message': c['commit']['message']} for c in commits],
-                            'comments_data': [{'user': c['user']['login'], 'body': c['body']} for c in comments]
-                        }
-                        all_prs.append(processed_pr)
+                            print(f"\n[PRS] Processando PR #{pr_number}...", flush=True)
+                            
+                            # Debug: Imprimir conteúdo do PR inicial
+                            print(f"[DEBUG] Conteúdo inicial do PR: {pr}", flush=True)
+                            
+                            # Busca detalhes do PR
+                            print(f"[PRS] Buscando detalhes do PR #{pr_number}...", flush=True)
+                            pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
+                            pr_response = requests.get(pr_url, headers=self.headers)
+                            
+                            # Debug: Imprimir status e headers da resposta
+                            print(f"[DEBUG] Status da resposta de detalhes: {pr_response.status_code}", flush=True)
+                            print(f"[DEBUG] Headers da resposta: {dict(pr_response.headers)}", flush=True)
+                            
+                            if not pr_response or pr_response.status_code != 200:
+                                print(f"[PRS] Erro ao buscar detalhes do PR #{pr_number}. Status: {pr_response.status_code if pr_response else 'None'}", flush=True)
+                                continue
+                                
+                            pr_details = pr_response.json()
+                            # Debug: Verificar conteúdo dos detalhes
+                            print(f"[DEBUG] Detalhes do PR obtidos: {bool(pr_details)}", flush=True)
+                            
+                            if not pr_details:
+                                print(f"[PRS] Detalhes vazios para PR #{pr_number}", flush=True)
+                                continue
+
+                            # Buscar commits
+                            print(f"[PRS] Buscando commits do PR #{pr_number}...", flush=True)
+                            commits_url = f'{pr_url}/commits'
+                            commits_response = requests.get(commits_url, headers=self.headers)
+                            # Debug: Status da resposta de commits
+                            print(f"[DEBUG] Status da resposta de commits: {commits_response.status_code}", flush=True)
+                            
+                            commits = []
+                            if commits_response.status_code == 200:
+                                commits = commits_response.json() or []
+                                # Debug: Número de commits encontrados
+                                print(f"[DEBUG] Número de commits encontrados: {len(commits)}", flush=True)
+
+                            # Buscar comentários
+                            print(f"[PRS] Buscando comentários do PR #{pr_number}...", flush=True)
+                            comments_url = f'{pr_url}/comments'
+                            comments_response = requests.get(comments_url, headers=self.headers)
+                            # Debug: Status da resposta de comentários
+                            print(f"[DEBUG] Status da resposta de comentários: {comments_response.status_code}", flush=True)
+                            
+                            comments = []
+                            if comments_response.status_code == 200:
+                                comments = comments_response.json() or []
+                                # Debug: Número de comentários encontrados
+                                print(f"[DEBUG] Número de comentários encontrados: {len(comments)}", flush=True)
+
+                            try:
+                                # Debug: Imprimir campos críticos antes de processar
+                                print("[DEBUG] Campos críticos do PR:", flush=True)
+                                print(f"- ID: {pr_details.get('id')}", flush=True)
+                                print(f"- User: {pr_details.get('user')}", flush=True)
+                                print(f"- Labels: {pr_details.get('labels')}", flush=True)
+
+                                processed_pr = {
+                                    'id': pr_details.get('id'),
+                                    'number': pr_details.get('number'),
+                                    'title': pr_details.get('title'),
+                                    'state': pr_details.get('state'),
+                                    'created_at': pr_details.get('created_at'),
+                                    'updated_at': pr_details.get('updated_at'),
+                                    'closed_at': pr_details.get('closed_at'),
+                                    'merged_at': pr_details.get('merged_at'),
+                                    'user': pr_details.get('user', {}).get('login'),
+                                    'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
+                                    'commits_data': [],
+                                    'comments_data': []
+                                }
+
+                                # Debug: Confirmar criação do dicionário base
+                                print("[DEBUG] Dicionário base criado com sucesso", flush=True)
+
+                                # Processar commits
+                                if commits:
+                                    processed_pr['commits_data'] = [
+                                        {
+                                            'sha': c.get('sha'),
+                                            'message': c.get('commit', {}).get('message')
+                                        } for c in commits if c
+                                    ]
+                                    # Debug: Confirmar processamento dos commits
+                                    print(f"[DEBUG] Commits processados: {len(processed_pr['commits_data'])}", flush=True)
+
+                                # Processar comentários
+                                if comments:
+                                    processed_pr['comments_data'] = [
+                                        {
+                                            'user': c.get('user', {}).get('login'),
+                                            'body': c.get('body')
+                                        } for c in comments if c
+                                    ]
+                                    # Debug: Confirmar processamento dos comentários
+                                    print(f"[DEBUG] Comentários processados: {len(processed_pr['comments_data'])}", flush=True)
+
+                                all_prs.append(processed_pr)
+                                print(f"[DEBUG] PR #{pr_number} processado com sucesso", flush=True)
+
+                            except Exception as e:
+                                print(f"[DEBUG] Erro ao processar dados do PR #{pr_number}: {str(e)}", flush=True)
+                                print(f"[DEBUG] Tipo do erro: {type(e)}", flush=True)
+                                import traceback
+                                print(f"[DEBUG] Traceback completo: {traceback.format_exc()}", flush=True)
+                                continue
+
+                        except Exception as e:
+                            print(f"[PRS] Erro ao processar PR #{pr_number if 'pr_number' in locals() else 'Unknown'}: {str(e)}", flush=True)
+                            print(f"[DEBUG] Tipo do erro externo: {type(e)}", flush=True)
+                            import traceback
+                            print(f"[DEBUG] Traceback completo externo: {traceback.format_exc()}", flush=True)
+                            continue
 
                     print(f"\n[PRS] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
                     
