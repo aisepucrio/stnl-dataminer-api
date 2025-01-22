@@ -323,125 +323,165 @@ class GitHubMiner:
         finally:
             self.verify_token()
 
+    def sanitize_text(self, text):
+        """Remove ou substitui caracteres inválidos do texto"""
+        if text is None:
+            return None
+        # Substitui caracteres nulos por espaço
+        return text.replace('\u0000', ' ')
+
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
+        all_issues = []
+        
         print(f"\n[ISSUES] Iniciando extração de issues para {repo_name}", flush=True)
-        print(f"[ISSUES] Período: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+        print(f"[ISSUES] Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
 
-        url = f'https://api.github.com/repos/{repo_name}/issues'
-        params = {
-            'since': start_date,
-            'until': end_date
-        }
         try:
-            print("[ISSUES] Fazendo requisição inicial...", flush=True)
-            response = requests.get(url, headers=self.headers, params=params)
-            print(f"[ISSUES] Full URL: {response.url}", flush=True)
-            if response.status_code == 403:
-                print("[ISSUES] Rate limit atingido, alternando token...", flush=True)
-                self.handle_rate_limit(response)
-                response = requests.get(url, headers=self.headers, params=params)
-            response.raise_for_status()
-            issues = response.json()
-            
-            print(f"[ISSUES] Encontradas {len(issues)} issues para processamento", flush=True)
-            
-            # Busca detalhes adicionais para cada issue
-            detailed_issues = []
-            for index, issue in enumerate(issues, 1):
-                issue_number = issue['number']
-                print(f"\n[ISSUES] Processando issue #{issue_number} ({index}/{len(issues)})", flush=True)
+            for period_start, period_end in self.split_date_range(start_date, end_date):
+                print(f"\n[ISSUES] Processando período: {period_start} até {period_end}", flush=True)
                 
-                # Dados adicionais para coletar da issue
-                issue_details = {
-                    'id': issue['id'],
-                    'number': issue_number,
-                    'title': issue['title'],
-                    'state': issue['state'],
-                    'locked': issue['locked'],
-                    'assignees': [assignee['login'] for assignee in issue['assignees']],
-                    'labels': [label['name'] for label in issue['labels']],
-                    'milestone': issue['milestone']['title'] if issue['milestone'] else None,
-                    'created_at': issue['created_at'],
-                    'updated_at': issue['updated_at'],
-                    'closed_at': issue['closed_at'],
-                    'author_association': issue['author_association'],
-                    'body': issue['body'],
-                    'reactions': {
-                        'total_count': issue['reactions']['total_count'],
-                        'url': issue['reactions']['url']
-                    },
-                    'is_pull_request': 'pull_request' in issue,
-                    'timeline_events': [],
-                    'comments_data': []
-                }
+                base_url = "https://api.github.com/search/issues"
+                page = 1
+                has_more_pages = True
 
-                # Buscar eventos da timeline
-                print(f"[ISSUES] Buscando timeline para issue #{issue_number}...", flush=True)
-                timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
-                headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
-                timeline_response = requests.get(timeline_url, headers=headers)
-                if timeline_response.status_code == 200:
-                    timeline_events = timeline_response.json()
-                    issue_details['timeline_events'] = [{
-                        'event': event.get('event'),
-                        'actor': event.get('actor', {}).get('login') if event.get('actor') else None,
-                        'created_at': event.get('created_at'),
-                        'assignee': event.get('assignee', {}).get('login') if event.get('assignee') else None,
-                        'label': event.get('label', {}).get('name') if event.get('label') else None
-                    } for event in timeline_events]
-                    print(f"[ISSUES] {len(timeline_events)} eventos de timeline encontrados", flush=True)
+                while has_more_pages:
+                    query = f"repo:{repo_name} is:issue"
+                    if period_start:
+                        query += f" created:{period_start}"
+                    if period_end:
+                        query += f"..{period_end}"
 
-                # Buscar comentários com informações expandidas
-                print(f"[ISSUES] Buscando comentários para issue #{issue_number}...", flush=True)
-                comments_response = requests.get(f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/comments', 
-                                              headers=self.headers)
-                if comments_response.status_code == 200:
-                    comments = comments_response.json()
-                    issue_details['comments_data'] = [{
-                        'id': c['id'],
-                        'user': c['user']['login'],
-                        'body': c['body'],
-                        'created_at': c['created_at'],
-                        'updated_at': c['updated_at'],
-                        'author_association': c['author_association'],
-                        'reactions': c.get('reactions', {})
-                    } for c in comments]
-                    print(f"[ISSUES] {len(comments)} comentários encontrados", flush=True)
-
-                detailed_issues.append(issue_details)
-
-                # Atualização do modelo GitHubIssue
-                print(f"[ISSUES] Salvando issue #{issue_number} no banco de dados...", flush=True)
-                GitHubIssue.objects.update_or_create(
-                    issue_id=issue_details['id'],
-                    defaults={
-                        'repository': repo_name,
-                        'number': issue_details['number'],
-                        'title': issue_details['title'],
-                        'state': issue_details['state'],
-                        'creator': issue['user']['login'],
-                        'assignees': issue_details['assignees'],
-                        'labels': issue_details['labels'],
-                        'milestone': issue_details['milestone'],
-                        'locked': issue_details['locked'],
-                        'created_at': issue_details['created_at'],
-                        'updated_at': issue_details['updated_at'],
-                        'closed_at': issue_details['closed_at'],
-                        'body': issue_details['body'],
-                        'comments': issue_details['comments_data'],
-                        'timeline_events': issue_details['timeline_events'],
-                        'is_pull_request': issue_details['is_pull_request'],
-                        'author_association': issue_details['author_association'],
-                        'reactions': issue_details['reactions']
+                    params = {
+                        'q': query,
+                        'per_page': 100,
+                        'page': page
                     }
-                )
+
+                    print(f"\n[ISSUES] [Página {page}] Iniciando busca...", flush=True)
+                    print(f"[ISSUES] Query: {query}", flush=True)
+
+                    response = requests.get(base_url, params=params, headers=self.headers)
+
+                    print(f'FULL URL: {response.url}', flush=True)
+
+                    if response.status_code == 403:
+                        print("[ISSUES] Rate limit atingido, alternando token...", flush=True)
+                        self.handle_rate_limit(response)
+                        response = requests.get(base_url, params=params, headers=self.headers)
+
+                    response.raise_for_status()
+                    data = response.json()
+
+                    if not data['items']:
+                        print("[ISSUES] Nenhuma issue encontrada nesta página.", flush=True)
+                        break
+
+                    print(f"[ISSUES] [Página {page}] Encontradas {len(data['items'])} issues", flush=True)
+
+                    for issue in data['items']:
+                        # Verifica se está dentro do período final
+                        if end_date and issue['created_at'] > end_date:
+                            continue
+                            
+                        # Ignora PRs, já que serão coletados separadamente
+                        if 'pull_request' in issue:
+                            continue
+
+                        issue_number = issue['number']
+                        print(f"\n[ISSUES] Processando issue #{issue_number}...", flush=True)
+
+                        # Buscar timeline events
+                        print(f"[ISSUES] Buscando timeline para issue #{issue_number}...", flush=True)
+                        timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
+                        headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
+                        timeline_response = requests.get(timeline_url, headers=headers)
+                        timeline_events = []
+                        if timeline_response.status_code == 200:
+                            timeline_events = [{
+                                'event': event.get('event'),
+                                'actor': event.get('actor', {}).get('login') if event.get('actor') else None,
+                                'created_at': event.get('created_at'),
+                                'assignee': event.get('assignee', {}).get('login') if event.get('assignee') else None,
+                                'label': event.get('label', {}).get('name') if event.get('label') else None
+                            } for event in timeline_response.json()]
+
+                        # Buscar comentários
+                        print(f"[ISSUES] Buscando comentários para issue #{issue_number}...", flush=True)
+                        comments_url = issue['comments_url']
+                        comments_response = requests.get(comments_url, headers=self.headers)
+                        comments = []
+                        if comments_response.status_code == 200:
+                            comments = [{
+                                'id': c['id'],
+                                'user': c['user']['login'],
+                                'body': c['body'],
+                                'created_at': c['created_at'],
+                                'updated_at': c['updated_at'],
+                                'author_association': c['author_association'],
+                                'reactions': c.get('reactions', {})
+                            } for c in comments_response.json()]
+
+                        # Estrutura os dados da issue
+                        processed_issue = {
+                            'id': issue['id'],
+                            'number': issue['number'],
+                            'title': issue['title'],
+                            'state': issue['state'],
+                            'locked': issue['locked'],
+                            'assignees': [assignee['login'] for assignee in issue['assignees']],
+                            'labels': [label['name'] for label in issue['labels']],
+                            'milestone': issue['milestone']['title'] if issue['milestone'] else None,
+                            'created_at': issue['created_at'],
+                            'updated_at': issue['updated_at'],
+                            'closed_at': issue['closed_at'],
+                            'author_association': issue['author_association'],
+                            'body': issue['body'],
+                            'reactions': issue.get('reactions', {}),
+                            'is_pull_request': False,
+                            'timeline_events': timeline_events,
+                            'comments_data': comments
+                        }
+                        all_issues.append(processed_issue)
+
+                        # Atualizar o banco de dados
+                        GitHubIssue.objects.update_or_create(
+                            issue_id=processed_issue['id'],
+                            defaults={
+                                'repository': repo_name,
+                                'number': processed_issue['number'],
+                                'title': self.sanitize_text(processed_issue['title']),
+                                'state': processed_issue['state'],
+                                'creator': issue['user']['login'],
+                                'assignees': processed_issue['assignees'],
+                                'labels': processed_issue['labels'],
+                                'milestone': processed_issue['milestone'],
+                                'locked': processed_issue['locked'],
+                                'created_at': processed_issue['created_at'],
+                                'updated_at': processed_issue['updated_at'],
+                                'closed_at': processed_issue['closed_at'],
+                                'body': self.sanitize_text(processed_issue['body']),
+                                'comments': [{**c, 'body': self.sanitize_text(c['body'])} for c in processed_issue['comments_data']],
+                                'timeline_events': processed_issue['timeline_events'],
+                                'is_pull_request': processed_issue['is_pull_request'],
+                                'author_association': processed_issue['author_association'],
+                                'reactions': processed_issue['reactions']
+                            }
+                        )
+
+                    print(f"\n[ISSUES] Progresso do período atual: {len(all_issues)} issues coletadas em {page} páginas", flush=True)
+                    
+                    if len(data['items']) < 100:
+                        has_more_pages = False
+                    else:
+                        page += 1
+
+                    time.sleep(1)
 
             print("\n[ISSUES] Salvando dados em JSON...", flush=True)
-            self.save_to_json(detailed_issues, f"{repo_name.replace('/', '_')}_issues.json")
-            print(f"[ISSUES] Total de issues processadas: {len(detailed_issues)}", flush=True)
-            print("[ISSUES] Issues salvas no banco de dados e no JSON com sucesso.", flush=True)
-
-            return detailed_issues
+            self.save_to_json(all_issues, f"{repo_name.replace('/', '_')}_issues.json")
+            print(f"\n[ISSUES] Extração concluída!", flush=True)
+            print(f"[ISSUES] Total de issues coletadas: {len(all_issues)}", flush=True)
+            return all_issues
 
         except requests.exceptions.RequestException as e:
             print(f"[ISSUES] Erro ao acessar issues: {e}", flush=True)
