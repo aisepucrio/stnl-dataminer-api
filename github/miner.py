@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv
 from git import Repo, GitCommandError
 from pydriller import Repository
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod
 import time
 
@@ -14,34 +14,66 @@ class APIMetrics:
         self.total_requests = 0
         self.total_prs_collected = 0
         self.pages_processed = 0
-        self.rate_limit_remaining = None
-        self.rate_limit_reset = None
-        self.rate_limit_limit = None
+        # Métricas para core
+        self.core_limit_remaining = None
+        self.core_limit_reset = None
+        self.core_limit_limit = None
+        # Métricas para search
+        self.search_limit_remaining = None
+        self.search_limit_reset = None
+        self.search_limit_limit = None
         self.requests_used = None
         self.average_time_per_request = 0
     
-    def update_rate_limit(self, headers):
-        """Updates rate limit information based on response headers"""
-        self.rate_limit_remaining = headers.get('X-RateLimit-Remaining')
-        self.rate_limit_reset = headers.get('X-RateLimit-Reset')
-        self.rate_limit_limit = headers.get('X-RateLimit-Limit', 30)
+    def update_rate_limit(self, headers, endpoint_type='core'):
+        """
+        Updates rate limit information based on response headers
         
-        if self.rate_limit_limit and self.rate_limit_remaining:
-            self.requests_used = int(self.rate_limit_limit) - int(self.rate_limit_remaining)
+        Args:
+            headers: Response headers from GitHub API
+            endpoint_type: Type of endpoint being accessed ('core' or 'search')
+        """
+        if endpoint_type == 'search':
+            self.search_limit_remaining = headers.get('X-RateLimit-Remaining')
+            self.search_limit_reset = headers.get('X-RateLimit-Reset')
+            self.search_limit_limit = headers.get('X-RateLimit-Limit', 30)  # Search tem limite de 30/min
+            
+            if self.search_limit_limit and self.search_limit_remaining:
+                self.requests_used = int(self.search_limit_limit) - int(self.search_limit_remaining)
+        else:  # core
+            self.core_limit_remaining = headers.get('X-RateLimit-Remaining')
+            self.core_limit_reset = headers.get('X-RateLimit-Reset')
+            self.core_limit_limit = headers.get('X-RateLimit-Limit', 5000)  # Core tem limite de 5000/hora
+            
+            if self.core_limit_limit and self.core_limit_remaining:
+                self.requests_used = int(self.core_limit_limit) - int(self.core_limit_remaining)
         
         if self.total_requests > 0:
             total_time = time.time() - self.execution_start
             self.average_time_per_request = total_time / self.total_requests
 
-    def format_reset_time(self):
-        """Converte o timestamp Unix para formato legível"""
-        if self.rate_limit_reset:
+    def format_reset_time(self, endpoint_type='core'):
+        """Converte o timestamp Unix para formato legível e considera fuso horário local"""
+        reset_time = self.core_limit_reset if endpoint_type == 'core' else self.search_limit_reset
+        if reset_time:
             try:
-                reset_time = datetime.fromtimestamp(int(self.rate_limit_reset))
-                return reset_time.strftime('%Y-%m-%d %H:%M:%S')
-            except:
+                # Converte timestamp UTC para datetime local
+                reset_time_utc = datetime.fromtimestamp(int(reset_time), tz=timezone.utc)
+                reset_time_local = reset_time_utc.astimezone(timezone(timedelta(hours=-3)))  # Forçando timezone de Brasília
+                
+                time_until_reset = reset_time_local - datetime.now().astimezone(timezone(timedelta(hours=-3)))  # Mesmo timezone para comparação
+                seconds_until_reset = int(time_until_reset.total_seconds())
+                
+                return f"{reset_time_local.strftime('%Y-%m-%d %H:%M:%S')} (em {seconds_until_reset} segundos)"
+            except Exception as e:
+                print(f"Erro ao formatar tempo: {e}")
                 return "Unknown"
         return "Unknown"
+
+    def get_remaining_requests(self, endpoint_type='core'):
+        """Retorna o número de requisições restantes para o tipo de endpoint"""
+        return (self.core_limit_remaining if endpoint_type == 'core' 
+                else self.search_limit_remaining)
 
     def get_execution_time(self):
         """Calculate execution time metrics"""
@@ -68,30 +100,18 @@ class GitHubMiner:
             url = "https://api.github.com/rate_limit"
             response = requests.get(url, headers=self.headers)
             
-            if response.status_code == 401:
-                print(f"Token inválido ou expirado: {self.tokens[self.current_token_index]}", flush=True)
-                if len(self.tokens) > 1:
-                    self.switch_token()
-                    return self.verify_token()  # Tenta novamente com o próximo token
-                return False
-            
-            if response.status_code == 403:
-                rate_limits = response.json().get("rate", {})
-                reset_time = rate_limits.get("reset")
-                if reset_time:
-                    reset_time = datetime.fromtimestamp(reset_time).strftime('%Y-%m-%d %H:%M:%S')
-                    print(f"Limite de requisições atingido. Reset em: {reset_time}", flush=True)
-                
-                if len(self.tokens) > 1:
-                    self.switch_token()
-                    return self.verify_token()  # Tenta novamente com o próximo token
+            if response.status_code != 200:
+                print(f"Erro ao verificar token: {response.status_code}", flush=True)
                 return False
 
-            response.raise_for_status()
-            rate_limits = response.json().get("rate", {})
+            # Pegando o rate limit do 'core' ao invés do geral
+            rate_limits = response.json().get("resources", {}).get("core", {})
             remaining = rate_limits.get("remaining", 0)
+            limit = rate_limits.get("limit", 0)
             
-            if remaining < 100:  # Limite baixo de requisições
+            print(f"Limite total: {limit}, Requisições restantes: {remaining}", flush=True)
+            
+            if remaining < 100:
                 print(f"Atenção: Apenas {remaining} requisições restantes", flush=True)
                 if len(self.tokens) > 1:
                     self.switch_token()
@@ -130,15 +150,42 @@ class GitHubMiner:
         self.update_auth_header()
         print(f"Alternando para o próximo token. Token atual: {self.current_token_index + 1}/{len(self.tokens)}", flush=True)
 
-    def handle_rate_limit(self, response):
-        """Alterna token caso o limite de requisições seja atingido e exibe requisições restantes"""
+    def wait_for_rate_limit_reset(self, endpoint_type='core'):
+        try:
+            if endpoint_type == 'search':
+                response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
+                rate_limits = response.json()['resources']['search']
+                reset_time = int(rate_limits['reset'])
+                current_time = int(time.time())
+                wait_time = reset_time - current_time + 1
+                
+                print(f"[RATE LIMIT] Status atual do Search API:", flush=True)
+                print(f"- Limite: {rate_limits['limit']}", flush=True)
+                print(f"- Restante: {rate_limits['remaining']}", flush=True)
+                print(f"- Reset em: {wait_time} segundos", flush=True)
+                
+                if wait_time > 0:
+                    print(f"\n[RATE LIMIT] Aguardando {wait_time} segundos para reset...", flush=True)
+                    time.sleep(wait_time)
+                    return True
+        except Exception as e:
+            print(f"[RATE LIMIT] Erro ao aguardar reset: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha ao aguardar reset do rate limit: {str(e)}")
+        return False
+
+    def handle_rate_limit(self, response, endpoint_type='core'):
+        """Gerencia o rate limit baseado no tipo de endpoint"""
         if response.status_code == 403 and 'rate limit' in response.text.lower():
-            print("Limite de requisições atingido. Alternando token.", flush=True)
-            self.switch_token()
-            self.verify_token()  # Adicionada verificação do token após a troca
+            if endpoint_type == 'search':
+                print("[RATE LIMIT] Limite de busca atingido. Aguardando reset...", flush=True)
+                self.wait_for_rate_limit_reset('search')
+            else:
+                print("[RATE LIMIT] Limite core atingido. Alternando token...", flush=True)
+                self.switch_token()
+                self.verify_token()
         else:
             remaining_requests = response.headers.get('X-RateLimit-Remaining', 'N/A')
-            print(f"Requisições restantes para o token atual: {remaining_requests}", flush=True)
+            print(f"Requisições restantes para o token atual ({endpoint_type}): {remaining_requests}", flush=True)
 
     def project_root_directory(self):
         return os.getcwd()
@@ -332,6 +379,7 @@ class GitHubMiner:
 
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
         all_issues = []
+        metrics = APIMetrics()
         
         print(f"\n[ISSUES] Iniciando extração de issues para {repo_name}", flush=True)
         print(f"[ISSUES] Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
@@ -361,13 +409,24 @@ class GitHubMiner:
                     print(f"[ISSUES] Query: {query}", flush=True)
 
                     response = requests.get(base_url, params=params, headers=self.headers)
+                    metrics.total_requests += 1
+                    metrics.update_rate_limit(response.headers, endpoint_type='search')
 
-                    print(f'FULL URL: {response.url}', flush=True)
+                    # Log das informações de limite
+                    print("\n=== Status do Rate Limit (Search API) ===")
+                    print(f"Limite total: {metrics.search_limit_limit}")
+                    print(f"Requisições restantes: {metrics.search_limit_remaining}")
+                    print(f"Reset em: {metrics.format_reset_time('search')}")
+                    print(f"Requisições utilizadas: {metrics.requests_used}")
+                    print("===========================\n")
 
                     if response.status_code == 403:
-                        print("[ISSUES] Rate limit atingido, alternando token...", flush=True)
-                        self.handle_rate_limit(response)
+                        print("[ISSUES] Rate limit atingido, aguardando reset...", flush=True)
+                        self.wait_for_rate_limit_reset('search')
+                        # Tentar novamente após esperar
                         response = requests.get(base_url, params=params, headers=self.headers)
+                        if response.status_code != 200:
+                            raise RuntimeError(f"Erro após aguardar reset: {response.status_code}")
 
                     response.raise_for_status()
                     data = response.json()
@@ -483,9 +542,9 @@ class GitHubMiner:
             print(f"[ISSUES] Total de issues coletadas: {len(all_issues)}", flush=True)
             return all_issues
 
-        except requests.exceptions.RequestException as e:
-            print(f"[ISSUES] Erro ao acessar issues: {e}", flush=True)
-            return []
+        except Exception as e:
+            print(f"[ISSUES] Erro durante a extração: {str(e)}", flush=True)
+            raise  # Re-lança a exceção com o tipo correto
         finally:
             self.verify_token()
 
