@@ -152,40 +152,60 @@ class GitHubMiner:
 
     def wait_for_rate_limit_reset(self, endpoint_type='core'):
         try:
-            if endpoint_type == 'search':
-                response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
-                rate_limits = response.json()['resources']['search']
-                reset_time = int(rate_limits['reset'])
-                current_time = int(time.time())
-                wait_time = reset_time - current_time + 1
-                
-                print(f"[RATE LIMIT] Status atual do Search API:", flush=True)
-                print(f"- Limite: {rate_limits['limit']}", flush=True)
-                print(f"- Restante: {rate_limits['remaining']}", flush=True)
-                print(f"- Reset em: {wait_time} segundos", flush=True)
-                
-                if wait_time > 0:
-                    print(f"\n[RATE LIMIT] Aguardando {wait_time} segundos para reset...", flush=True)
-                    time.sleep(wait_time)
-                    return True
+            response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
+            rate_limits = response.json()['resources'][endpoint_type]
+            reset_time = int(rate_limits['reset'])
+            current_time = int(time.time())
+            wait_time = reset_time - current_time + 1
+            
+            print("\n" + "="*50)
+            print(f"📊 Status atual do {endpoint_type.upper()} Rate Limit:")
+            print(f"Limite total: {rate_limits['limit']}")
+            print(f"Restante: {rate_limits['remaining']}")
+            print(f"Reset em: {wait_time} segundos")
+            print("="*50 + "\n")
+            
+            if wait_time > 0:
+                print(f"\n⏳ [RATE LIMIT] Aguardando {wait_time} segundos para reset...", flush=True)
+                time.sleep(wait_time)
+                print("✅ [RATE LIMIT] Reset concluído! Retomando operações...\n", flush=True)
+                return True
         except Exception as e:
-            print(f"[RATE LIMIT] Erro ao aguardar reset: {str(e)}", flush=True)
+            print(f"❌ [RATE LIMIT] Erro ao aguardar reset: {str(e)}", flush=True)
             raise RuntimeError(f"Falha ao aguardar reset do rate limit: {str(e)}")
         return False
 
     def handle_rate_limit(self, response, endpoint_type='core'):
         """Gerencia o rate limit baseado no tipo de endpoint"""
         if response.status_code == 403 and 'rate limit' in response.text.lower():
+            reset_time = response.headers.get('X-RateLimit-Reset')
+            if reset_time:
+                reset_datetime = datetime.fromtimestamp(int(reset_time))
+                wait_time = (reset_datetime - datetime.now()).total_seconds()
+                
+                print("\n" + "="*50)
+                print("🚫 RATE LIMIT ATINGIDO!")
+                print(f"Tipo de endpoint: {endpoint_type.upper()}")
+                print(f"Reset programado para: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Tempo de espera necessário: {int(wait_time)} segundos")
+                print("="*50 + "\n")
+                
             if endpoint_type == 'search':
                 print("[RATE LIMIT] Limite de busca atingido. Aguardando reset...", flush=True)
                 self.wait_for_rate_limit_reset('search')
             else:
-                print("[RATE LIMIT] Limite core atingido. Alternando token...", flush=True)
-                self.switch_token()
-                self.verify_token()
+                if len(self.tokens) > 1:
+                    print("[RATE LIMIT] Limite core atingido. Alternando para próximo token...", flush=True)
+                    self.switch_token()
+                    self.verify_token()
+                else:
+                    print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos disponíveis!", flush=True)
         else:
             remaining_requests = response.headers.get('X-RateLimit-Remaining', 'N/A')
-            print(f"Requisições restantes para o token atual ({endpoint_type}): {remaining_requests}", flush=True)
+            if remaining_requests != 'N/A' and int(remaining_requests) < 100:
+                print(f"\n⚠️ ALERTA: Apenas {remaining_requests} requisições restantes para o token atual ({endpoint_type})", flush=True)
+            else:
+                print(f"Requisições restantes para o token atual ({endpoint_type}): {remaining_requests}", flush=True)
 
     def project_root_directory(self):
         return os.getcwd()
@@ -772,12 +792,12 @@ class GitHubMiner:
                         'number': pr['number'],
                         'title': pr['title'],
                         'state': pr['state'],
-                        'creator': pr['user']['login'],
+                        'creator': pr['user'].get('login') if isinstance(pr['user'], dict) else pr['user'],
                         'created_at': pr['created_at'],
                         'updated_at': pr['updated_at'],
                         'closed_at': pr.get('closed_at'),
                         'merged_at': pr.get('merged_at'),
-                        'labels': [label['name'] for label in pr['labels']],
+                        'labels': pr['labels'],
                         'commits': pr['commits_data'],
                         'comments': pr['comments_data']
                     }
