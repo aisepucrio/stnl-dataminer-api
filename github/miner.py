@@ -579,14 +579,35 @@ class GitHubMiner:
 
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
         all_prs = []
-        metrics = APIMetrics()  # Adiciona métricas
+        metrics = APIMetrics()
         
         print(f"\n[PRS] Iniciando extração de PRs para {repo_name}", flush=True)
         print(f"[PRS] Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
 
+        def log_debug(pr_number, messages):
+            """Função auxiliar para logs de debug"""
+            if not hasattr(log_debug, 'buffer'):
+                log_debug.buffer = []
+            log_debug.buffer.append(f"[DEBUG][PR #{pr_number}] {messages}")
+
+        def flush_debug_logs():
+            """Função para imprimir logs acumulados"""
+            if hasattr(log_debug, 'buffer') and log_debug.buffer:
+                print("\n=== Debug Logs ===", flush=True)
+                print('\n'.join(log_debug.buffer), flush=True)
+                print("=================\n", flush=True)
+                log_debug.buffer = []
+
+        def log_error(pr_number, message, error=None):
+            """Função auxiliar para logs de erro"""
+            print(f"\n[ERROR][PR #{pr_number}] {message}", flush=True)
+            if error:
+                print(f"[ERROR][PR #{pr_number}] Detalhes: {str(error)}\n", flush=True)
+
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
                 print(f"\n[PRS] Processando período: {period_start} até {period_end}", flush=True)
+                print(f"[PRS] Período atual representa {self.calculate_period_days(period_start, period_end)} dias", flush=True)
                 
                 base_url = "https://api.github.com/search/issues"
                 page = 1
@@ -641,68 +662,46 @@ class GitHubMiner:
                         try:
                             pr_number = pr.get('number')
                             if not pr_number:
-                                print("[PRS] PR sem número válido, pulando...", flush=True)
                                 continue
 
-                            print(f"\n[PRS] Processando PR #{pr_number}...", flush=True)
-                            
-                            # Debug: Imprimir conteúdo do PR inicial
-                            print(f"[DEBUG] Conteúdo inicial do PR: {pr}", flush=True)
+                            log_debug(pr_number, "Iniciando processamento")
                             
                             # Busca detalhes do PR
-                            print(f"[PRS] Buscando detalhes do PR #{pr_number}...", flush=True)
                             pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
                             pr_response = requests.get(pr_url, headers=self.headers)
                             
-                            # Debug: Imprimir status e headers da resposta
-                            print(f"[DEBUG] Status da resposta de detalhes: {pr_response.status_code}", flush=True)
-                            print(f"[DEBUG] Headers da resposta: {dict(pr_response.headers)}", flush=True)
-                            
-                            if not pr_response or pr_response.status_code != 200:
-                                print(f"[PRS] Erro ao buscar detalhes do PR #{pr_number}. Status: {pr_response.status_code if pr_response else 'None'}", flush=True)
+                            if pr_response.status_code != 200:
+                                log_error(pr_number, f"Falha ao buscar detalhes. Status: {pr_response.status_code}")
+                                flush_debug_logs()
                                 continue
-                                
-                            pr_details = pr_response.json()
-                            # Debug: Verificar conteúdo dos detalhes
-                            print(f"[DEBUG] Detalhes do PR obtidos: {bool(pr_details)}", flush=True)
                             
+                            pr_details = pr_response.json()
                             if not pr_details:
-                                print(f"[PRS] Detalhes vazios para PR #{pr_number}", flush=True)
+                                log_error(pr_number, "Detalhes do PR vazios")
+                                flush_debug_logs()
                                 continue
 
+                            log_debug(pr_number, "Detalhes obtidos com sucesso")
+
                             # Buscar commits
-                            print(f"[PRS] Buscando commits do PR #{pr_number}...", flush=True)
                             commits_url = f'{pr_url}/commits'
                             commits_response = requests.get(commits_url, headers=self.headers)
-                            # Debug: Status da resposta de commits
-                            print(f"[DEBUG] Status da resposta de commits: {commits_response.status_code}", flush=True)
                             
                             commits = []
                             if commits_response.status_code == 200:
                                 commits = commits_response.json() or []
-                                # Debug: Número de commits encontrados
-                                print(f"[DEBUG] Número de commits encontrados: {len(commits)}", flush=True)
+                                log_debug(pr_number, f"Commits encontrados: {len(commits)}")
 
                             # Buscar comentários
-                            print(f"[PRS] Buscando comentários do PR #{pr_number}...", flush=True)
                             comments_url = f'{pr_url}/comments'
                             comments_response = requests.get(comments_url, headers=self.headers)
-                            # Debug: Status da resposta de comentários
-                            print(f"[DEBUG] Status da resposta de comentários: {comments_response.status_code}", flush=True)
                             
                             comments = []
                             if comments_response.status_code == 200:
                                 comments = comments_response.json() or []
-                                # Debug: Número de comentários encontrados
-                                print(f"[DEBUG] Número de comentários encontrados: {len(comments)}", flush=True)
+                                log_debug(pr_number, f"Comentários encontrados: {len(comments)}")
 
                             try:
-                                # Debug: Imprimir campos críticos antes de processar
-                                print("[DEBUG] Campos críticos do PR:", flush=True)
-                                print(f"- ID: {pr_details.get('id')}", flush=True)
-                                print(f"- User: {pr_details.get('user')}", flush=True)
-                                print(f"- Labels: {pr_details.get('labels')}", flush=True)
-
                                 processed_pr = {
                                     'id': pr_details.get('id'),
                                     'number': pr_details.get('number'),
@@ -718,9 +717,6 @@ class GitHubMiner:
                                     'comments_data': []
                                 }
 
-                                # Debug: Confirmar criação do dicionário base
-                                print("[DEBUG] Dicionário base criado com sucesso", flush=True)
-
                                 # Processar commits
                                 if commits:
                                     processed_pr['commits_data'] = [
@@ -729,8 +725,7 @@ class GitHubMiner:
                                             'message': c.get('commit', {}).get('message')
                                         } for c in commits if c
                                     ]
-                                    # Debug: Confirmar processamento dos commits
-                                    print(f"[DEBUG] Commits processados: {len(processed_pr['commits_data'])}", flush=True)
+                                    log_debug(pr_number, f"Processados {len(processed_pr['commits_data'])} commits")
 
                                 # Processar comentários
                                 if comments:
@@ -740,24 +735,20 @@ class GitHubMiner:
                                             'body': c.get('body')
                                         } for c in comments if c
                                     ]
-                                    # Debug: Confirmar processamento dos comentários
-                                    print(f"[DEBUG] Comentários processados: {len(processed_pr['comments_data'])}", flush=True)
+                                    log_debug(pr_number, f"Processados {len(processed_pr['comments_data'])} comentários")
 
                                 all_prs.append(processed_pr)
-                                print(f"[DEBUG] PR #{pr_number} processado com sucesso", flush=True)
+                                log_debug(pr_number, "Processamento concluído com sucesso")
+                                flush_debug_logs()  # Imprime todos os logs acumulados para este PR
 
                             except Exception as e:
-                                print(f"[DEBUG] Erro ao processar dados do PR #{pr_number}: {str(e)}", flush=True)
-                                print(f"[DEBUG] Tipo do erro: {type(e)}", flush=True)
-                                import traceback
-                                print(f"[DEBUG] Traceback completo: {traceback.format_exc()}", flush=True)
+                                log_error(pr_number, "Erro ao processar dados", e)
+                                flush_debug_logs()
                                 continue
 
                         except Exception as e:
-                            print(f"[PRS] Erro ao processar PR #{pr_number if 'pr_number' in locals() else 'Unknown'}: {str(e)}", flush=True)
-                            print(f"[DEBUG] Tipo do erro externo: {type(e)}", flush=True)
-                            import traceback
-                            print(f"[DEBUG] Traceback completo externo: {traceback.format_exc()}", flush=True)
+                            log_error(pr_number if 'pr_number' in locals() else 'Unknown', "Erro ao processar PR", e)
+                            flush_debug_logs()
                             continue
 
                     print(f"\n[PRS] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
@@ -828,3 +819,21 @@ class GitHubMiner:
             return []
         finally:
             self.verify_token()
+
+    def calculate_period_days(self, start_date, end_date):
+        """
+        Calcula o número de dias entre duas datas
+        
+        Args:
+            start_date (str): Data inicial no formato YYYY-MM-DD
+            end_date (str): Data final no formato YYYY-MM-DD
+            
+        Returns:
+            int: Número de dias entre as datas
+        """
+        if not start_date or not end_date:
+            return "período completo"
+            
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        return (end - start).days + 1  # +1 para incluir o próprio dia
