@@ -624,6 +624,34 @@ class GitHubMiner:
             if error:
                 print(f"[ERROR][PR #{pr_number}] Detalhes: {str(error)}\n", flush=True)
 
+        def check_rate_limit_response(response, pr_number):
+            """Função auxiliar para verificar rate limit na resposta"""
+            if response.status_code == 403:
+                if 'rate limit' in response.text.lower():
+                    print("\n" + "="*50)
+                    print("🚫 RATE LIMIT ATINGIDO durante processamento do PR!")
+                    print(f"PR Número: #{pr_number}")
+                    
+                    reset_time = response.headers.get('X-RateLimit-Reset')
+                    if reset_time:
+                        reset_datetime = datetime.fromtimestamp(int(reset_time))
+                        wait_time = (reset_datetime - datetime.now()).total_seconds()
+                        print(f"Reset programado para: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                        print(f"Tempo de espera necessário: {int(wait_time)} segundos")
+                    print("="*50 + "\n")
+                    
+                    if len(self.tokens) > 1:
+                        print("[RATE LIMIT] Alternando para próximo token...", flush=True)
+                        self.switch_token()
+                        return True
+                    else:
+                        print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos!", flush=True)
+                        self.wait_for_rate_limit_reset()
+                        return True
+                else:
+                    print(f"[ERROR][PR #{pr_number}] Erro 403 não relacionado ao rate limit: {response.text}", flush=True)
+            return False
+
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
                 print(f"\n[PRS] Processando período: {period_start} até {period_end}", flush=True)
@@ -656,7 +684,7 @@ class GitHubMiner:
                     # Log das informações de limite
                     print("\n=== Status do Rate Limit (Search API) ===")
                     print(f"Limite total: {metrics.search_limit_limit}")
-                    print(f"Requisições restantes: {metrics.search_limit_remaining}")
+                    print(f"Requisições restates: {metrics.search_limit_remaining}")
                     print(f"Reset em: {metrics.format_reset_time('search')}")
                     print(f"Requisições utilizadas: {metrics.requests_used}")
                     print("===========================\n")
@@ -664,7 +692,7 @@ class GitHubMiner:
                     if response.status_code == 403:
                         print("[PRS] Rate limit atingido, aguardando reset...", flush=True)
                         self.wait_for_rate_limit_reset('search')
-                        # Tentar novamente após esperar
+            
                         response = requests.get(base_url, params=params, headers=self.headers)
                         if response.status_code != 200:
                             raise RuntimeError(f"Erro após aguardar reset: {response.status_code}")
@@ -691,10 +719,18 @@ class GitHubMiner:
                             pr_response = requests.get(pr_url, headers=self.headers)
                             
                             if pr_response.status_code != 200:
-                                log_error(pr_number, f"Falha ao buscar detalhes. Status: {pr_response.status_code}")
-                                flush_debug_logs()
-                                continue
-                            
+                                if check_rate_limit_response(pr_response, pr_number):
+                                    # Tenta novamente após tratar o rate limit
+                                    pr_response = requests.get(pr_url, headers=self.headers)
+                                    if pr_response.status_code != 200:
+                                        log_error(pr_number, f"Falha ao buscar detalhes mesmo após tratar rate limit. Status: {pr_response.status_code}")
+                                        flush_debug_logs()
+                                        continue
+                                else:
+                                    log_error(pr_number, f"Falha ao buscar detalhes. Status: {pr_response.status_code}")
+                                    flush_debug_logs()
+                                    continue
+
                             pr_details = pr_response.json()
                             if not pr_details:
                                 log_error(pr_number, "Detalhes do PR vazios")
