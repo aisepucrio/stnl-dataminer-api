@@ -5,7 +5,7 @@ def read_json(file_path):
         return json.load(file)
     
 if __name__ == "__main__":
-    file_path = "esp8266_Arduino_issues.json"
+    file_path = "grafana_grafana_pull_requests.json"
     data = read_json(file_path)
 
     print(f'Total de issues: {len(data)}')
