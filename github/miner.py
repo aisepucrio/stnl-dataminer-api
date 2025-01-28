@@ -99,24 +99,14 @@ class GitHubMiner:
         try:
             url = "https://api.github.com/rate_limit"
             response = requests.get(url, headers=self.headers)
+            metrics = APIMetrics()
             
             if response.status_code != 200:
                 print(f"Erro ao verificar token: {response.status_code}", flush=True)
                 return False
 
-            # Pegando o rate limit do 'core' ao invés do geral
-            rate_limits = response.json().get("resources", {}).get("core", {})
-            remaining = rate_limits.get("remaining", 0)
-            limit = rate_limits.get("limit", 0)
-            
-            print(f"Limite total: {limit}, Requisições restantes: {remaining}", flush=True)
-            
-            if remaining < 100:
-                print(f"Atenção: Apenas {remaining} requisições restantes", flush=True)
-                if len(self.tokens) > 1:
-                    self.switch_token()
-                    return self.verify_token()
-            
+            # Usar a função unificada para mostrar o status
+            self.check_and_log_rate_limit(response, metrics, 'core', "Verificação de Token")
             return True
 
         except Exception as e:
@@ -151,25 +141,37 @@ class GitHubMiner:
         print(f"Alternando para o próximo token. Token atual: {self.current_token_index + 1}/{len(self.tokens)}", flush=True)
 
     def wait_for_rate_limit_reset(self, endpoint_type='core'):
+        """Aguarda o reset do rate limit com margem de segurança"""
         try:
             response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
+            metrics = APIMetrics()
+            
+            # Usar a função unificada para mostrar o status
+            self.check_and_log_rate_limit(response, metrics, endpoint_type, "Aguardando Reset")
+            
             rate_limits = response.json()['resources'][endpoint_type]
             reset_time = int(rate_limits['reset'])
             current_time = int(time.time())
-            wait_time = reset_time - current_time + 1
             
-            print("\n" + "="*50)
-            print(f"📊 Status atual do {endpoint_type.upper()} Rate Limit:")
-            print(f"Limite total: {rate_limits['limit']}")
-            print(f"Restante: {rate_limits['remaining']}")
-            print(f"Reset em: {wait_time} segundos")
-            print("="*50 + "\n")
+            # Adiciona margem de segurança de 5 segundos
+            wait_time = reset_time - current_time + 5
             
             if wait_time > 0:
-                print(f"\n⏳ [RATE LIMIT] Aguardando {wait_time} segundos para reset...", flush=True)
+                print(f"\n⏳ [RATE LIMIT] Aguardando {wait_time} segundos para reset (incluindo margem de segurança)...", flush=True)
                 time.sleep(wait_time)
                 print("✅ [RATE LIMIT] Reset concluído! Retomando operações...\n", flush=True)
-                return True
+                
+                # Verifica novamente o rate limit após a espera
+                response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
+                if response.status_code == 200:
+                    new_limits = response.json()['resources'][endpoint_type]
+                    if int(new_limits['remaining']) > 0:
+                        return True
+                    else:
+                        # Se ainda não resetou, aguarda mais 5 segundos
+                        print("⚠️ [RATE LIMIT] Token ainda não resetou, aguardando mais 5 segundos...", flush=True)
+                        time.sleep(5)
+                        return True
         except Exception as e:
             print(f"❌ [RATE LIMIT] Erro ao aguardar reset: {str(e)}", flush=True)
             raise RuntimeError(f"Falha ao aguardar reset do rate limit: {str(e)}")
@@ -401,16 +403,21 @@ class GitHubMiner:
         all_issues = []
         metrics = APIMetrics()
         
-        print(f"\n[ISSUES] Iniciando extração de issues para {repo_name}", flush=True)
-        print(f"[ISSUES] Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+        print("\n" + "="*50)
+        print(f"🔍 INICIANDO EXTRAÇÃO DE ISSUES: {repo_name}")
+        print(f"📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
+        print("="*50 + "\n")
 
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
-                print(f"\n[ISSUES] Processando período: {period_start} até {period_end}", flush=True)
+                print("\n" + "-"*40)
+                print(f"📊 Processando período: {period_start} até {period_end}")
+                print("-"*40)
                 
                 base_url = "https://api.github.com/search/issues"
                 page = 1
                 has_more_pages = True
+                period_issues_count = 0
 
                 while has_more_pages:
                     query = f"repo:{repo_name} is:issue"
@@ -425,56 +432,40 @@ class GitHubMiner:
                         'page': page
                     }
 
-                    print(f"\n[ISSUES] [Página {page}] Iniciando busca...", flush=True)
-                    print(f"[ISSUES] Query: {query}", flush=True)
-
                     response = requests.get(base_url, params=params, headers=self.headers)
                     metrics.total_requests += 1
-                    metrics.update_rate_limit(response.headers, endpoint_type='search')
-
-                    # Log das informações de limite
-                    print("\n=== Status do Rate Limit (Search API) ===")
-                    print(f"Limite total: {metrics.search_limit_limit}")
-                    print(f"Requisições restantes: {metrics.search_limit_remaining}")
-                    print(f"Reset em: {metrics.format_reset_time('search')}")
-                    print(f"Requisições utilizadas: {metrics.requests_used}")
-                    print("===========================\n")
-
-                    if response.status_code == 403:
-                        print("[ISSUES] Rate limit atingido, aguardando reset...", flush=True)
-                        self.wait_for_rate_limit_reset('search')
-                        # Tentar novamente após esperar
+                    
+                    if self.check_and_log_rate_limit(response, metrics, 'search', f"Página {page}"):
                         response = requests.get(base_url, params=params, headers=self.headers)
                         if response.status_code != 200:
-                            raise RuntimeError(f"Erro após aguardar reset: {response.status_code}")
+                            raise RuntimeError(f"Erro após tratar rate limit: {response.status_code}. Resposta: {response.text}")
 
                     response.raise_for_status()
                     data = response.json()
 
                     if not data['items']:
-                        print("[ISSUES] Nenhuma issue encontrada nesta página.", flush=True)
                         break
 
-                    print(f"[ISSUES] [Página {page}] Encontradas {len(data['items'])} issues", flush=True)
+                    issues_in_page = len(data['items'])
+                    period_issues_count += issues_in_page
+                    print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
 
                     for issue in data['items']:
-                        # Verifica se está dentro do período final
-                        if end_date and issue['created_at'] > end_date:
-                            continue
-                            
-                        # Ignora PRs, já que serão coletados separadamente
                         if 'pull_request' in issue:
                             continue
 
                         issue_number = issue['number']
-                        print(f"\n[ISSUES] Processando issue #{issue_number}...", flush=True)
-
+                        
                         # Buscar timeline events
-                        print(f"[ISSUES] Buscando timeline para issue #{issue_number}...", flush=True)
                         timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
                         headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
                         timeline_response = requests.get(timeline_url, headers=headers)
+                        metrics.total_requests += 1
+                        
                         timeline_events = []
+                        if self.check_and_log_rate_limit(timeline_response, metrics, 'core', f"Timeline #{issue_number}"):
+                            timeline_response = requests.get(timeline_url, headers=headers)
+                        
                         if timeline_response.status_code == 200:
                             timeline_events = [{
                                 'event': event.get('event'),
@@ -485,10 +476,14 @@ class GitHubMiner:
                             } for event in timeline_response.json()]
 
                         # Buscar comentários
-                        print(f"[ISSUES] Buscando comentários para issue #{issue_number}...", flush=True)
                         comments_url = issue['comments_url']
                         comments_response = requests.get(comments_url, headers=self.headers)
+                        metrics.total_requests += 1
+                        
                         comments = []
+                        if self.check_and_log_rate_limit(comments_response, metrics, 'core', f"Comentários #{issue_number}"):
+                            comments_response = requests.get(comments_url, headers=self.headers)
+                        
                         if comments_response.status_code == 200:
                             comments = [{
                                 'id': c['id'],
@@ -500,7 +495,6 @@ class GitHubMiner:
                                 'reactions': c.get('reactions', {})
                             } for c in comments_response.json()]
 
-                        # Estrutura os dados da issue
                         processed_issue = {
                             'id': issue['id'],
                             'number': issue['number'],
@@ -521,34 +515,8 @@ class GitHubMiner:
                             'comments_data': comments
                         }
                         all_issues.append(processed_issue)
+                        print(f"✓ Issue #{issue_number} processada", end='\r')
 
-                        # Atualizar o banco de dados
-                        GitHubIssue.objects.update_or_create(
-                            issue_id=processed_issue['id'],
-                            defaults={
-                                'repository': repo_name,
-                                'number': processed_issue['number'],
-                                'title': self.sanitize_text(processed_issue['title']),
-                                'state': processed_issue['state'],
-                                'creator': issue['user']['login'],
-                                'assignees': processed_issue['assignees'],
-                                'labels': processed_issue['labels'],
-                                'milestone': processed_issue['milestone'],
-                                'locked': processed_issue['locked'],
-                                'created_at': processed_issue['created_at'],
-                                'updated_at': processed_issue['updated_at'],
-                                'closed_at': processed_issue['closed_at'],
-                                'body': self.sanitize_text(processed_issue['body']),
-                                'comments': [{**c, 'body': self.sanitize_text(c['body'])} for c in processed_issue['comments_data']],
-                                'timeline_events': processed_issue['timeline_events'],
-                                'is_pull_request': processed_issue['is_pull_request'],
-                                'author_association': processed_issue['author_association'],
-                                'reactions': processed_issue['reactions']
-                            }
-                        )
-
-                    print(f"\n[ISSUES] Progresso do período atual: {len(all_issues)} issues coletadas em {page} páginas", flush=True)
-                    
                     if len(data['items']) < 100:
                         has_more_pages = False
                     else:
@@ -556,15 +524,18 @@ class GitHubMiner:
 
                     time.sleep(1)
 
-            print("\n[ISSUES] Salvando dados em JSON...", flush=True)
+                print(f"\n✅ Período concluído: {period_issues_count} issues coletadas em {page} páginas")
+
+            print("\n" + "="*50)
+            print("💾 Salvando dados em JSON...")
             self.save_to_json(all_issues, f"{repo_name.replace('/', '_')}_issues.json")
-            print(f"\n[ISSUES] Extração concluída!", flush=True)
-            print(f"[ISSUES] Total de issues coletadas: {len(all_issues)}", flush=True)
+            print(f"✨ Extração concluída! Total de issues coletadas: {len(all_issues)}")
+            print("="*50 + "\n")
             return all_issues
 
         except Exception as e:
-            print(f"[ISSUES] Erro durante a extração: {str(e)}", flush=True)
-            raise  # Re-lança a exceção com o tipo correto
+            print(f"\n❌ Erro durante a extração: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha na extração de issues: {str(e)}") from e
         finally:
             self.verify_token()
 
@@ -598,31 +569,8 @@ class GitHubMiner:
             current = interval_end + timedelta(days=1)
 
     def check_and_log_rate_limit(self, response, metrics, endpoint_type='core', context=""):
-        """Função unificada para verificar e logar status do rate limit
-        
-        Args:
-            response: Resposta da requisição
-            metrics: Objeto APIMetrics
-            endpoint_type: Tipo do endpoint ('core' ou 'search')
-            context: Contexto adicional para o log (ex: "PR #123")
-        
-        Returns:
-            bool: True se precisou tratar rate limit, False caso contrário
-        """
+        """Função unificada para verificar e logar status do rate limit"""
         metrics.update_rate_limit(response.headers, endpoint_type)
-        
-        # Log das informações de limite
-        print(f"\n=== Status do Rate Limit ({endpoint_type.upper()} API) {context} ===")
-        if endpoint_type == 'search':
-            print(f"Limite total: {metrics.search_limit_limit}")
-            print(f"Requisições restantes: {metrics.search_limit_remaining}")
-            print(f"Reset em: {metrics.format_reset_time('search')}")
-        else:
-            print(f"Limite total: {metrics.core_limit_limit}")
-            print(f"Requisições restantes: {metrics.core_limit_remaining}")
-            print(f"Reset em: {metrics.format_reset_time('core')}")
-        print(f"Requisições utilizadas: {metrics.requests_used}")
-        print("=" * 50 + "\n")
         
         # Verifica se atingiu o rate limit
         if response.status_code == 403 and 'rate limit' in response.text.lower():
@@ -651,10 +599,10 @@ class GitHubMiner:
                     self.wait_for_rate_limit_reset()
             return True
         
-        # Alerta quando estiver próximo do limite
+        # Alerta apenas quando estiver muito próximo do limite
         remaining = (metrics.search_limit_remaining if endpoint_type == 'search' 
                     else metrics.core_limit_remaining)
-        if remaining and int(remaining) < 100:
+        if remaining and int(remaining) < 50:
             print(f"\n⚠️ ALERTA: Apenas {remaining} requisições restantes para o token atual ({endpoint_type})", flush=True)
         
         return False
@@ -662,38 +610,44 @@ class GitHubMiner:
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
         all_prs = []
         metrics = APIMetrics()
+        debug_buffer = []  # Buffer para acumular mensagens de debug
         
-        print(f"\n[PRS] Iniciando extração de PRs para {repo_name}", flush=True)
-        print(f"[PRS] Período total: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
-
-        def log_debug(pr_number, messages):
-            """Função auxiliar para logs de debug"""
-            if not hasattr(log_debug, 'buffer'):
-                log_debug.buffer = []
-            log_debug.buffer.append(f"[DEBUG][PR #{pr_number}] {messages}")
-
-        def flush_debug_logs():
-            """Função para imprimir logs acumulados"""
-            if hasattr(log_debug, 'buffer') and log_debug.buffer:
-                print("\n=== Debug Logs ===", flush=True)
-                print('\n'.join(log_debug.buffer), flush=True)
-                print("=================\n", flush=True)
-                log_debug.buffer = []
+        def log_debug(pr_number, message):
+            """Adiciona mensagem de debug ao buffer"""
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            debug_buffer.append(f"[{timestamp}][PRs][DEBUG][PR #{pr_number}] {message}")
 
         def log_error(pr_number, message, error=None):
-            """Função auxiliar para logs de erro"""
-            print(f"\n[ERROR][PR #{pr_number}] {message}", flush=True)
+            """Loga erro e imprime imediatamente"""
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            error_message = f"[{timestamp}][PRs][ERROR][PR #{pr_number}] {message}"
             if error:
-                print(f"[ERROR][PR #{pr_number}] Detalhes: {str(error)}\n", flush=True)
+                error_message += f"\nDetalhes: {str(error)}"
+            print(f"\n{error_message}", flush=True)
+
+        def flush_debug_logs():
+            """Imprime e limpa o buffer de logs de debug"""
+            if debug_buffer:
+                print("\n=== Debug Logs ===", flush=True)
+                print('\n'.join(debug_buffer), flush=True)
+                print("=================\n", flush=True)
+                debug_buffer.clear()
+
+        print("\n" + "="*50)
+        print(f"[PRs] 🔍 INICIANDO EXTRAÇÃO DE PULL REQUESTS: {repo_name}")
+        print(f"[PRs] 📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
+        print("="*50 + "\n")
 
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
-                print(f"\n[PRS] Processando período: {period_start} até {period_end}", flush=True)
-                print(f"[PRS] Período atual representa {self.calculate_period_days(period_start, period_end)} dias", flush=True)
+                print("\n" + "-"*40)
+                print(f"[PRs] 📊 Processando período: {period_start} até {period_end}")
+                print("-"*40)
                 
                 base_url = "https://api.github.com/search/issues"
                 page = 1
                 has_more_pages = True
+                period_prs_count = 0
 
                 while has_more_pages:
                     query = f"repo:{repo_name} is:pr"
@@ -708,26 +662,26 @@ class GitHubMiner:
                         'page': page
                     }
 
-                    print(f"\n[PRS] [Página {page}] Iniciando busca...", flush=True)
-                    print(f"[PRS] Query: {query}", flush=True)
+                    print(f"[PRs] [Página {page}] Iniciando busca...", flush=True)
+                    print(f"[PRs] Query: {query}", flush=True)
 
                     response = requests.get(base_url, params=params, headers=self.headers)
                     metrics.total_requests += 1
                     
                     # Verifica rate limit unificado
-                    if self.check_and_log_rate_limit(response, metrics, 'search', f"Página {page}"):
+                    if self.check_and_log_rate_limit(response, metrics, 'search', f"[PRs] Página {page}"):
                         response = requests.get(base_url, params=params, headers=self.headers)
                         if response.status_code != 200:
-                            raise RuntimeError(f"Erro após tratar rate limit: {response.status_code}")
+                            raise RuntimeError(f"[PRs] Erro após tratar rate limit: {response.status_code}")
 
                     response.raise_for_status()
                     data = response.json()
 
                     if not data['items']:
-                        print("[PRS] Nenhum PR encontrado nesta página.", flush=True)
+                        print("[PRs] Nenhum PR encontrado nesta página.", flush=True)
                         break
 
-                    print(f"[PRS] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
+                    print(f"[PRs] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
 
                     for pr in data.get('items', []):
                         try:
@@ -743,18 +697,18 @@ class GitHubMiner:
                             metrics.total_requests += 1
                             
                             # Verifica rate limit unificado
-                            if self.check_and_log_rate_limit(pr_response, metrics, 'core', f"PR #{pr_number}"):
+                            if self.check_and_log_rate_limit(pr_response, metrics, 'core', f"[PRs] PR #{pr_number}"):
                                 pr_response = requests.get(pr_url, headers=self.headers)
                                 if pr_response.status_code != 200:
-                                    log_error(pr_number, f"Falha ao buscar detalhes mesmo após tratar rate limit. Status: {pr_response.status_code}")
+                                    log_error(pr_number, f"[PRs] Falha ao buscar detalhes mesmo após tratar rate limit. Status: {pr_response.status_code}")
                                     continue
                             
                             pr_details = pr_response.json()
                             if not pr_details:
-                                log_error(pr_number, "Detalhes do PR vazios")
+                                log_error(pr_number, "[PRs] Detalhes do PR vazios")
                                 continue
 
-                            log_debug(pr_number, "Detalhes obtidos com sucesso")
+                            log_debug(pr_number, "[PRs] Detalhes obtidos com sucesso")
 
                             # Buscar commits
                             commits_url = f'{pr_url}/commits'
@@ -763,7 +717,7 @@ class GitHubMiner:
                             commits = []
                             if commits_response.status_code == 200:
                                 commits = commits_response.json() or []
-                                log_debug(pr_number, f"Commits encontrados: {len(commits)}")
+                                log_debug(pr_number, f"[PRs] Commits encontrados: {len(commits)}")
 
                             # Buscar comentários
                             comments_url = f'{pr_url}/comments'
@@ -772,7 +726,7 @@ class GitHubMiner:
                             comments = []
                             if comments_response.status_code == 200:
                                 comments = comments_response.json() or []
-                                log_debug(pr_number, f"Comentários encontrados: {len(comments)}")
+                                log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
 
                             try:
                                 processed_pr = {
@@ -798,7 +752,7 @@ class GitHubMiner:
                                             'message': c.get('commit', {}).get('message')
                                         } for c in commits if c
                                     ]
-                                    log_debug(pr_number, f"Processados {len(processed_pr['commits_data'])} commits")
+                                    log_debug(pr_number, f"[PRs] Processados {len(processed_pr['commits_data'])} commits")
 
                                 # Processar comentários
                                 if comments:
@@ -808,23 +762,40 @@ class GitHubMiner:
                                             'body': c.get('body')
                                         } for c in comments if c
                                     ]
-                                    log_debug(pr_number, f"Processados {len(processed_pr['comments_data'])} comentários")
+                                    log_debug(pr_number, f"[PRs] Processados {len(processed_pr['comments_data'])} comentários")
 
+                                # Salvar no banco de dados
+                                GitHubPullRequest.objects.update_or_create(
+                                    pr_id=processed_pr['id'],
+                                    defaults={
+                                        'repository': repo_name,
+                                        'number': processed_pr['number'],
+                                        'title': processed_pr['title'],
+                                        'state': processed_pr['state'],
+                                        'creator': processed_pr['user'],
+                                        'created_at': processed_pr['created_at'],
+                                        'updated_at': processed_pr['updated_at'],
+                                        'closed_at': processed_pr.get('closed_at'),
+                                        'merged_at': processed_pr.get('merged_at'),
+                                        'labels': processed_pr['labels'],
+                                        'commits': processed_pr['commits_data'],
+                                        'comments': processed_pr['comments_data']
+                                    }
+                                )
+                                
                                 all_prs.append(processed_pr)
-                                log_debug(pr_number, "Processamento concluído com sucesso")
-                                flush_debug_logs()  # Imprime todos os logs acumulados para este PR
+                                log_debug(pr_number, "Processamento e salvamento concluídos com sucesso")
+                                flush_debug_logs()
 
                             except Exception as e:
-                                log_error(pr_number, "Erro ao processar dados", e)
-                                flush_debug_logs()
+                                log_error(pr_number if 'pr_number' in locals() else 'Unknown', "Erro ao processar PR", e)
                                 continue
 
                         except Exception as e:
                             log_error(pr_number if 'pr_number' in locals() else 'Unknown', "Erro ao processar PR", e)
-                            flush_debug_logs()
                             continue
 
-                    print(f"\n[PRS] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
+                    print(f"[PRs] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
                     
                     if len(data['items']) < 100:
                         has_more_pages = False
@@ -833,36 +804,16 @@ class GitHubMiner:
 
                     time.sleep(1)
 
-            print("\n[PRS] Salvando dados em JSON...", flush=True)
+            print("\n" + "="*50)
+            print("[PRs] 💾 Salvando dados em JSON...")
             self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
-
-            print("[PRS] Atualizando banco de dados...", flush=True)
-            for pr in all_prs:
-                GitHubPullRequest.objects.update_or_create(
-                    pr_id=pr['id'],
-                    defaults={
-                        'repository': repo_name,
-                        'number': pr['number'],
-                        'title': pr['title'],
-                        'state': pr['state'],
-                        'creator': pr['user'].get('login') if isinstance(pr['user'], dict) else pr['user'],
-                        'created_at': pr['created_at'],
-                        'updated_at': pr['updated_at'],
-                        'closed_at': pr.get('closed_at'),
-                        'merged_at': pr.get('merged_at'),
-                        'labels': pr['labels'],
-                        'commits': pr['commits_data'],
-                        'comments': pr['comments_data']
-                    }
-                )
-
-            print(f"\n[PRS] Extração concluída!", flush=True)
-            print(f"[PRS] Total de PRs coletados: {len(all_prs)}", flush=True)
+            print(f"[PRs] ✨ Extração concluída! Total de PRs coletados: {len(all_prs)}")
+            print("="*50 + "\n")
             return all_prs
 
-        except requests.exceptions.RequestException as e:
-            print(f"[PRS] Erro ao acessar pull requests: {e}", flush=True)
-            return []
+        except Exception as e:
+            print(f"[PRs] ❌ Erro durante a extração: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha na extração de PRs: {str(e)}") from e
         finally:
             self.verify_token()
 

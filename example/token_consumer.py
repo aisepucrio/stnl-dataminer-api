@@ -2,11 +2,36 @@ import os
 import requests
 import time
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+import multiprocessing
 
 load_dotenv()
 
+def make_github_request(headers, request_number, print_lock):
+    url = "https://api.github.com/user"
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        with print_lock:
+            print(f"Requisição #{request_number}")
+            print(f"Status: {response.status_code}")
+            print(f"Restantes: {response.headers.get('X-RateLimit-Remaining', 0)}")
+            print("-" * 40)
+            
+        return int(response.headers.get("X-RateLimit-Remaining", 0))
+    
+    except requests.exceptions.RequestException as e:
+        with print_lock:
+            print(f"Erro na requisição {request_number}: {str(e)}")
+        return 0
+
 def frenetic_github_requests():
     token = os.getenv("GITHUB_TOKENS")
+
+    tokens = token.split(",")
+
+    token = tokens[1]
     
     if not token:
         raise ValueError("Token não encontrado no .env")
@@ -16,39 +41,37 @@ def frenetic_github_requests():
         "Accept": "application/vnd.github.v3+json"
     }
     
-    request_count = 0
-    url = "https://api.github.com/user"  # Altere para o endpoint desejado
+    print_lock = Lock()
     
-    while True:
-        try:
-            response = requests.get(url, headers=headers, timeout=10)
-            request_count += 1
+    # Calcula o número máximo de threads
+    max_workers = min(32, (multiprocessing.cpu_count() * 4))  # Limitando a 32 para segurança
+    print(f"Iniciando com {max_workers} threads simultâneas")
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        request_number = 0
+        futures = []
+        
+        while True:
+            # Cria várias requisições de uma vez
+            for _ in range(max_workers):
+                request_number += 1
+                future = executor.submit(make_github_request, headers, request_number, print_lock)
+                futures.append(future)
             
-            # Captura os limites de taxa da resposta
-            remaining = int(response.headers.get("X-RateLimit-Remaining", 0))
-            reset_time = int(response.headers.get("X-RateLimit-Reset", 0))
+            # Verifica os resultados completados
+            for completed_future in [f for f in futures if f.done()]:
+                remaining = completed_future.result()
+                if remaining <= 0:
+                    print("⚠️ Rate limit atingido! Parando todas as threads...")
+                    executor._threads.clear()
+                    return
             
-            # Calcula tempo até o reset do limite
-            current_time = time.time()
-            time_until_reset = reset_time - current_time
+            # Remove futures completados da lista
+            futures = [f for f in futures if not f.done()]
             
-            print(f"Requisição #{request_count}")
-            print(f"Status: {response.status_code}")
-            print(f"Restantes: {remaining}")
-            print(f"Reset em: {time_until_reset:.0f} segundos")
-            print("-" * 40)
-            
-            # Para quando atingir o limite
-            if remaining <= 0:
-                print("⚠️ Rate limit atingido! Pare de fazer requisições.")
-                break
-            
-            # Intervalo entre requisições (ajuste conforme necessário)
-            time.sleep(1)
-            
-        except requests.exceptions.RequestException as e:
-            print(f"Erro na requisição: {str(e)}")
-            break
+            # Reduz o intervalo entre batches de requisições
+            time.sleep(0.5)
 
 # Execute a função
-frenetic_github_requests()
+if __name__ == "__main__":
+    frenetic_github_requests()
