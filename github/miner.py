@@ -197,17 +197,67 @@ class GitHubMiner:
                 self.wait_for_rate_limit_reset('search')
             else:
                 if len(self.tokens) > 1:
-                    print("[RATE LIMIT] Limite core atingido. Alternando para próximo token...", flush=True)
-                    self.switch_token()
-                    self.verify_token()
+                    # Verifica todos os tokens disponíveis
+                    best_token = self.find_best_available_token()
+                    if best_token is None:
+                        print("[RATE LIMIT] Todos os tokens estão indisponíveis. Aguardando reset do token com menor tempo...", flush=True)
+                        self.wait_for_rate_limit_reset()
+                    else:
+                        print(f"[RATE LIMIT] Alternando para token {best_token + 1}/{len(self.tokens)}...", flush=True)
+                        self.current_token_index = best_token
+                        self.update_auth_header()
                 else:
                     print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos disponíveis!", flush=True)
+                    self.wait_for_rate_limit_reset()
         else:
             remaining_requests = response.headers.get('X-RateLimit-Remaining', 'N/A')
             if remaining_requests != 'N/A' and int(remaining_requests) < 100:
                 print(f"\n⚠️ ALERTA: Apenas {remaining_requests} requisições restantes para o token atual ({endpoint_type})", flush=True)
             else:
                 print(f"Requisições restantes para o token atual ({endpoint_type}): {remaining_requests}", flush=True)
+
+    def find_best_available_token(self):
+        """
+        Verifica todos os tokens e retorna o índice do melhor token disponível
+        ou None se todos estiverem indisponíveis
+        """
+        best_token = None
+        earliest_reset = float('inf')
+        
+        original_token_index = self.current_token_index
+        
+        for i in range(len(self.tokens)):
+            self.current_token_index = i
+            self.update_auth_header()
+            
+            try:
+                response = requests.get("https://api.github.com/rate_limit", headers=self.headers)
+                if response.status_code == 200:
+                    rate_data = response.json()['resources']
+                    
+                    # Verifica limites core e search
+                    core_remaining = int(rate_data['core']['remaining'])
+                    search_remaining = int(rate_data['search']['remaining'])
+                    reset_time = int(rate_data['core']['reset'])
+                    
+                    if core_remaining > 0 or search_remaining > 0:
+                        # Se encontrar um token com requisições disponíveis, retorna imediatamente
+                        return i
+                    
+                    # Se não tem requisições disponíveis, guarda o que tem reset mais próximo
+                    if reset_time < earliest_reset:
+                        earliest_reset = reset_time
+                        best_token = i
+                    
+            except Exception as e:
+                print(f"Erro ao verificar token {i + 1}: {str(e)}", flush=True)
+        
+        # Restaura o token original se nenhum token disponível for encontrado
+        self.current_token_index = original_token_index
+        self.update_auth_header()
+        
+        # Retorna o token com reset mais próximo se nenhum estiver disponível imediatamente
+        return best_token
 
     def project_root_directory(self):
         return os.getcwd()
@@ -435,10 +485,11 @@ class GitHubMiner:
                     response = requests.get(base_url, params=params, headers=self.headers)
                     metrics.total_requests += 1
                     
-                    if self.check_and_log_rate_limit(response, metrics, 'search', f"Página {page}"):
+                    if response.status_code == 403 and 'rate limit' in response.text.lower():
+                        if not self.handle_rate_limit(response, 'search'):
+                            print("[Issues] Falha ao recuperar após rate limit", flush=True)
+                            break
                         response = requests.get(base_url, params=params, headers=self.headers)
-                        if response.status_code != 200:
-                            raise RuntimeError(f"Erro após tratar rate limit: {response.status_code}. Resposta: {response.text}")
 
                     response.raise_for_status()
                     data = response.json()
@@ -463,7 +514,10 @@ class GitHubMiner:
                         metrics.total_requests += 1
                         
                         timeline_events = []
-                        if self.check_and_log_rate_limit(timeline_response, metrics, 'core', f"Timeline #{issue_number}"):
+                        if timeline_response.status_code == 403 and 'rate limit' in timeline_response.text.lower():
+                            if not self.handle_rate_limit(timeline_response, 'core'):
+                                print(f"[Issues] Falha ao recuperar timeline #{issue_number} após rate limit", flush=True)
+                                continue
                             timeline_response = requests.get(timeline_url, headers=headers)
                         
                         if timeline_response.status_code == 200:
@@ -481,7 +535,10 @@ class GitHubMiner:
                         metrics.total_requests += 1
                         
                         comments = []
-                        if self.check_and_log_rate_limit(comments_response, metrics, 'core', f"Comentários #{issue_number}"):
+                        if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
+                            if not self.handle_rate_limit(comments_response, 'core'):
+                                print(f"[Issues] Falha ao recuperar comentários #{issue_number} após rate limit", flush=True)
+                                continue
                             comments_response = requests.get(comments_url, headers=self.headers)
                         
                         if comments_response.status_code == 200:
@@ -668,11 +725,11 @@ class GitHubMiner:
                     response = requests.get(base_url, params=params, headers=self.headers)
                     metrics.total_requests += 1
                     
-                    # Verifica rate limit unificado
-                    if self.check_and_log_rate_limit(response, metrics, 'search', f"[PRs] Página {page}"):
+                    if response.status_code == 403 and 'rate limit' in response.text.lower():
+                        if not self.handle_rate_limit(response):
+                            print("[PRs] Falha ao recuperar após rate limit", flush=True)
+                            break
                         response = requests.get(base_url, params=params, headers=self.headers)
-                        if response.status_code != 200:
-                            raise RuntimeError(f"[PRs] Erro após tratar rate limit: {response.status_code}")
 
                     response.raise_for_status()
                     data = response.json()
@@ -696,13 +753,12 @@ class GitHubMiner:
                             pr_response = requests.get(pr_url, headers=self.headers)
                             metrics.total_requests += 1
                             
-                            # Verifica rate limit unificado
-                            if self.check_and_log_rate_limit(pr_response, metrics, 'core', f"[PRs] PR #{pr_number}"):
-                                pr_response = requests.get(pr_url, headers=self.headers)
-                                if pr_response.status_code != 200:
-                                    log_error(pr_number, f"[PRs] Falha ao buscar detalhes mesmo após tratar rate limit. Status: {pr_response.status_code}")
+                            if pr_response.status_code == 403 and 'rate limit' in pr_response.text.lower():
+                                if not self.handle_rate_limit(pr_response, 'core'):
+                                    print(f"[PRs] Falha ao recuperar PR #{pr_number} após rate limit", flush=True)
                                     continue
-                            
+                                pr_response = requests.get(pr_url, headers=self.headers)
+
                             pr_details = pr_response.json()
                             if not pr_details:
                                 log_error(pr_number, "[PRs] Detalhes do PR vazios")
@@ -724,6 +780,12 @@ class GitHubMiner:
                             comments_response = requests.get(comments_url, headers=self.headers)
                             
                             comments = []
+                            if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
+                                if not self.handle_rate_limit(comments_response, 'core'):
+                                    print(f"[PRs] Falha ao recuperar comentários #{pr_number} após rate limit", flush=True)
+                                    continue
+                                comments_response = requests.get(comments_url, headers=self.headers)
+                            
                             if comments_response.status_code == 200:
                                 comments = comments_response.json() or []
                                 log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
@@ -821,8 +883,10 @@ class GitHubMiner:
         url = f'https://api.github.com/repos/{repo_name}/branches'
         try:
             response = requests.get(url, headers=self.headers)
-            if response.status_code == 403:
-                self.handle_rate_limit(response)
+            if response.status_code == 403 and 'rate limit' in response.text.lower():
+                if not self.handle_rate_limit(response, 'core'):
+                    print("[Branches] Falha ao recuperar após rate limit", flush=True)
+                    return []
                 response = requests.get(url, headers=self.headers)
             response.raise_for_status()
             branches = response.json()
