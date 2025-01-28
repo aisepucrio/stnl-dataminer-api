@@ -597,6 +597,68 @@ class GitHubMiner:
             )
             current = interval_end + timedelta(days=1)
 
+    def check_and_log_rate_limit(self, response, metrics, endpoint_type='core', context=""):
+        """Função unificada para verificar e logar status do rate limit
+        
+        Args:
+            response: Resposta da requisição
+            metrics: Objeto APIMetrics
+            endpoint_type: Tipo do endpoint ('core' ou 'search')
+            context: Contexto adicional para o log (ex: "PR #123")
+        
+        Returns:
+            bool: True se precisou tratar rate limit, False caso contrário
+        """
+        metrics.update_rate_limit(response.headers, endpoint_type)
+        
+        # Log das informações de limite
+        print(f"\n=== Status do Rate Limit ({endpoint_type.upper()} API) {context} ===")
+        if endpoint_type == 'search':
+            print(f"Limite total: {metrics.search_limit_limit}")
+            print(f"Requisições restantes: {metrics.search_limit_remaining}")
+            print(f"Reset em: {metrics.format_reset_time('search')}")
+        else:
+            print(f"Limite total: {metrics.core_limit_limit}")
+            print(f"Requisições restantes: {metrics.core_limit_remaining}")
+            print(f"Reset em: {metrics.format_reset_time('core')}")
+        print(f"Requisições utilizadas: {metrics.requests_used}")
+        print("=" * 50 + "\n")
+        
+        # Verifica se atingiu o rate limit
+        if response.status_code == 403 and 'rate limit' in response.text.lower():
+            print("\n" + "="*50)
+            print(f"🚫 RATE LIMIT ATINGIDO! {context}")
+            print(f"Tipo de endpoint: {endpoint_type.upper()}")
+            
+            reset_time = response.headers.get('X-RateLimit-Reset')
+            if reset_time:
+                reset_datetime = datetime.fromtimestamp(int(reset_time))
+                wait_time = (reset_datetime - datetime.now()).total_seconds()
+                print(f"Reset programado para: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Tempo de espera necessário: {int(wait_time)} segundos")
+            print("="*50 + "\n")
+            
+            if endpoint_type == 'search':
+                print("[RATE LIMIT] Limite de busca atingido. Aguardando reset...", flush=True)
+                self.wait_for_rate_limit_reset('search')
+            else:
+                if len(self.tokens) > 1:
+                    print("[RATE LIMIT] Limite core atingido. Alternando para próximo token...", flush=True)
+                    self.switch_token()
+                    self.verify_token()
+                else:
+                    print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos!", flush=True)
+                    self.wait_for_rate_limit_reset()
+            return True
+        
+        # Alerta quando estiver próximo do limite
+        remaining = (metrics.search_limit_remaining if endpoint_type == 'search' 
+                    else metrics.core_limit_remaining)
+        if remaining and int(remaining) < 100:
+            print(f"\n⚠️ ALERTA: Apenas {remaining} requisições restantes para o token atual ({endpoint_type})", flush=True)
+        
+        return False
+
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
         all_prs = []
         metrics = APIMetrics()
@@ -623,34 +685,6 @@ class GitHubMiner:
             print(f"\n[ERROR][PR #{pr_number}] {message}", flush=True)
             if error:
                 print(f"[ERROR][PR #{pr_number}] Detalhes: {str(error)}\n", flush=True)
-
-        def check_rate_limit_response(response, pr_number):
-            """Função auxiliar para verificar rate limit na resposta"""
-            if response.status_code == 403:
-                if 'rate limit' in response.text.lower():
-                    print("\n" + "="*50)
-                    print("🚫 RATE LIMIT ATINGIDO durante processamento do PR!")
-                    print(f"PR Número: #{pr_number}")
-                    
-                    reset_time = response.headers.get('X-RateLimit-Reset')
-                    if reset_time:
-                        reset_datetime = datetime.fromtimestamp(int(reset_time))
-                        wait_time = (reset_datetime - datetime.now()).total_seconds()
-                        print(f"Reset programado para: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-                        print(f"Tempo de espera necessário: {int(wait_time)} segundos")
-                    print("="*50 + "\n")
-                    
-                    if len(self.tokens) > 1:
-                        print("[RATE LIMIT] Alternando para próximo token...", flush=True)
-                        self.switch_token()
-                        return True
-                    else:
-                        print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos!", flush=True)
-                        self.wait_for_rate_limit_reset()
-                        return True
-                else:
-                    print(f"[ERROR][PR #{pr_number}] Erro 403 não relacionado ao rate limit: {response.text}", flush=True)
-            return False
 
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
@@ -679,23 +713,12 @@ class GitHubMiner:
 
                     response = requests.get(base_url, params=params, headers=self.headers)
                     metrics.total_requests += 1
-                    metrics.update_rate_limit(response.headers, endpoint_type='search')
-
-                    # Log das informações de limite
-                    print("\n=== Status do Rate Limit (Search API) ===")
-                    print(f"Limite total: {metrics.search_limit_limit}")
-                    print(f"Requisições restates: {metrics.search_limit_remaining}")
-                    print(f"Reset em: {metrics.format_reset_time('search')}")
-                    print(f"Requisições utilizadas: {metrics.requests_used}")
-                    print("===========================\n")
-
-                    if response.status_code == 403:
-                        print("[PRS] Rate limit atingido, aguardando reset...", flush=True)
-                        self.wait_for_rate_limit_reset('search')
-            
+                    
+                    # Verifica rate limit unificado
+                    if self.check_and_log_rate_limit(response, metrics, 'search', f"Página {page}"):
                         response = requests.get(base_url, params=params, headers=self.headers)
                         if response.status_code != 200:
-                            raise RuntimeError(f"Erro após aguardar reset: {response.status_code}")
+                            raise RuntimeError(f"Erro após tratar rate limit: {response.status_code}")
 
                     response.raise_for_status()
                     data = response.json()
@@ -717,24 +740,18 @@ class GitHubMiner:
                             # Busca detalhes do PR
                             pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
                             pr_response = requests.get(pr_url, headers=self.headers)
+                            metrics.total_requests += 1
                             
-                            if pr_response.status_code != 200:
-                                if check_rate_limit_response(pr_response, pr_number):
-                                    # Tenta novamente após tratar o rate limit
-                                    pr_response = requests.get(pr_url, headers=self.headers)
-                                    if pr_response.status_code != 200:
-                                        log_error(pr_number, f"Falha ao buscar detalhes mesmo após tratar rate limit. Status: {pr_response.status_code}")
-                                        flush_debug_logs()
-                                        continue
-                                else:
-                                    log_error(pr_number, f"Falha ao buscar detalhes. Status: {pr_response.status_code}")
-                                    flush_debug_logs()
+                            # Verifica rate limit unificado
+                            if self.check_and_log_rate_limit(pr_response, metrics, 'core', f"PR #{pr_number}"):
+                                pr_response = requests.get(pr_url, headers=self.headers)
+                                if pr_response.status_code != 200:
+                                    log_error(pr_number, f"Falha ao buscar detalhes mesmo após tratar rate limit. Status: {pr_response.status_code}")
                                     continue
-
+                            
                             pr_details = pr_response.json()
                             if not pr_details:
                                 log_error(pr_number, "Detalhes do PR vazios")
-                                flush_debug_logs()
                                 continue
 
                             log_debug(pr_number, "Detalhes obtidos com sucesso")
