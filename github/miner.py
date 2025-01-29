@@ -194,27 +194,24 @@ class GitHubMiner:
                 
             if endpoint_type == 'search':
                 print("[RATE LIMIT] Limite de busca atingido. Aguardando reset...", flush=True)
-                self.wait_for_rate_limit_reset('search')
+                return self.wait_for_rate_limit_reset('search')
             else:
                 if len(self.tokens) > 1:
-                    # Verifica todos os tokens disponíveis
+                    print("[RATE LIMIT] Procurando token alternativo disponível...", flush=True)
                     best_token = self.find_best_available_token()
-                    if best_token is None:
-                        print("[RATE LIMIT] Todos os tokens estão indisponíveis. Aguardando reset do token com menor tempo...", flush=True)
-                        self.wait_for_rate_limit_reset()
-                    else:
-                        print(f"[RATE LIMIT] Alternando para token {best_token + 1}/{len(self.tokens)}...", flush=True)
+                    
+                    if best_token is not None:
                         self.current_token_index = best_token
                         self.update_auth_header()
+                        print(f"[RATE LIMIT] Token alternativo encontrado! Usando token {best_token + 1}/{len(self.tokens)}", flush=True)
+                        return True
+                    else:
+                        print("[RATE LIMIT] Nenhum token alternativo disponível. Aguardando reset...", flush=True)
+                        return self.wait_for_rate_limit_reset()
                 else:
-                    print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos disponíveis!", flush=True)
-                    self.wait_for_rate_limit_reset()
-        else:
-            remaining_requests = response.headers.get('X-RateLimit-Remaining', 'N/A')
-            if remaining_requests != 'N/A' and int(remaining_requests) < 100:
-                print(f"\n⚠️ ALERTA: Apenas {remaining_requests} requisições restantes para o token atual ({endpoint_type})", flush=True)
-            else:
-                print(f"Requisições restantes para o token atual ({endpoint_type}): {remaining_requests}", flush=True)
+                    print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos!", flush=True)
+                    return self.wait_for_rate_limit_reset()
+        return False
 
     def find_best_available_token(self):
         """
@@ -222,11 +219,14 @@ class GitHubMiner:
         ou None se todos estiverem indisponíveis
         """
         best_token = None
-        earliest_reset = float('inf')
-        
+        max_remaining = 0
         original_token_index = self.current_token_index
         
         for i in range(len(self.tokens)):
+            # Não testar o token atual novamente
+            if i == original_token_index:
+                continue
+            
             self.current_token_index = i
             self.update_auth_header()
             
@@ -234,30 +234,31 @@ class GitHubMiner:
                 response = requests.get("https://api.github.com/rate_limit", headers=self.headers)
                 if response.status_code == 200:
                     rate_data = response.json()['resources']
-                    
-                    # Verifica limites core e search
                     core_remaining = int(rate_data['core']['remaining'])
-                    search_remaining = int(rate_data['search']['remaining'])
-                    reset_time = int(rate_data['core']['reset'])
                     
-                    if core_remaining > 0 or search_remaining > 0:
-                        # Se encontrar um token com requisições disponíveis, retorna imediatamente
-                        return i
-                    
-                    # Se não tem requisições disponíveis, guarda o que tem reset mais próximo
-                    if reset_time < earliest_reset:
-                        earliest_reset = reset_time
+                    # Se encontrar um token com mais requisições disponíveis
+                    if core_remaining > max_remaining:
+                        max_remaining = core_remaining
                         best_token = i
-                    
+                        
+                        # Se encontrar um token com requisições suficientes, usar imediatamente
+                        if core_remaining > 100:
+                            print(f"[TOKEN] Encontrado token {i + 1} com {core_remaining} requisições disponíveis", flush=True)
+                            return i
+                            
             except Exception as e:
                 print(f"Erro ao verificar token {i + 1}: {str(e)}", flush=True)
         
-        # Restaura o token original se nenhum token disponível for encontrado
+        # Se não encontrou nenhum token com mais de 100 requisições,
+        # mas encontrou algum com requisições disponíveis
+        if best_token is not None and max_remaining > 0:
+            print(f"[TOKEN] Usando token {best_token + 1} com {max_remaining} requisições restantes", flush=True)
+            return best_token
+        
+        # Se não encontrou nenhum token disponível, volta para o token original
         self.current_token_index = original_token_index
         self.update_auth_header()
-        
-        # Retorna o token com reset mais próximo se nenhum estiver disponível imediatamente
-        return best_token
+        return None
 
     def project_root_directory(self):
         return os.getcwd()
@@ -754,10 +755,15 @@ class GitHubMiner:
                             metrics.total_requests += 1
                             
                             if pr_response.status_code == 403 and 'rate limit' in pr_response.text.lower():
-                                if not self.handle_rate_limit(pr_response, 'core'):
+                                if self.handle_rate_limit(pr_response, 'core'):
+                                    # Se um novo token foi encontrado, tenta a requisição novamente
+                                    pr_response = requests.get(pr_url, headers=self.headers)
+                                    if pr_response.status_code != 200:
+                                        print(f"[PRs] Falha ao recuperar PR #{pr_number} mesmo após troca de token", flush=True)
+                                        continue
+                                else:
                                     print(f"[PRs] Falha ao recuperar PR #{pr_number} após rate limit", flush=True)
                                     continue
-                                pr_response = requests.get(pr_url, headers=self.headers)
 
                             pr_details = pr_response.json()
                             if not pr_details:
