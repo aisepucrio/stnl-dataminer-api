@@ -55,7 +55,7 @@ class GitHubIssue(models.Model):
     repository = models.CharField(max_length=255, db_index=True, default='')
     issue_id = models.BigIntegerField()
     number = models.IntegerField(null=True)
-    title = models.CharField(max_length=255)
+    title = models.TextField()
     state = models.CharField(max_length=20)
     creator = models.CharField(max_length=100)
     assignees = models.JSONField(default=list)
