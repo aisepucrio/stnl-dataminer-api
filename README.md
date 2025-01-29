@@ -41,7 +41,7 @@ Before getting started, ensure you have the following installed:
    POSTGRES_PORT=5432
    ```
    
-   Note: For instructions on how to generate your GitHub token, see the "GitHub Token Configuration" section below (lines 107-115).
+   Note: Para instruções sobre como gerar seu token do GitHub, veja a [seção de Configuração do Token GitHub](#github-token-configuration) abaixo.
 
 3. **Verify the Line Format of `start.sh`**
    
