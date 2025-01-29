@@ -13,12 +13,108 @@ This is a Django-based API designed for mining and analyzing software developmen
 
 ## Requirements
 
-Before getting started, ensure you have the following installed:
+Antes de começar, certifique-se de ter os seguintes programas instalados:
 
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- [PostgreSQL](https://www.postgresql.org/download/)
-- [Git](https://git-scm.com/downloads)
+### 1. Docker
+- **Windows**:
+  1. Baixe o [Docker Desktop para Windows](https://docs.docker.com/desktop/install/windows-install/)
+  2. Execute o instalador
+  3. Se solicitado, habilite o WSL 2 (Windows Subsystem for Linux)
+  4. Reinicie o computador após a instalação
+  5. Verifique a instalação abrindo o terminal e digitando: `docker --version`
+
+- **macOS**:
+  1. Baixe o [Docker Desktop para Mac](https://docs.docker.com/desktop/install/mac-install/)
+  2. Arraste o Docker para a pasta Applications
+  3. Abra o Docker e permita a instalação de componentes adicionais
+  4. Verifique a instalação abrindo o terminal e digitando: `docker --version`
+
+- **Linux (Ubuntu)**:
+  ```bash
+  sudo apt update
+  sudo apt install docker.io
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  sudo usermod -aG docker $USER
+  # Faça logout e login novamente
+  docker --version
+  ```
+
+### 2. Docker Compose
+- **Windows/macOS**: 
+  - Já vem incluído no Docker Desktop
+
+- **Linux**:
+  ```bash
+  sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  sudo chmod +x /usr/local/bin/docker-compose
+  docker-compose --version
+  ```
+
+### 3. PostgreSQL
+- **Windows**:
+  1. Baixe o [instalador do PostgreSQL](https://www.postgresql.org/download/windows/)
+  2. Execute o instalador
+  3. Selecione os componentes (pelo menos "Server" e "pgAdmin")
+  4. Defina uma senha para o usuário postgres
+  5. Mantenha a porta padrão (5432)
+  6. Verifique a instalação abrindo o pgAdmin
+
+- **macOS**:
+  ```bash
+  brew install postgresql
+  brew services start postgresql
+  psql --version
+  ```
+
+- **Linux (Ubuntu)**:
+  ```bash
+  sudo apt update
+  sudo apt install postgresql postgresql-contrib
+  sudo systemctl start postgresql
+  sudo systemctl enable postgresql
+  psql --version
+  ```
+
+### 4. Git
+- **Windows**:
+  1. Baixe o [Git para Windows](https://git-scm.com/download/win)
+  2. Execute o instalador
+  3. Mantenha as opções padrão durante a instalação
+  4. Verifique a instalação: `git --version`
+
+- **macOS**:
+  ```bash
+  brew install git
+  git --version
+  ```
+
+- **Linux (Ubuntu)**:
+  ```bash
+  sudo apt update
+  sudo apt install git
+  git --version
+  ```
+
+### Verificação da Instalação
+
+Após instalar todos os requisitos, você pode verificar se tudo está funcionando corretamente executando:
+
+```bash
+# Verificar Docker
+docker --version
+
+# Verificar Docker Compose
+docker-compose --version
+
+# Verificar PostgreSQL
+psql --version
+
+# Verificar Git
+git --version
+```
+
+Se todos os comandos retornarem as versões dos programas, você está pronto para prosseguir com a instalação do projeto.
 
 ## Installation and Configuration
 
