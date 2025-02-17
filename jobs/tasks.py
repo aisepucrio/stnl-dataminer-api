@@ -39,28 +39,31 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None):
         raise
 
 @shared_task(bind=True)
-def fetch_issues(self, repo_name, start_date=None, end_date=None):
+def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic'):
     self.update_state(
         state='STARTED',
         meta={
             'operation': 'fetch_issues',
-            'repository': repo_name
+            'repository': repo_name,
+            'depth': depth
         }
     )
     try:
         miner = GitHubMiner()
-        issues = miner.get_issues(repo_name, start_date, end_date)
+        issues = miner.get_issues(repo_name, start_date, end_date, depth)
         self.update_state(
             state='SUCCESS',
             meta={
                 'operation': 'fetch_issues',
                 'repository': repo_name,
+                'depth': depth,
                 'data': issues
             }
         )
         return {
             'operation': 'fetch_issues',
             'repository': repo_name,
+            'depth': depth,
             'data': issues
         }
     except Exception as e:
@@ -75,22 +78,31 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None):
         raise
 
 @shared_task(bind=True)
-def fetch_pull_requests(self, repo_name, start_date=None, end_date=None):
+def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic'):
+    """
+    self - primeiro argumento automático do Celery devido ao bind=True
+    repo_name - nome do repositório
+    start_date - data inicial (opcional)
+    end_date - data final (opcional)
+    depth - profundidade da mineração (opcional, default='basic')
+    """
     self.update_state(
         state='STARTED',
         meta={
             'operation': 'fetch_pull_requests',
-            'repository': repo_name
+            'repository': repo_name,
+            'depth': depth
         }
     )
     try:
         miner = GitHubMiner()
-        pull_requests = miner.get_pull_requests(repo_name, start_date, end_date)
+        pull_requests = miner.get_pull_requests(repo_name, start_date, end_date, depth)
         self.update_state(
             state='SUCCESS',
             meta={
                 'operation': 'fetch_pull_requests',
                 'repository': repo_name,
+                'depth': depth,
                 'data': pull_requests
             }
         )

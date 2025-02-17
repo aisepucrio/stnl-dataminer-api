@@ -31,8 +31,9 @@ class GitHubIssueViewSet(viewsets.ViewSet):
         repo_name = request.query_params.get('repo_name')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
+        depth = request.query_params.get('depth', 'basic')  # default é 'basic'
 
-        task = fetch_issues.apply_async(args=[repo_name, start_date, end_date])
+        task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
 
         return Response({
             "task_id": task.id,
@@ -47,8 +48,9 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
         repo_name = request.query_params.get('repo_name')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
+        depth = request.query_params.get('depth', 'basic')  # default é 'basic'
 
-        task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date])
+        task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth])
 
         return Response({
             "task_id": task.id,
