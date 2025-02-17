@@ -450,13 +450,14 @@ class GitHubMiner:
         # Substitui caracteres nulos por espaço
         return text.replace('\u0000', ' ')
 
-    def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None):
+    def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
         all_issues = []
         metrics = APIMetrics()
         
         print("\n" + "="*50)
         print(f"🔍 INICIANDO EXTRAÇÃO DE ISSUES: {repo_name}")
         print(f"📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
+        print(f"🔎 Profundidade: {depth.upper()}")
         print("="*50 + "\n")
 
         try:
@@ -465,7 +466,6 @@ class GitHubMiner:
                 print(f"📊 Processando período: {period_start} até {period_end}")
                 print("-"*40)
                 
-                base_url = "https://api.github.com/search/issues"
                 page = 1
                 has_more_pages = True
                 period_issues_count = 0
@@ -483,19 +483,17 @@ class GitHubMiner:
                         'page': page
                     }
 
-                    response = requests.get(base_url, params=params, headers=self.headers)
+                    response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
                     metrics.total_requests += 1
-                    
+
                     if response.status_code == 403 and 'rate limit' in response.text.lower():
                         if not self.handle_rate_limit(response, 'search'):
-                            print("[Issues] Falha ao recuperar após rate limit", flush=True)
+                            print("Falha ao recuperar após rate limit", flush=True)
                             break
-                        response = requests.get(base_url, params=params, headers=self.headers)
+                        response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
 
-                    response.raise_for_status()
                     data = response.json()
-
-                    if not data['items']:
+                    if not data.get('items'):
                         break
 
                     issues_in_page = len(data['items'])
@@ -530,29 +528,31 @@ class GitHubMiner:
                                 'label': event.get('label', {}).get('name') if event.get('label') else None
                             } for event in timeline_response.json()]
 
-                        # Buscar comentários
-                        comments_url = issue['comments_url']
-                        comments_response = requests.get(comments_url, headers=self.headers)
-                        metrics.total_requests += 1
-                        
+                        # Buscar comentários apenas se for mineração complexa
                         comments = []
-                        if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
-                            if not self.handle_rate_limit(comments_response, 'core'):
-                                print(f"[Issues] Falha ao recuperar comentários #{issue_number} após rate limit", flush=True)
-                                continue
+                        if depth == 'complex':
+                            comments_url = issue['comments_url']
                             comments_response = requests.get(comments_url, headers=self.headers)
-                        
-                        if comments_response.status_code == 200:
-                            comments = [{
-                                'id': c['id'],
-                                'user': c['user']['login'],
-                                'body': c['body'],
-                                'created_at': c['created_at'],
-                                'updated_at': c['updated_at'],
-                                'author_association': c['author_association'],
-                                'reactions': c.get('reactions', {})
-                            } for c in comments_response.json()]
+                            metrics.total_requests += 1
+                            
+                            if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
+                                if not self.handle_rate_limit(comments_response, 'core'):
+                                    print(f"[Issues] Falha ao recuperar comentários #{issue_number} após rate limit", flush=True)
+                                    continue
+                                comments_response = requests.get(comments_url, headers=self.headers)
+                            
+                            if comments_response.status_code == 200:
+                                comments = [{
+                                    'id': c['id'],
+                                    'user': c['user']['login'],
+                                    'body': c['body'],
+                                    'created_at': c['created_at'],
+                                    'updated_at': c['updated_at'],
+                                    'author_association': c['author_association'],
+                                    'reactions': c.get('reactions', {})
+                                } for c in comments_response.json()]
 
+                        # Criar objeto para salvar no banco de dados
                         processed_issue = {
                             'id': issue['id'],
                             'number': issue['number'],
@@ -570,8 +570,34 @@ class GitHubMiner:
                             'reactions': issue.get('reactions', {}),
                             'is_pull_request': False,
                             'timeline_events': timeline_events,
-                            'comments_data': comments
+                            'comments_data': comments if depth == 'complex' else []
                         }
+
+                        # Salvar no banco de dados
+                        GitHubIssue.objects.update_or_create(
+                            issue_id=processed_issue['id'],
+                            defaults={
+                                'repository': repo_name,
+                                'number': processed_issue['number'],
+                                'title': processed_issue['title'],
+                                'state': processed_issue['state'],
+                                'creator': issue['user']['login'],
+                                'assignees': processed_issue['assignees'],
+                                'labels': processed_issue['labels'],
+                                'milestone': processed_issue['milestone'],
+                                'locked': processed_issue['locked'],
+                                'created_at': processed_issue['created_at'],
+                                'updated_at': processed_issue['updated_at'],
+                                'closed_at': processed_issue['closed_at'],
+                                'body': processed_issue['body'],
+                                'comments': processed_issue['comments_data'],
+                                'timeline_events': processed_issue['timeline_events'],
+                                'is_pull_request': False,
+                                'author_association': processed_issue['author_association'],
+                                'reactions': processed_issue['reactions']
+                            }
+                        )
+
                         all_issues.append(processed_issue)
                         print(f"✓ Issue #{issue_number} processada", end='\r')
 
@@ -665,7 +691,7 @@ class GitHubMiner:
         
         return False
 
-    def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None):
+    def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
         all_prs = []
         metrics = APIMetrics()
         debug_buffer = []  # Buffer para acumular mensagens de debug
@@ -694,6 +720,7 @@ class GitHubMiner:
         print("\n" + "="*50)
         print(f"[PRs] 🔍 INICIANDO EXTRAÇÃO DE PULL REQUESTS: {repo_name}")
         print(f"[PRs] 📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
+        print(f"[PRs] 🔎 Profundidade: {depth.upper()}")
         print("="*50 + "\n")
 
         try:
@@ -749,7 +776,7 @@ class GitHubMiner:
 
                             log_debug(pr_number, "Iniciando processamento")
                             
-                            # Busca detalhes do PR
+                            # Buscar detalhes do PR
                             pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
                             pr_response = requests.get(pr_url, headers=self.headers)
                             metrics.total_requests += 1
@@ -766,101 +793,95 @@ class GitHubMiner:
                                     continue
 
                             pr_details = pr_response.json()
+                            
                             if not pr_details:
                                 log_error(pr_number, "[PRs] Detalhes do PR vazios")
                                 continue
-
                             log_debug(pr_number, "[PRs] Detalhes obtidos com sucesso")
 
-                            # Buscar commits
-                            commits_url = f'{pr_url}/commits'
-                            commits_response = requests.get(commits_url, headers=self.headers)
-                            
-                            commits = []
-                            if commits_response.status_code == 200:
-                                commits = commits_response.json() or []
-                                log_debug(pr_number, f"[PRs] Commits encontrados: {len(commits)}")
+                            # Dados básicos que sempre serão coletados
+                            processed_pr = {
+                                'id': pr_details.get('id'),
+                                'number': pr_details.get('number'),
+                                'title': pr_details.get('title'),
+                                'state': pr_details.get('state'),
+                                'created_at': pr_details.get('created_at'),
+                                'updated_at': pr_details.get('updated_at'),
+                                'closed_at': pr_details.get('closed_at'),
+                                'merged_at': pr_details.get('merged_at'),
+                                'user': pr_details.get('user', {}).get('login'),
+                                'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
+                            }
 
-                            # Buscar comentários
-                            comments_url = f'{pr_url}/comments'
-                            comments_response = requests.get(comments_url, headers=self.headers)
-                            
-                            comments = []
-                            if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
-                                if not self.handle_rate_limit(comments_response, 'core'):
-                                    print(f"[PRs] Falha ao recuperar comentários #{pr_number} após rate limit", flush=True)
-                                    continue
+                            # Dados adicionais coletados apenas no modo complexo
+                            if depth == 'complex':
+                                # Buscar commits
+                                commits_url = f'{pr_url}/commits'
+                                commits_response = requests.get(commits_url, headers=self.headers)
+                                metrics.total_requests += 1
+                                
+                                commits = []
+                                if commits_response.status_code == 200:
+                                    commits = commits_response.json() or []
+                                    log_debug(pr_number, f"[PRs] Commits encontrados: {len(commits)}")
+
+                                # Buscar comentários
+                                comments_url = f'{pr_url}/comments'
                                 comments_response = requests.get(comments_url, headers=self.headers)
-                            
-                            if comments_response.status_code == 200:
-                                comments = comments_response.json() or []
-                                log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
+                                metrics.total_requests += 1
+                                
+                                comments = []
+                                if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
+                                    if self.handle_rate_limit(comments_response, 'core'):
+                                        comments_response = requests.get(comments_url, headers=self.headers)
+                                    else:
+                                        print(f"[PRs] Falha ao recuperar comentários #{pr_number} após rate limit", flush=True)
+                                        continue
+                                
+                                if comments_response.status_code == 200:
+                                    comments = comments_response.json() or []
+                                    log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
 
-                            try:
-                                processed_pr = {
-                                    'id': pr_details.get('id'),
-                                    'number': pr_details.get('number'),
-                                    'title': pr_details.get('title'),
-                                    'state': pr_details.get('state'),
-                                    'created_at': pr_details.get('created_at'),
-                                    'updated_at': pr_details.get('updated_at'),
-                                    'closed_at': pr_details.get('closed_at'),
-                                    'merged_at': pr_details.get('merged_at'),
-                                    'user': pr_details.get('user', {}).get('login'),
-                                    'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
-                                    'commits_data': [],
-                                    'comments_data': []
-                                }
-
-                                # Processar commits
-                                if commits:
-                                    processed_pr['commits_data'] = [
+                                processed_pr.update({
+                                    'commits_data': [
                                         {
                                             'sha': c.get('sha'),
                                             'message': c.get('commit', {}).get('message')
-                                        } for c in commits if c
-                                    ]
-                                    log_debug(pr_number, f"[PRs] Processados {len(processed_pr['commits_data'])} commits")
-
-                                # Processar comentários
-                                if comments:
-                                    processed_pr['comments_data'] = [
+                                        } for c in commits
+                                    ],
+                                    'comments_data': [
                                         {
                                             'user': c.get('user', {}).get('login'),
                                             'body': c.get('body')
-                                        } for c in comments if c
+                                        } for c in comments
                                     ]
-                                    log_debug(pr_number, f"[PRs] Processados {len(processed_pr['comments_data'])} comentários")
+                                })
 
-                                # Salvar no banco de dados
-                                GitHubPullRequest.objects.update_or_create(
-                                    pr_id=processed_pr['id'],
-                                    defaults={
-                                        'repository': repo_name,
-                                        'number': processed_pr['number'],
-                                        'title': processed_pr['title'],
-                                        'state': processed_pr['state'],
-                                        'creator': processed_pr['user'],
-                                        'created_at': processed_pr['created_at'],
-                                        'updated_at': processed_pr['updated_at'],
-                                        'closed_at': processed_pr.get('closed_at'),
-                                        'merged_at': processed_pr.get('merged_at'),
-                                        'labels': processed_pr['labels'],
-                                        'commits': processed_pr['commits_data'],
-                                        'comments': processed_pr['comments_data']
-                                    }
-                                )
-                                
-                                all_prs.append(processed_pr)
-                                log_debug(pr_number, "Processamento e salvamento concluídos com sucesso")
-                                flush_debug_logs()
+                            # Salvar no banco de dados
+                            GitHubPullRequest.objects.update_or_create(
+                                pr_id=processed_pr['id'],
+                                defaults={
+                                    'repository': repo_name,
+                                    'number': processed_pr['number'],
+                                    'title': processed_pr['title'],
+                                    'state': processed_pr['state'],
+                                    'creator': processed_pr['user'],
+                                    'created_at': processed_pr['created_at'],
+                                    'updated_at': processed_pr['updated_at'],
+                                    'closed_at': processed_pr['closed_at'],
+                                    'merged_at': processed_pr['merged_at'],
+                                    'labels': processed_pr['labels'],
+                                    'commits': processed_pr.get('commits_data', []),
+                                    'comments': processed_pr.get('comments_data', [])
+                                }
+                            )
 
-                            except Exception as e:
-                                log_error(pr_number if 'pr_number' in locals() else 'Unknown', "Erro ao processar PR", e)
-                                continue
+                            all_prs.append(processed_pr)
+                            log_debug(pr_number, "Processamento e salvamento concluídos com sucesso")
+                            flush_debug_logs()
 
                         except Exception as e:
-                            log_error(pr_number if 'pr_number' in locals() else 'Unknown', "Erro ao processar PR", e)
+                            log_error(pr_number, f"Erro ao processar PR", error=e)
                             continue
 
                     print(f"[PRs] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
