@@ -573,7 +573,15 @@ class GitHubMiner:
                             'comments_data': comments if depth == 'complex' else []
                         }
 
-                        # Salvar no banco de dados
+                        if depth == 'basic':
+                            # Se for mineração básica, buscar Issue existente
+                            existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
+                            if existing_issue:
+                                # Preservar dados complexos se existirem
+                                processed_issue['comments_data'] = existing_issue.comments
+                                processed_issue['timeline_events'] = existing_issue.timeline_events
+
+                        # Atualizar ou criar Issue
                         GitHubIssue.objects.update_or_create(
                             issue_id=processed_issue['id'],
                             defaults={
@@ -590,8 +598,8 @@ class GitHubMiner:
                                 'updated_at': processed_issue['updated_at'],
                                 'closed_at': processed_issue['closed_at'],
                                 'body': processed_issue['body'],
-                                'comments': processed_issue['comments_data'],
-                                'timeline_events': processed_issue['timeline_events'],
+                                'comments': processed_issue.get('comments_data', existing_issue.comments if existing_issue else []),
+                                'timeline_events': processed_issue.get('timeline_events', existing_issue.timeline_events if existing_issue else []),
                                 'is_pull_request': False,
                                 'author_association': processed_issue['author_association'],
                                 'reactions': processed_issue['reactions']
