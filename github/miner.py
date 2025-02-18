@@ -811,6 +811,7 @@ class GitHubMiner:
                                 'merged_at': pr_details.get('merged_at'),
                                 'user': pr_details.get('user', {}).get('login'),
                                 'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
+                                'body': pr_details.get('body')
                             }
 
                             # Dados adicionais coletados apenas no modo complexo
@@ -872,7 +873,8 @@ class GitHubMiner:
                                     'merged_at': processed_pr['merged_at'],
                                     'labels': processed_pr['labels'],
                                     'commits': processed_pr.get('commits_data', []),
-                                    'comments': processed_pr.get('comments_data', [])
+                                    'comments': processed_pr.get('comments_data', []),
+                                    'body': processed_pr.get('body')
                                 }
                             )
 
