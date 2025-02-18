@@ -96,6 +96,7 @@ class GitHubPullRequest(models.Model):
     labels = models.JSONField(default=list)
     commits = models.JSONField(default=list)
     comments = models.JSONField(default=list)
+    body = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'github_pull_requests'
