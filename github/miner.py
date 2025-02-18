@@ -858,7 +858,16 @@ class GitHubMiner:
                                     ]
                                 })
 
-                            # Salvar no banco de dados
+                            # Dentro do método get_pull_requests
+                            if depth == 'basic':
+                                # Se for mineração básica, buscar PR existente
+                                existing_pr = GitHubPullRequest.objects.filter(pr_id=processed_pr['id']).first()
+                                if existing_pr:
+                                    # Preservar dados complexos se existirem
+                                    processed_pr['commits'] = existing_pr.commits
+                                    processed_pr['comments'] = existing_pr.comments
+
+                            # Atualizar ou criar PR
                             GitHubPullRequest.objects.update_or_create(
                                 pr_id=processed_pr['id'],
                                 defaults={
@@ -872,8 +881,8 @@ class GitHubMiner:
                                     'closed_at': processed_pr['closed_at'],
                                     'merged_at': processed_pr['merged_at'],
                                     'labels': processed_pr['labels'],
-                                    'commits': processed_pr.get('commits_data', []),
-                                    'comments': processed_pr.get('comments_data', []),
+                                    'commits': processed_pr.get('commits_data', processed_pr.get('commits', [])),
+                                    'comments': processed_pr.get('comments_data', processed_pr.get('comments', [])),
                                     'body': processed_pr.get('body')
                                 }
                             )
