@@ -148,16 +148,103 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+# Define a URL do broker (Redis) que o Celery usará para mensageria
 CELERY_BROKER_URL = 'redis://redis:6379/0'
+
+# Define onde os resultados das tarefas serão armazenados
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+
+# Define quais formatos de serialização são aceitos para as mensagens
+# Neste caso, apenas JSON é permitido
 CELERY_ACCEPT_CONTENT = ['json']
+
+# Define o serializador usado para as tarefas
 CELERY_TASK_SERIALIZER = 'json'
+
+# Define o serializador usado para os resultados
 CELERY_RESULT_SERIALIZER = 'json'
+
+# Define o fuso horário para o Celery
 CELERY_TIMEZONE = 'UTC'
+
+# Define quanto tempo os resultados das tarefas são mantidos
+# Neste caso: 3 dias (60 segundos * 60 minutos * 24 horas * 3 dias)
 CELERY_TASK_RESULT_EXPIRES = 60 * 60 * 24 * 3
+
+# Permite que o Celery tente reconectar ao broker em caso de falha durante o startup
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Habilita o rastreamento do estado "STARTED" das tarefas
 CELERY_TASK_TRACK_STARTED = True
+
+# Força o armazenamento dos resultados mesmo em modo eager (útil para testes)
 CELERY_TASK_STORE_EAGER_RESULT = True
+
+# Duplicata do CELERY_TASK_TRACK_STARTED (pode ser removido)
 CELERY_TRACK_STARTED = True
+
+# Define o limite máximo de memória por processo worker (2MB neste caso)
 CELERY_MAX_MEMORY_PER_CHILD = 1024*1024*2
+
+# Define o número de processos workers concorrentes
 CELERY_CONCURRENCY = 4

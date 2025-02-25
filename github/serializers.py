@@ -69,18 +69,22 @@ class GitHubMetadataSerializer(serializers.ModelSerializer):
         model = GitHubMetadata
         fields = [
             'repository',
+            'owner',
+            'organization',
             'stars_count',
-            'forks_count',
             'watchers_count',
+            'forks_count',
             'open_issues_count',
-            'language',
+            'default_branch',
+            'description',
+            'html_url',
+            'contributors_count',
             'topics',
+            'languages',
+            'readme',
+            'labels_count',
             'created_at',
             'updated_at',
-            'last_sync',
-            'description',
-            'homepage',
-            'license',
             'is_archived',
             'is_template'
         ]

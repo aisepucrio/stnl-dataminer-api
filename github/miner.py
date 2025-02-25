@@ -7,6 +7,7 @@ from pydriller import Repository
 from datetime import datetime, timezone, timedelta
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
 import time
+from bs4 import BeautifulSoup
 
 class APIMetrics:
     def __init__(self):
@@ -982,6 +983,7 @@ class GitHubMiner:
         print(f"\n[METADATA] Iniciando extração de metadados para {repo_name}", flush=True)
         
         try:
+            owner, repo = repo_name.split('/')
             url = f'https://api.github.com/repos/{repo_name}'
             response = requests.get(url, headers=self.headers)
             
@@ -994,24 +996,35 @@ class GitHubMiner:
             if response.status_code != 200:
                 print(f"[METADATA] Erro ao obter metadados: {response.status_code}", flush=True)
                 return None
-            
+
             data = response.json()
+            
+            # Obter dados adicionais
+            languages = self.get_repo_languages(owner, repo)
+            readme = self.get_repo_readme(owner, repo)
+            contributors_count = self.get_contributors_from_html(owner, repo)
+            labels_count = self.get_repo_labels_count(owner, repo)
             
             # Criar ou atualizar metadados no banco
             metadata, created = GitHubMetadata.objects.update_or_create(
                 repository=repo_name,
                 defaults={
+                    'owner': data.get('owner', {}).get('login'),
+                    'organization': data.get('organization', {}).get('login') if data.get('organization') else None,
                     'stars_count': data.get('stargazers_count', 0),
-                    'forks_count': data.get('forks_count', 0),
                     'watchers_count': data.get('watchers_count', 0),
+                    'forks_count': data.get('forks_count', 0),
                     'open_issues_count': data.get('open_issues_count', 0),
-                    'language': data.get('language'),
-                    'topics': data.get('topics', []),
+                    'default_branch': data.get('default_branch'),
+                    'description': data.get('description'),
+                    'html_url': data.get('html_url'),
+                    'contributors_count': contributors_count,
+                    'topics': data.get('topics'),
+                    'languages': languages,
+                    'readme': readme,
+                    'labels_count': labels_count,
                     'created_at': data.get('created_at'),
                     'updated_at': data.get('updated_at'),
-                    'description': data.get('description'),
-                    'homepage': data.get('homepage'),
-                    'license': data.get('license', {}).get('name'),
                     'is_archived': data.get('archived', False),
                     'is_template': data.get('is_template', False)
                 }
@@ -1019,7 +1032,68 @@ class GitHubMiner:
             
             print(f"[METADATA] Metadados {'criados' if created else 'atualizados'} com sucesso", flush=True)
             return metadata
-            
+
         except Exception as e:
-            print(f"[METADATA] Erro ao extrair metadados: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha na extração de metadados: {str(e)}")
+            print(f"[METADATA] Erro durante a extração: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha na extração de metadados: {str(e)}") from e
+
+    def get_repo_languages(self, owner: str, repo: str):
+        url = f'https://api.github.com/repos/{owner}/{repo}/languages'
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 200:
+            data = response.json()
+            total_bytes = sum(data.values())
+            
+            return {
+                'languages': [
+                    {
+                        'language': lang,
+                        'percentage': round((bytes_used / total_bytes) * 100, 2)
+                    }
+                    for lang, bytes_used in data.items()
+                ]
+            }
+            
+    def get_repo_readme(self, owner: str, repo: str):
+        url = f'https://api.github.com/repos/{owner}/{repo}/readme'
+        headers = {**self.headers, 'Accept': 'application/vnd.github.v3.raw'}
+        response = requests.get(url, headers=headers)
+        return response.text if response.status_code == 200 else None
+
+    def get_contributors_from_html(self, owner: str, repo: str):
+        url = f'https://github.com/{owner}/{repo}'
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'lxml')
+            contributors_element = soup.find('a', {'href': f'/{owner}/{repo}/graphs/contributors'})
+            if contributors_element:
+                span_element = contributors_element.find('span', class_='Counter ml-1')
+                if span_element and 'title' in span_element.attrs:
+                    try:
+                        return int(span_element['title'].replace(',', ''))
+                    except ValueError:
+                        return None
+        return None
+
+    def get_repo_labels_count(self, owner: str, repo: str):
+        """
+        Obtém a contagem total de labels de um repositório, considerando todas as páginas
+        """
+        url = f'https://api.github.com/repos/{owner}/{repo}/labels'
+        total_labels = []
+        
+        while url:
+            response = requests.get(url, headers=self.headers)
+            
+            if response.status_code == 403 and 'rate limit' in response.text.lower():
+                if not self.handle_rate_limit(response, 'core'):
+                    return None
+                response = requests.get(url, headers=self.headers)
+            
+            if response.status_code != 200:
+                return None
+                
+            total_labels.extend(response.json())
+            url = response.links.get('next', {}).get('url')
+        
+        return len(total_labels)

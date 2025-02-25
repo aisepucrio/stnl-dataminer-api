@@ -209,13 +209,13 @@ def fetch_metadata(self, repo_name):
             'forks_count': metadata.forks_count,
             'watchers_count': metadata.watchers_count,
             'open_issues_count': metadata.open_issues_count,
-            'language': metadata.language,
+            'languages': metadata.languages,
             'topics': metadata.topics,
             'created_at': metadata.created_at,
             'updated_at': metadata.updated_at,
             'description': metadata.description,
-            'homepage': metadata.homepage,
-            'license': metadata.license,
+            'html_url': metadata.html_url,
+            'contributors_count': metadata.contributors_count,
             'is_archived': metadata.is_archived,
             'is_template': metadata.is_template
         }
@@ -236,7 +236,8 @@ def fetch_metadata(self, repo_name):
             meta={
                 'operation': 'fetch_metadata',
                 'repository': repo_name,
-                'error': str(e)
+                'error': str(e),
+                'error_type': type(e).__name__
             }
         )
-        raise 
+        raise type(e)(str(e)).with_traceback(e.__traceback__) 
