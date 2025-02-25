@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
 
 class GitHubAuthorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -63,3 +63,24 @@ class GitHubBranchSerializer(serializers.ModelSerializer):
     class Meta:
         model = GitHubBranch
         fields = '__all__'
+
+class GitHubMetadataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GitHubMetadata
+        fields = [
+            'repository',
+            'stars_count',
+            'forks_count',
+            'watchers_count',
+            'open_issues_count',
+            'language',
+            'topics',
+            'created_at',
+            'updated_at',
+            'last_sync',
+            'description',
+            'homepage',
+            'license',
+            'is_archived',
+            'is_template'
+        ]

@@ -187,4 +187,56 @@ def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_ap
                 'error': str(e)
             }
         )
+        raise
+
+@shared_task(bind=True)
+def fetch_metadata(self, repo_name):
+    self.update_state(
+        state='STARTED',
+        meta={
+            'operation': 'fetch_metadata',
+            'repository': repo_name
+        }
+    )
+    try:
+        miner = GitHubMiner()
+        metadata = miner.get_repository_metadata(repo_name)
+        
+        # Serializar os dados antes de retornar
+        metadata_dict = {
+            'repository': metadata.repository,
+            'stars_count': metadata.stars_count,
+            'forks_count': metadata.forks_count,
+            'watchers_count': metadata.watchers_count,
+            'open_issues_count': metadata.open_issues_count,
+            'language': metadata.language,
+            'topics': metadata.topics,
+            'created_at': metadata.created_at,
+            'updated_at': metadata.updated_at,
+            'description': metadata.description,
+            'homepage': metadata.homepage,
+            'license': metadata.license,
+            'is_archived': metadata.is_archived,
+            'is_template': metadata.is_template
+        }
+        
+        self.update_state(
+            state='SUCCESS',
+            meta={
+                'operation': 'fetch_metadata',
+                'repository': repo_name,
+                'result': metadata_dict
+            }
+        )
+        return metadata_dict
+        
+    except Exception as e:
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'operation': 'fetch_metadata',
+                'repository': repo_name,
+                'error': str(e)
+            }
+        )
         raise 

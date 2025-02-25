@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from git import Repo, GitCommandError
 from pydriller import Repository
 from datetime import datetime, timezone, timedelta
-from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
 import time
 
 class APIMetrics:
@@ -971,3 +971,55 @@ class GitHubMiner:
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")
         return (end - start).days + 1  # +1 para incluir o próprio dia
+
+    def get_repository_metadata(self, repo_name: str):
+        """
+        Obtém metadados do repositório GitHub
+        
+        Args:
+            repo_name (str): Nome do repositório no formato 'owner/repo'
+        """
+        print(f"\n[METADATA] Iniciando extração de metadados para {repo_name}", flush=True)
+        
+        try:
+            url = f'https://api.github.com/repos/{repo_name}'
+            response = requests.get(url, headers=self.headers)
+            
+            if response.status_code == 403 and 'rate limit' in response.text.lower():
+                if not self.handle_rate_limit(response, 'core'):
+                    print("[METADATA] Falha ao recuperar após rate limit", flush=True)
+                    return None
+                response = requests.get(url, headers=self.headers)
+            
+            if response.status_code != 200:
+                print(f"[METADATA] Erro ao obter metadados: {response.status_code}", flush=True)
+                return None
+            
+            data = response.json()
+            
+            # Criar ou atualizar metadados no banco
+            metadata, created = GitHubMetadata.objects.update_or_create(
+                repository=repo_name,
+                defaults={
+                    'stars_count': data.get('stargazers_count', 0),
+                    'forks_count': data.get('forks_count', 0),
+                    'watchers_count': data.get('watchers_count', 0),
+                    'open_issues_count': data.get('open_issues_count', 0),
+                    'language': data.get('language'),
+                    'topics': data.get('topics', []),
+                    'created_at': data.get('created_at'),
+                    'updated_at': data.get('updated_at'),
+                    'description': data.get('description'),
+                    'homepage': data.get('homepage'),
+                    'license': data.get('license', {}).get('name'),
+                    'is_archived': data.get('archived', False),
+                    'is_template': data.get('is_template', False)
+                }
+            )
+            
+            print(f"[METADATA] Metadados {'criados' if created else 'atualizados'} com sucesso", flush=True)
+            return metadata
+            
+        except Exception as e:
+            print(f"[METADATA] Erro ao extrair metadados: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha na extração de metadados: {str(e)}")

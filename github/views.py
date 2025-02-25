@@ -2,9 +2,9 @@ from rest_framework import viewsets, generics
 from rest_framework.response import Response
 from rest_framework import status
 from celery.result import AsyncResult
-from jobs.tasks import fetch_commits, fetch_issues, fetch_pull_requests, fetch_branches
-from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch
-from .serializers import GitHubCommitSerializer, GitHubIssueSerializer, GitHubPullRequestSerializer, GitHubBranchSerializer
+from jobs.tasks import fetch_commits, fetch_issues, fetch_pull_requests, fetch_branches, fetch_metadata
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubMetadata
+from .serializers import GitHubCommitSerializer, GitHubIssueSerializer, GitHubPullRequestSerializer, GitHubBranchSerializer, GitHubMetadataSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFilter, GitHubBranchFilter
@@ -124,3 +124,27 @@ class BranchDetailView(generics.RetrieveAPIView):
     queryset = GitHubBranch.objects.all()
     serializer_class = GitHubBranchSerializer
     lookup_field = 'name'
+
+class GitHubMetadataViewSet(viewsets.ViewSet):
+    def list(self, request):
+        repo_name = request.query_params.get('repo_name')
+        if not repo_name:
+            return Response(
+                {"error": "repo_name parameter is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task = fetch_metadata.apply_async(args=[repo_name])
+
+        return Response({
+            "task_id": task.id,
+            "message": "Task successfully initiated",
+            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+        }, status=status.HTTP_200_OK)
+
+class MetadataListView(generics.ListAPIView):
+    queryset = GitHubMetadata.objects.all()
+    serializer_class = GitHubMetadataSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    search_fields = ['repository', 'language']
+    ordering_fields = ['stars_count', 'forks_count', 'created_at', 'updated_at']

@@ -111,3 +111,30 @@ class GitHubBranch(models.Model):
 
     def __str__(self):
         return f"Branch {self.name}"
+
+class GitHubMetadata(models.Model):
+    repository = models.CharField(max_length=255, db_index=True)
+    stars_count = models.IntegerField(default=0)
+    forks_count = models.IntegerField(default=0)
+    watchers_count = models.IntegerField(default=0)
+    open_issues_count = models.IntegerField(default=0)
+    language = models.CharField(max_length=100, null=True)
+    topics = models.JSONField(default=list)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    last_sync = models.DateTimeField(auto_now=True)
+    description = models.TextField(null=True)
+    homepage = models.URLField(null=True)
+    license = models.CharField(max_length=100, null=True)
+    is_archived = models.BooleanField(default=False)
+    is_template = models.BooleanField(default=False)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['repository']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['updated_at'])
+        ]
+
+    def __str__(self):
+        return f"Metadata for {self.repository}"

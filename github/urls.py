@@ -7,6 +7,7 @@ router.register(r'commits/mine', views.GitHubCommitViewSet, basename='commit-min
 router.register(r'issues/mine', views.GitHubIssueViewSet, basename='github-issue-mine')
 router.register(r'pull-requests/mine', views.GitHubPullRequestViewSet, basename='pullrequest-mine')
 router.register(r'branches/mine', views.GitHubBranchViewSet, basename='branch-mine')
+router.register(r'metadata/mine', views.GitHubMetadataViewSet, basename='metadata-mine')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -19,4 +20,5 @@ urlpatterns = [
     path('pull-requests/<int:pr_id>/', views.PullRequestDetailView.as_view(), name='pullrequest-detail'),
     path('branches/', views.BranchListView.as_view(), name='branch-list'),
     path('branches/<str:name>/', views.BranchDetailView.as_view(), name='branch-detail'),
+    path('metadata/', views.MetadataListView.as_view(), name='metadata-list'),
 ]
