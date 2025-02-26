@@ -10,69 +10,84 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFilter, GitHubBranchFilter
 
 class GitHubCommitViewSet(viewsets.ViewSet):
-    def list(self, request):
-        repo_name = request.query_params.get('repo_name')
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
+    def create(self, request):
+        repo_name = request.data.get('repo_name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
 
-        # Inicia a tarefa e obtém o ID da tarefa
-        task = fetch_commits.apply_async(args=[repo_name, start_date, end_date]) 
+        if not repo_name:
+            return Response(
+                {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task = fetch_commits.apply_async(args=[repo_name, start_date, end_date])
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "instructions": "To check the task status, make a GET request to: "
-                          f"http://localhost:8000/jobs/{task.id}/",
             "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_202_ACCEPTED)
 
 class GitHubIssueViewSet(viewsets.ViewSet):
-    def list(self, request):
-        repo_name = request.query_params.get('repo_name')
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-        depth = request.query_params.get('depth', 'basic')  # default é 'basic'
+    def create(self, request):
+        repo_name = request.data.get('repo_name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        depth = request.data.get('depth', 'basic')
+
+        if not repo_name:
+            return Response(
+                {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "instructions": "To check the task status, make a GET request to: "
-                          f"http://localhost:8000/jobs/{task.id}/",
             "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_202_ACCEPTED)
 
 class GitHubPullRequestViewSet(viewsets.ViewSet):
-    def list(self, request):
-        repo_name = request.query_params.get('repo_name')
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-        depth = request.query_params.get('depth', 'basic')  # default é 'basic'
+    def create(self, request):
+        repo_name = request.data.get('repo_name')
+        start_date = request.data.get('start_date')
+        end_date = request.data.get('end_date')
+        depth = request.data.get('depth', 'basic')
+
+        if not repo_name:
+            return Response(
+                {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth])
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "instructions": "To check the task status, make a GET request to: "
-                          f"http://localhost:8000/jobs/{task.id}/",
             "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_202_ACCEPTED)
 
 class GitHubBranchViewSet(viewsets.ViewSet):
-    def list(self, request):
-        repo_name = request.query_params.get('repo_name')
+    def create(self, request):
+        repo_name = request.data.get('repo_name')
+
+        if not repo_name:
+            return Response(
+                {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         task = fetch_branches.apply_async(args=[repo_name])
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "instructions": "To check the task status, make a GET request to: "
-                          f"http://localhost:8000/jobs/{task.id}/",
             "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_202_ACCEPTED)
 
 # Novas views genéricas para consulta
 class CommitListView(generics.ListAPIView):
@@ -126,11 +141,12 @@ class BranchDetailView(generics.RetrieveAPIView):
     lookup_field = 'name'
 
 class GitHubMetadataViewSet(viewsets.ViewSet):
-    def list(self, request):
-        repo_name = request.query_params.get('repo_name')
+    def create(self, request):
+        repo_name = request.data.get('repo_name')
+        
         if not repo_name:
             return Response(
-                {"error": "repo_name parameter is required"}, 
+                {"error": "repo_name is required"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -140,7 +156,7 @@ class GitHubMetadataViewSet(viewsets.ViewSet):
             "task_id": task.id,
             "message": "Task successfully initiated",
             "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_202_ACCEPTED)
 
 class MetadataListView(generics.ListAPIView):
     queryset = GitHubMetadata.objects.all()

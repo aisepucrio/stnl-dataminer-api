@@ -3,11 +3,11 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'commits/mine', views.GitHubCommitViewSet, basename='commit-mine')
-router.register(r'issues/mine', views.GitHubIssueViewSet, basename='github-issue-mine')
-router.register(r'pull-requests/mine', views.GitHubPullRequestViewSet, basename='pullrequest-mine')
-router.register(r'branches/mine', views.GitHubBranchViewSet, basename='branch-mine')
-router.register(r'metadata/mine', views.GitHubMetadataViewSet, basename='metadata-mine')
+router.register(r'commits/collect', views.GitHubCommitViewSet, basename='commit-collect')
+router.register(r'issues/collect', views.GitHubIssueViewSet, basename='issue-collect')
+router.register(r'pull-requests/collect', views.GitHubPullRequestViewSet, basename='pullrequest-collect')
+router.register(r'branches/collect', views.GitHubBranchViewSet, basename='branch-collect')
+router.register(r'metadata/collect', views.GitHubMetadataViewSet, basename='metadata-collect')
 
 urlpatterns = [
     path('', include(router.urls)),

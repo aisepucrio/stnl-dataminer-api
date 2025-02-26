@@ -83,7 +83,7 @@ class GitHubIssue(models.Model):
         return f"Issue {self.issue_id} - {self.title}"
 
 class GitHubPullRequest(models.Model):
-    pr_id = models.IntegerField(primary_key=True)
+    pr_id = models.BigIntegerField(primary_key=True)
     repository = models.CharField(max_length=255)
     number = models.IntegerField(null=True)
     title = models.CharField(max_length=255)
