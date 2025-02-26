@@ -13,21 +13,21 @@ This is a Django-based API designed for mining and analyzing software developmen
 
 ## Requirements
 
-Antes de começar, certifique-se de ter os seguintes programas instalados:
+Before starting, make sure you have the following programs installed:
 
 ### 1. Docker
 - **Windows**:
-  1. Baixe o [Docker Desktop para Windows](https://docs.docker.com/desktop/install/windows-install/)
-  2. Execute o instalador
-  3. Se solicitado, habilite o WSL 2 (Windows Subsystem for Linux)
-  4. Reinicie o computador após a instalação
-  5. Verifique a instalação abrindo o terminal e digitando: `docker --version`
+  1. Download [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
+  2. Run the installer
+  3. If prompted, enable WSL 2 (Windows Subsystem for Linux)
+  4. Restart your computer after installation
+  5. Verify the installation by opening terminal and typing: `docker --version`
 
 - **macOS**:
-  1. Baixe o [Docker Desktop para Mac](https://docs.docker.com/desktop/install/mac-install/)
-  2. Arraste o Docker para a pasta Applications
-  3. Abra o Docker e permita a instalação de componentes adicionais
-  4. Verifique a instalação abrindo o terminal e digitando: `docker --version`
+  1. Download [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
+  2. Drag Docker to Applications folder
+  3. Open Docker and allow installation of additional components
+  4. Verify the installation by opening terminal and typing: `docker --version`
 
 - **Linux (Ubuntu)**:
   ```bash
@@ -36,13 +36,13 @@ Antes de começar, certifique-se de ter os seguintes programas instalados:
   sudo systemctl start docker
   sudo systemctl enable docker
   sudo usermod -aG docker $USER
-  # Faça logout e login novamente
+  # Logout and login again
   docker --version
   ```
 
 ### 2. Docker Compose
 - **Windows/macOS**: 
-  - Já vem incluído no Docker Desktop
+  - Already included in Docker Desktop
 
 - **Linux**:
   ```bash
@@ -53,12 +53,12 @@ Antes de começar, certifique-se de ter os seguintes programas instalados:
 
 ### 3. PostgreSQL
 - **Windows**:
-  1. Baixe o [instalador do PostgreSQL](https://www.postgresql.org/download/windows/)
-  2. Execute o instalador
-  3. Selecione os componentes (pelo menos "Server" e "pgAdmin")
-  4. Defina uma senha para o usuário postgres
-  5. Mantenha a porta padrão (5432)
-  6. Verifique a instalação abrindo o pgAdmin
+  1. Download the [PostgreSQL installer](https://www.postgresql.org/download/windows/)
+  2. Run the installer
+  3. Select components (at least "Server" and "pgAdmin")
+  4. Set a password for postgres user
+  5. Keep the default port (5432)
+  6. Verify installation by opening pgAdmin
 
 - **macOS**:
   ```bash
@@ -78,10 +78,10 @@ Antes de começar, certifique-se de ter os seguintes programas instalados:
 
 ### 4. Git
 - **Windows**:
-  1. Baixe o [Git para Windows](https://git-scm.com/download/win)
-  2. Execute o instalador
-  3. Mantenha as opções padrão durante a instalação
-  4. Verifique a instalação: `git --version`
+  1. Download [Git for Windows](https://git-scm.com/download/win)
+  2. Run the installer
+  3. Keep default options during installation
+  4. Verify installation: `git --version`
 
 - **macOS**:
   ```bash
@@ -96,25 +96,25 @@ Antes de começar, certifique-se de ter os seguintes programas instalados:
   git --version
   ```
 
-### Verificação da Instalação
+### Installation Verification
 
-Após instalar todos os requisitos, você pode verificar se tudo está funcionando corretamente executando:
+After installing all requirements, you can verify everything is working correctly by running:
 
 ```bash
-# Verificar Docker
+# Verify Docker
 docker --version
 
-# Verificar Docker Compose
+# Verify Docker Compose
 docker-compose --version
 
-# Verificar PostgreSQL
+# Verify PostgreSQL
 psql --version
 
-# Verificar Git
+# Verify Git
 git --version
 ```
 
-Se todos os comandos retornarem as versões dos programas, você está pronto para prosseguir com a instalação do projeto.
+If all commands return the program versions, you're ready to proceed with the project installation.
 
 ## Installation and Configuration
 
@@ -137,7 +137,7 @@ Se todos os comandos retornarem as versões dos programas, você está pronto pa
    POSTGRES_PORT=5432
    ```
    
-   Note: Para instruções sobre como gerar seu token do GitHub, veja a [seção de Configuração do Token GitHub](#github-token-configuration) abaixo.
+   Note: For instructions on how to generate your GitHub token, see the [GitHub Token Configuration](#github-token-configuration) section below.
 
 3. **Verify the Line Format of `start.sh`**
    
