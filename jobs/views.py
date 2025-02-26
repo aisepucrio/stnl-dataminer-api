@@ -4,12 +4,6 @@ from rest_framework import status
 from celery.result import AsyncResult
 from celery import current_app
 
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from celery.result import AsyncResult
-from celery import current_app
-
 class TaskStatusView(APIView):
     def get(self, request, task_id):
         task_result = AsyncResult(task_id, app=current_app)
@@ -47,7 +41,6 @@ class TaskStatusView(APIView):
                 "task_id": task_id
             }, status=status.HTTP_404_NOT_FOUND)
 
-class TaskCancelView(APIView):
     def delete(self, request, task_id):
         task_result = AsyncResult(task_id, app=current_app)
 

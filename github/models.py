@@ -106,7 +106,7 @@ class GitHubPullRequest(models.Model):
 
 class GitHubBranch(models.Model):
     repository = models.CharField(max_length=255, db_index=True, default='')
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=500)
     sha = models.CharField(max_length=40)
 
     def __str__(self):
