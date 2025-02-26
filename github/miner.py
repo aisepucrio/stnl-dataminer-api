@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
 import time
 from bs4 import BeautifulSoup
+import base64
 
 class APIMetrics:
     def __init__(self):
@@ -973,12 +974,70 @@ class GitHubMiner:
         end = datetime.strptime(end_date, "%Y-%m-%d")
         return (end - start).days + 1  # +1 para incluir o próprio dia
 
+    def get_watchers_from_html(self, owner: str, repo: str):
+        """Obtém o número de watchers do repositório através do HTML"""
+        url = f'https://github.com/{owner}/{repo}'
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'lxml')
+                watchers_link = soup.find('a', {'href': f'/{owner}/{repo}/watchers', 'class': 'Link--muted'})
+                if watchers_link:
+                    strong_element = watchers_link.find('strong')
+                    if strong_element and strong_element.text.strip():
+                        text = strong_element.text.strip()
+                        if 'k' in text.lower():
+                            return int(float(text.lower().replace('k', '')) * 1000)
+                        return int(text.replace(',', ''))
+            return 0
+        except Exception as e:
+            print(f"[METADATA] Erro ao obter watchers: {e}", flush=True)
+            return 0
+
+    def get_used_by_from_html(self, owner: str, repo: str):
+        """Obtém o número de 'Used by' do repositório através da API"""
+        url = f'https://api.github.com/repos/{owner}/{repo}/network/dependents'
+        try:
+            response = requests.get(url, headers=self.headers)
+            if response.status_code == 200:
+                # A resposta inclui o número total de dependentes no cabeçalho Link
+                if 'Link' in response.headers:
+                    link_header = response.headers['Link']
+                    # Procura pelo último número de página na URL
+                    if 'page=' in link_header:
+                        last_page = int(link_header.split('page=')[-1].split('>')[0])
+                        # Cada página tem 30 itens por padrão
+                        return last_page * 30
+                # Se não houver cabeçalho Link, conta os itens na primeira página
+                soup = BeautifulSoup(response.content, 'lxml')
+                dependents = soup.find_all('div', class_='Box-row')
+
+                return len(dependents)
+            return 0
+        except Exception as e:
+            print(f"[METADATA] Erro ao obter Used by: {e}", flush=True)
+            return 0
+
+    def get_releases_count(self, owner: str, repo: str):
+        """Obtém o número de releases do repositório através do HTML"""
+        url = f'https://github.com/{owner}/{repo}'
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'lxml')
+                releases_link = soup.find('a', {'href': f'/{owner}/{repo}/releases', 'class': 'Link--primary'})
+                if releases_link:
+                    span_element = releases_link.find('span', class_='Counter')
+                    if span_element and span_element.text.strip():
+                        return int(span_element.text.strip().replace(',', ''))
+            return 0
+        except Exception as e:
+            print(f"[METADATA] Erro ao obter releases: {e}", flush=True)
+            return 0
+
     def get_repository_metadata(self, repo_name: str):
         """
         Obtém metadados do repositório GitHub
-        
-        Args:
-            repo_name (str): Nome do repositório no formato 'owner/repo'
         """
         print(f"\n[METADATA] Iniciando extração de metadados para {repo_name}", flush=True)
         
@@ -1005,6 +1064,11 @@ class GitHubMiner:
             contributors_count = self.get_contributors_from_html(owner, repo)
             labels_count = self.get_repo_labels_count(owner, repo)
             
+            # Novos dados
+            watchers_count = self.get_watchers_from_html(owner, repo)
+            used_by_count = self.get_used_by_from_html(owner, repo)
+            releases_count = self.get_releases_count(owner, repo)
+            
             # Criar ou atualizar metadados no banco
             metadata, created = GitHubMetadata.objects.update_or_create(
                 repository=repo_name,
@@ -1012,7 +1076,9 @@ class GitHubMiner:
                     'owner': data.get('owner', {}).get('login'),
                     'organization': data.get('organization', {}).get('login') if data.get('organization') else None,
                     'stars_count': data.get('stargazers_count', 0),
-                    'watchers_count': data.get('watchers_count', 0),
+                    'watchers_count': watchers_count,  # Usando o valor obtido do HTML
+                    'used_by_count': used_by_count,    # Novo campo
+                    'releases_count': releases_count,   # Novo campo
                     'forks_count': data.get('forks_count', 0),
                     'open_issues_count': data.get('open_issues_count', 0),
                     'default_branch': data.get('default_branch'),
@@ -1055,10 +1121,33 @@ class GitHubMiner:
             }
             
     def get_repo_readme(self, owner: str, repo: str):
+        """
+        Obtém o conteúdo do README do repositório usando a API do GitHub
+        e decodifica o conteúdo Base64 retornado.
+        """
         url = f'https://api.github.com/repos/{owner}/{repo}/readme'
-        headers = {**self.headers, 'Accept': 'application/vnd.github.v3.raw'}
-        response = requests.get(url, headers=headers)
-        return response.text if response.status_code == 200 else None
+        headers = {**self.headers, 'Accept': 'application/vnd.github.v3+json'}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code == 403 and 'rate limit' in response.text.lower():
+                if not self.handle_rate_limit(response, 'core'):
+                    return None
+                response = requests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                content = response.json()
+                if 'content' in content:
+                    # Decodifica o conteúdo Base64 e converte para string
+                    readme_content = base64.b64decode(content['content']).decode('utf-8')
+                    return readme_content
+            
+            return None
+        
+        except Exception as e:
+            print(f"[README] Erro ao obter README: {str(e)}", flush=True)
+            return None
 
     def get_contributors_from_html(self, owner: str, repo: str):
         url = f'https://github.com/{owner}/{repo}'

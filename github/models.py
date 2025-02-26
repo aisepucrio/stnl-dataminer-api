@@ -133,6 +133,8 @@ class GitHubMetadata(models.Model):
     last_sync = models.DateTimeField(auto_now=True)
     is_archived = models.BooleanField(default=False)
     is_template = models.BooleanField(default=False)
+    used_by_count = models.IntegerField(default=0)
+    releases_count = models.IntegerField(default=0)
     
     class Meta:
         indexes = [

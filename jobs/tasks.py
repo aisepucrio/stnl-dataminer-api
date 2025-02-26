@@ -206,8 +206,10 @@ def fetch_metadata(self, repo_name):
         metadata_dict = {
             'repository': metadata.repository,
             'stars_count': metadata.stars_count,
-            'forks_count': metadata.forks_count,
             'watchers_count': metadata.watchers_count,
+            'used_by_count': metadata.used_by_count,
+            'releases_count': metadata.releases_count,
+            'forks_count': metadata.forks_count,
             'open_issues_count': metadata.open_issues_count,
             'languages': metadata.languages,
             'topics': metadata.topics,
