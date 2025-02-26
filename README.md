@@ -193,53 +193,144 @@ The API provides various endpoints for data mining. To test the endpoints, we re
 
 #### Basic Request Structure
 
-All requests follow the base format:
+All collection requests follow the base format:
 ```
-http://localhost:8000/api/github/{endpoint}/?repo_name={owner}/{repository}&start_date={start_date}&end_date={end_date}
+POST http://localhost:8000/api/github/{endpoint}/collect/
+```
+
+All query requests follow the base format:
+```
+GET http://localhost:8000/api/github/{endpoint}/?{parameters}
 ```
 
 Where:
-- `{endpoint}`: can be commits, issues, pull-requests, or branches
-- `{owner}`: repository owner/organization
-- `{repository}`: repository name
-- `{start_date}` and `{end_date}`: dates in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ)
+- `{endpoint}`: can be commits, issues, pull-requests, branches, or metadata
+- `{parameters}`: query parameters for filtering data
 
-#### Request Examples
+#### Collection Endpoints (POST)
 
-1. **Commit Mining**
-```
-GET http://localhost:8000/api/github/commits/?repo_name=facebook/react&start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T00:00:00Z
-```
+1. **Commit Collection**
+```http
+POST http://localhost:8000/api/github/commits/collect/
+Content-Type: application/json
 
-2. **Issue Mining**
-```
-GET http://localhost:8000/api/github/issues/?repo_name=tensorflow/tensorflow&start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T00:00:00Z
-```
-
-3. **Pull Request Mining**
-```
-GET http://localhost:8000/api/github/pull-requests/?repo_name=kubernetes/kubernetes&start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T00:00:00Z
+{
+    "repo_name": "facebook/react",
+    "start_date": "2023-01-01T00:00:00Z",
+    "end_date": "2023-12-31T00:00:00Z"
+}
 ```
 
-4. **Branch Mining**
-```
-GET http://localhost:8000/api/github/branches/?repo_name=django/django
+2. **Issue Collection**
+```http
+POST http://localhost:8000/api/github/issues/collect/
+Content-Type: application/json
+
+{
+    "repo_name": "tensorflow/tensorflow",
+    "start_date": "2023-01-01T00:00:00Z",
+    "end_date": "2023-12-31T00:00:00Z",
+    "depth": "basic"
+}
 ```
 
-#### Query Parameters
+3. **Pull Request Collection**
+```http
+POST http://localhost:8000/api/github/pull-requests/collect/
+Content-Type: application/json
 
-- `repo_name` (required): In the format `owner/repository` (e.g., `microsoft/vscode`)
-- `start_date` (optional): Initial date to filter data
-- `end_date` (optional): Final date to filter data
-- `per_page` (optional): Number of items per page (default: 100)
-- `page` (optional): Page number for pagination (default: 1)
+{
+    "repo_name": "kubernetes/kubernetes",
+    "start_date": "2023-01-01T00:00:00Z",
+    "end_date": "2023-12-31T00:00:00Z",
+    "depth": "basic"
+}
+```
+
+4. **Branch Collection**
+```http
+POST http://localhost:8000/api/github/branches/collect/
+Content-Type: application/json
+
+{
+    "repo_name": "django/django"
+}
+```
+
+5. **Metadata Collection**
+```http
+POST http://localhost:8000/api/github/metadata/collect/
+Content-Type: application/json
+
+{
+    "repo_name": "microsoft/vscode"
+}
+```
+
+#### Query Endpoints (GET)
+
+1. **Query Commits**
+```http
+GET http://localhost:8000/api/github/commits/?repository=facebook/react&created_after=2023-01-01&created_before=2023-12-31
+```
+
+2. **Query Issues**
+```http
+GET http://localhost:8000/api/github/issues/?repository=tensorflow/tensorflow&state=open&created_after=2023-01-01
+```
+
+3. **Query Pull Requests**
+```http
+GET http://localhost:8000/api/github/pull-requests/?repository=kubernetes/kubernetes&state=merged&created_after=2023-01-01
+```
+
+4. **Query Branches**
+```http
+GET http://localhost:8000/api/github/branches/?repository=django/django
+```
+
+5. **Query Metadata**
+```http
+GET http://localhost:8000/api/github/metadata/?repository=microsoft/vscode
+```
+
+#### Request Parameters
+
+Collection Parameters (POST body):
+- `repo_name` (required): Repository in format `owner/repository`
+- `start_date` (optional): Initial date to filter data (ISO 8601 format)
+- `end_date` (optional): Final date to filter data (ISO 8601 format)
+- `depth` (optional): Data collection depth ("basic" or "full", default: "basic")
+
+Query Parameters (GET):
+- `repository`: Filter by repository name
+- `created_after`: Filter items created after date
+- `created_before`: Filter items created before date
+- `state`: Filter by state (e.g., "open", "closed", "merged")
+- `per_page`: Number of items per page (default: 100)
+- `page`: Page number for pagination (default: 1)
+
+#### Response Format
+
+Collection endpoints return:
+```json
+{
+    "task_id": "task-uuid",
+    "message": "Task successfully initiated",
+    "status_endpoint": "http://localhost:8000/api/jobs/task/task-uuid/"
+}
+```
+
+Query endpoints return paginated lists of items in JSON format.
 
 #### Important Notes
 
-1. Dates must be in ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`
-2. The repository must be public or your token must have access to it
-3. For large repositories, consider using smaller date ranges to avoid timeout
-4. Branch mining doesn't require date parameters
+1. All dates must be in ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`
+2. Collection endpoints return 202 Accepted status code
+3. Query endpoints return 200 OK status code
+4. The repository must be public or your token must have access to it
+5. For large repositories, consider using smaller date ranges
+6. Branch and metadata endpoints don't require date parameters
 
 ### **Jira Mining**
 
