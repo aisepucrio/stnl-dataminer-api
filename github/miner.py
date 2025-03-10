@@ -354,7 +354,7 @@ class GitHubMiner:
                         'dmm_unit_size': commit.dmm_unit_size,
                         'dmm_unit_complexity': commit.dmm_unit_complexity,
                         'dmm_unit_interfacing': commit.dmm_unit_interfacing,
-                        'time_mined': current_timestamp  # Salvando diretamente o float
+                        'time_mined': current_timestamp
                     }
                 )
 
@@ -397,7 +397,7 @@ class GitHubMiner:
                             'added_lines': mod.added_lines,
                             'deleted_lines': mod.deleted_lines,
                             'complexity': mod.complexity,
-                            'time_mined': current_timestamp  # Salvando diretamente o float
+                            'time_mined': current_timestamp
                         }
                     )
                     
@@ -422,7 +422,7 @@ class GitHubMiner:
                             defaults={
                                 'complexity': method.complexity,
                                 'max_nesting': getattr(method, 'max_nesting', None),
-                                'time_mined': current_timestamp  # Salvando diretamente o float
+                                'time_mined': current_timestamp
                             }
                         )
 
@@ -578,7 +578,7 @@ class GitHubMiner:
                             'is_pull_request': False,
                             'timeline_events': timeline_events,
                             'comments_data': comments if depth == 'complex' else [],
-                            'time_mined': current_timestamp  # Salvando diretamente o float
+                            'time_mined': current_timestamp
                         }
 
                         if depth == 'basic':
@@ -611,7 +611,7 @@ class GitHubMiner:
                                 'is_pull_request': False,
                                 'author_association': processed_issue['author_association'],
                                 'reactions': processed_issue['reactions'],
-                                'time_mined': current_timestamp  # Salvando diretamente o float
+                                'time_mined': current_timestamp
                             }
                         )
 
@@ -830,7 +830,7 @@ class GitHubMiner:
                                 'user': pr_details.get('user', {}).get('login'),
                                 'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
                                 'body': pr_details.get('body'),
-                                'time_mined': current_timestamp  # Salvando diretamente o float
+                                'time_mined': current_timestamp
                             }
 
                             # Dados adicionais coletados apenas no modo complexo
@@ -903,7 +903,7 @@ class GitHubMiner:
                                     'commits': processed_pr.get('commits_data', processed_pr.get('commits', [])),
                                     'comments': processed_pr.get('comments_data', processed_pr.get('comments', [])),
                                     'body': processed_pr.get('body'),
-                                    'time_mined': current_timestamp  # Salvando diretamente o float
+                                    'time_mined': current_timestamp
                                 }
                             )
 
@@ -957,7 +957,7 @@ class GitHubMiner:
                     defaults={
                         'repository': repo_name,
                         'sha': branch['commit']['sha'],
-                        'time_mined': current_timestamp  # Salvando diretamente o float
+                        'time_mined': current_timestamp
                     }
                 )
             print("Branches salvas no banco de dados e no JSON com sucesso.", flush=True)
@@ -1106,7 +1106,7 @@ class GitHubMiner:
                     'updated_at': data.get('updated_at'),
                     'is_archived': data.get('archived', False),
                     'is_template': data.get('is_template', False),
-                    'time_mined': current_timestamp  # Salvando diretamente o float
+                    'time_mined': current_timestamp
                 }
             )
             
