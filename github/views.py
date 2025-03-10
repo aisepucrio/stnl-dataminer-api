@@ -11,6 +11,15 @@ from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFil
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     def create(self, request):
+        """
+        Endpoint para minerar commits de um repositório.
+        Aceita POST com parâmetros no body:
+        {
+            "repo_name": "owner/repo",
+            "start_date": "2024-01-01T00:00:00Z",  # opcional
+            "end_date": "2024-03-01T00:00:00Z"     # opcional
+        }
+        """
         repo_name = request.data.get('repo_name')
         start_date = request.data.get('start_date')
         end_date = request.data.get('end_date')

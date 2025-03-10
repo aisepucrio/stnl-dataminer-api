@@ -329,6 +329,7 @@ class GitHubMiner:
             essential_commits = []
 
             for commit in repo:
+                current_timestamp = time.time()  # Timestamp Unix em segundos
                 print(f"[COMMITS] Processando commit: {commit.hash[:7]}", flush=True)
                 # Cria ou recupera o autor e o committer
                 author, _ = GitHubAuthor.objects.get_or_create(
@@ -336,7 +337,7 @@ class GitHubMiner:
                 committer, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.committer.name, email=commit.committer.email if commit.committer else None)
 
-                # Cria ou atualiza o commit no banco de dados
+                # Cria ou atualiza o commit no banco de dados com o timestamp
                 db_commit, created = GitHubCommit.objects.update_or_create(
                     sha=commit.hash,
                     defaults={
@@ -352,7 +353,8 @@ class GitHubMiner:
                         'merge': commit.merge,
                         'dmm_unit_size': commit.dmm_unit_size,
                         'dmm_unit_complexity': commit.dmm_unit_complexity,
-                        'dmm_unit_interfacing': commit.dmm_unit_interfacing
+                        'dmm_unit_interfacing': commit.dmm_unit_interfacing,
+                        'time_mined': current_timestamp  # Salvando diretamente o float
                     }
                 )
 
@@ -394,7 +396,8 @@ class GitHubMiner:
                             'diff': mod.diff,
                             'added_lines': mod.added_lines,
                             'deleted_lines': mod.deleted_lines,
-                            'complexity': mod.complexity
+                            'complexity': mod.complexity,
+                            'time_mined': current_timestamp  # Salvando diretamente o float
                         }
                     )
                     
@@ -418,7 +421,8 @@ class GitHubMiner:
                             name=method.name,
                             defaults={
                                 'complexity': method.complexity,
-                                'max_nesting': getattr(method, 'max_nesting', None)
+                                'max_nesting': getattr(method, 'max_nesting', None),
+                                'time_mined': current_timestamp  # Salvando diretamente o float
                             }
                         )
 
@@ -503,6 +507,7 @@ class GitHubMiner:
                     print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
 
                     for issue in data['items']:
+                        current_timestamp = time.time()  # Timestamp Unix em segundos
                         if 'pull_request' in issue:
                             continue
 
@@ -572,7 +577,8 @@ class GitHubMiner:
                             'reactions': issue.get('reactions', {}),
                             'is_pull_request': False,
                             'timeline_events': timeline_events,
-                            'comments_data': comments if depth == 'complex' else []
+                            'comments_data': comments if depth == 'complex' else [],
+                            'time_mined': current_timestamp  # Salvando diretamente o float
                         }
 
                         if depth == 'basic':
@@ -604,7 +610,8 @@ class GitHubMiner:
                                 'timeline_events': processed_issue.get('timeline_events', existing_issue.timeline_events if existing_issue else []),
                                 'is_pull_request': False,
                                 'author_association': processed_issue['author_association'],
-                                'reactions': processed_issue['reactions']
+                                'reactions': processed_issue['reactions'],
+                                'time_mined': current_timestamp  # Salvando diretamente o float
                             }
                         )
 
@@ -779,6 +786,7 @@ class GitHubMiner:
                     print(f"[PRs] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
 
                     for pr in data.get('items', []):
+                        current_timestamp = time.time()  # Timestamp Unix em segundos
                         try:
                             pr_number = pr.get('number')
                             if not pr_number:
@@ -821,7 +829,8 @@ class GitHubMiner:
                                 'merged_at': pr_details.get('merged_at'),
                                 'user': pr_details.get('user', {}).get('login'),
                                 'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
-                                'body': pr_details.get('body')
+                                'body': pr_details.get('body'),
+                                'time_mined': current_timestamp  # Salvando diretamente o float
                             }
 
                             # Dados adicionais coletados apenas no modo complexo
@@ -893,7 +902,8 @@ class GitHubMiner:
                                     'labels': processed_pr['labels'],
                                     'commits': processed_pr.get('commits_data', processed_pr.get('commits', [])),
                                     'comments': processed_pr.get('comments_data', processed_pr.get('comments', [])),
-                                    'body': processed_pr.get('body')
+                                    'body': processed_pr.get('body'),
+                                    'time_mined': current_timestamp  # Salvando diretamente o float
                                 }
                             )
 
@@ -941,11 +951,13 @@ class GitHubMiner:
             self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
 
             for branch in branches:
+                current_timestamp = time.time()  # Timestamp Unix em segundos
                 GitHubBranch.objects.update_or_create(
                     name=branch['name'],
                     defaults={
                         'repository': repo_name,
-                        'sha': branch['commit']['sha']
+                        'sha': branch['commit']['sha'],
+                        'time_mined': current_timestamp  # Salvando diretamente o float
                     }
                 )
             print("Branches salvas no banco de dados e no JSON com sucesso.", flush=True)
@@ -1070,6 +1082,7 @@ class GitHubMiner:
             releases_count = self.get_releases_count(owner, repo)
             
             # Criar ou atualizar metadados no banco
+            current_timestamp = time.time()  # Timestamp Unix em segundos
             metadata, created = GitHubMetadata.objects.update_or_create(
                 repository=repo_name,
                 defaults={
@@ -1092,7 +1105,8 @@ class GitHubMiner:
                     'created_at': data.get('created_at'),
                     'updated_at': data.get('updated_at'),
                     'is_archived': data.get('archived', False),
-                    'is_template': data.get('is_template', False)
+                    'is_template': data.get('is_template', False),
+                    'time_mined': current_timestamp  # Salvando diretamente o float
                 }
             )
             
