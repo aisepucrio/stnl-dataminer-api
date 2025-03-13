@@ -1,6 +1,7 @@
 from celery import shared_task
 from github.miner import GitHubMiner
 from jira.miner import JiraMiner
+from django.conf import settings
 
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None):
@@ -154,7 +155,10 @@ def fetch_branches(self, repo_name):
         raise
 
 @shared_task(bind=True)
-def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_api_token, issuetypes, start_date=None, end_date=None):
+def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None):
+    jira_email = settings.JIRA_EMAIL
+    jira_api_token = settings.JIRA_API_TOKEN
+
     self.update_state(
         state='STARTED',
         meta={
@@ -163,8 +167,13 @@ def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_ap
         }
     )
     try:
+        logger.info(f"🔄 Iniciando coleta de issues do Jira: {project_key} no domínio {jira_domain}")
+        
         miner = JiraMiner(jira_domain, jira_email, jira_api_token)
         issues = miner.collect_jira_issues(project_key, issuetypes, start_date, end_date)
+
+        logger.info(f"✅ Coleta concluída: {len(issues.get('data', []))} issues coletadas.")
+
         self.update_state(
             state='SUCCESS',
             meta={
@@ -179,6 +188,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, jira_email, jira_ap
             'data': issues
         }
     except Exception as e:
+        logger.error(f"❌ Erro ao coletar issues do Jira: {e}", exc_info=True)
         self.update_state(
             state='FAILURE',
             meta={
