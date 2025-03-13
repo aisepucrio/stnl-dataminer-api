@@ -6,6 +6,8 @@ from requests.auth import HTTPBasicAuth
 from .models import JiraIssue
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
+import time
+
 
 class JiraMiner:
     def __init__(self, jira_domain, jira_email, jira_api_token):
@@ -53,6 +55,7 @@ class JiraMiner:
                 break
 
             for issue_data in issues:
+                current_timestamp = time.time()
                 description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
                 JiraIssue.objects.update_or_create(
@@ -70,7 +73,8 @@ class JiraMiner:
                         'project': project_key,
                         'creator': issue_data['fields']['creator']['displayName'],
                         'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
-                        'all_fields': issue_data['fields']
+                        'all_fields': issue_data['fields'],
+                        'time_mined': current_timestamp # precisa ser convertido de timestamp para datetime
                     }
                 )
             total_collected += len(issues)

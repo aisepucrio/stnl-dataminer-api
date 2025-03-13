@@ -16,6 +16,7 @@ class JiraIssue(models.Model):
     summary = models.TextField()
     description = models.TextField(null=True, blank=True)
     all_fields = models.JSONField(null=True, blank=True)
+    time_mined = models.FloatField(null=True, blank=True)
 
     class Meta:
         constraints = [
