@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata, GitHubIssuePullRequest
 
 class GitHubAuthorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -88,3 +88,17 @@ class GitHubMetadataSerializer(serializers.ModelSerializer):
             'is_archived',
             'is_template'
         ]
+
+class GitHubIssuePullRequestSerializer(serializers.ModelSerializer):
+    created_at_formatted = serializers.SerializerMethodField()
+    updated_at_formatted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GitHubIssuePullRequest
+        fields = '__all__'
+
+    def get_created_at_formatted(self, obj):
+        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+    def get_updated_at_formatted(self, obj):
+        return obj.updated_at.strftime("%Y-%m-%d %H:%M:%S")

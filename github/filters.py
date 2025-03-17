@@ -1,5 +1,5 @@
 from django_filters import rest_framework as filters
-from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubIssuePullRequest
 
 class GitHubCommitFilter(filters.FilterSet):
     # Filtros para datas
@@ -83,4 +83,20 @@ class GitHubBranchFilter(filters.FilterSet):
             'name': ['icontains'],
             'repository': ['exact'],
             'sha': ['exact']
-        } 
+        }
+
+class GitHubIssuePullRequestFilter(filters.FilterSet):
+    created_after = filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
+    created_before = filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')
+    updated_after = filters.DateTimeFilter(field_name='updated_at', lookup_expr='gte')
+    updated_before = filters.DateTimeFilter(field_name='updated_at', lookup_expr='lte')
+    
+    title = filters.CharFilter(lookup_expr='icontains')
+    creator = filters.CharFilter(lookup_expr='icontains')
+    repository = filters.CharFilter(lookup_expr='iexact')
+    state = filters.CharFilter(lookup_expr='iexact')
+    tipo = filters.CharFilter(lookup_expr='iexact')
+
+    class Meta:
+        model = GitHubIssuePullRequest
+        fields = ['record_id', 'state', 'repository', 'tipo'] 
