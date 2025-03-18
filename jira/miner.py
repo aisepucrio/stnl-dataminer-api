@@ -58,6 +58,8 @@ class JiraMiner:
                 current_timestamp = time.time()
                 description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
+                commits = self.get_commits_for_issue(issue_data['key'])
+                
                 JiraIssue.objects.update_or_create(
                     issue_id=issue_data['id'],
                     defaults={
@@ -74,7 +76,8 @@ class JiraMiner:
                         'creator': issue_data['fields']['creator']['displayName'],
                         'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
                         'all_fields': issue_data['fields'],
-                        'time_mined': current_timestamp # precisa ser convertido de timestamp para datetime
+                        'time_mined': current_timestamp, # precisa ser convertido de timestamp para datetime
+                        'commits': commits  # Adicionando os commits
                     }
                 )
             total_collected += len(issues)
@@ -83,7 +86,29 @@ class JiraMiner:
                 break
             
         return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
+    
+    def get_commits_for_issue(self, issue_key):
+        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueId={issue_key}&applicationType=git&dataType=repository"
 
+        response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
+        if response.status_code != 200:
+            return []
+        
+        details = response.json().get('detail', [])
+        commits = []
+        
+        for detail in details:
+            repositories = detail.get('repositories', [])
+            for repo in repositories:
+                for commit in repo.get('commits', []):
+                    commits.append({
+                        'id': commit.get('id'),
+                        'message': commit.get('message'),
+                        'author': commit.get('author', {}).get('name'),
+                        'url': commit.get('url')
+                    })
+        return commits
+    
     def get_custom_fields_mapping(self, jira_domain, jira_email, jira_api_token):
         url = f"https://{jira_domain}/rest/api/3/field"
         
