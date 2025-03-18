@@ -73,10 +73,11 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
             meta={
                 'operation': 'fetch_issues',
                 'repository': repo_name,
-                'error': str(e)
+                'error': str(e),
+                'error_type': type(e).__name__
             }
         )
-        raise
+        raise type(e)(str(e)).with_traceback(e.__traceback__)
 
 @shared_task(bind=True)
 def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic'):
@@ -112,11 +113,16 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
             'data': pull_requests
         }
     except Exception as e:
-        return {
-            'status': 'error',
-            'error_type': type(e).__name__,
-            'error_message': str(e)
-        }
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'operation': 'fetch_pull_requests',
+                'repository': repo_name,
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+        )
+        raise type(e)(str(e)).with_traceback(e.__traceback__)
 
 @shared_task(bind=True)
 def fetch_branches(self, repo_name):
@@ -252,4 +258,4 @@ def fetch_metadata(self, repo_name):
                 'error_type': type(e).__name__
             }
         )
-        raise type(e)(str(e)).with_traceback(e.__traceback__) 
+        raise type(e)(str(e)).with_traceback(e.__traceback__)

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from git import Repo, GitCommandError
 from pydriller import Repository
 from datetime import datetime, timezone, timedelta
-from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
+from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata, GitHubIssuePullRequest
 import time
 from bs4 import BeautifulSoup
 import base64
@@ -456,189 +456,6 @@ class GitHubMiner:
         # Substitui caracteres nulos por espaço
         return text.replace('\u0000', ' ')
 
-    def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
-        all_issues = []
-        metrics = APIMetrics()
-        
-        print("\n" + "="*50)
-        print(f"🔍 INICIANDO EXTRAÇÃO DE ISSUES: {repo_name}")
-        print(f"📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
-        print(f"🔎 Profundidade: {depth.upper()}")
-        print("="*50 + "\n")
-
-        try:
-            for period_start, period_end in self.split_date_range(start_date, end_date):
-                print("\n" + "-"*40)
-                print(f"📊 Processando período: {period_start} até {period_end}")
-                print("-"*40)
-                
-                page = 1
-                has_more_pages = True
-                period_issues_count = 0
-
-                while has_more_pages:
-                    query = f"repo:{repo_name} is:issue"
-                    if period_start:
-                        query += f" created:{period_start}"
-                    if period_end:
-                        query += f"..{period_end}"
-
-                    params = {
-                        'q': query,
-                        'per_page': 100,
-                        'page': page
-                    }
-
-                    response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
-                    metrics.total_requests += 1
-
-                    if response.status_code == 403 and 'rate limit' in response.text.lower():
-                        if not self.handle_rate_limit(response, 'search'):
-                            print("Falha ao recuperar após rate limit", flush=True)
-                            break
-                        response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
-
-                    data = response.json()
-                    if not data.get('items'):
-                        break
-
-                    issues_in_page = len(data['items'])
-                    period_issues_count += issues_in_page
-                    print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
-
-                    for issue in data['items']:
-                        current_timestamp = time.time()  # Timestamp Unix em segundos
-                        if 'pull_request' in issue:
-                            continue
-
-                        issue_number = issue['number']
-                        
-                        # Buscar timeline events
-                        timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
-                        headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
-                        timeline_response = requests.get(timeline_url, headers=headers)
-                        metrics.total_requests += 1
-                        
-                        timeline_events = []
-                        if timeline_response.status_code == 403 and 'rate limit' in timeline_response.text.lower():
-                            if not self.handle_rate_limit(timeline_response, 'core'):
-                                print(f"[Issues] Falha ao recuperar timeline #{issue_number} após rate limit", flush=True)
-                                continue
-                            timeline_response = requests.get(timeline_url, headers=headers)
-                        
-                        if timeline_response.status_code == 200:
-                            timeline_events = [{
-                                'event': event.get('event'),
-                                'actor': event.get('actor', {}).get('login') if event.get('actor') else None,
-                                'created_at': event.get('created_at'),
-                                'assignee': event.get('assignee', {}).get('login') if event.get('assignee') else None,
-                                'label': event.get('label', {}).get('name') if event.get('label') else None
-                            } for event in timeline_response.json()]
-
-                        # Buscar comentários apenas se for mineração complexa
-                        comments = []
-                        if depth == 'complex':
-                            comments_url = issue['comments_url']
-                            comments_response = requests.get(comments_url, headers=self.headers)
-                            metrics.total_requests += 1
-                            
-                            if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
-                                if not self.handle_rate_limit(comments_response, 'core'):
-                                    print(f"[Issues] Falha ao recuperar comentários #{issue_number} após rate limit", flush=True)
-                                    continue
-                                comments_response = requests.get(comments_url, headers=self.headers)
-                            
-                            if comments_response.status_code == 200:
-                                comments = [{
-                                    'id': c['id'],
-                                    'user': c['user']['login'],
-                                    'body': c['body'],
-                                    'created_at': c['created_at'],
-                                    'updated_at': c['updated_at'],
-                                    'author_association': c['author_association'],
-                                    'reactions': c.get('reactions', {})
-                                } for c in comments_response.json()]
-
-                        # Criar objeto para salvar no banco de dados
-                        processed_issue = {
-                            'id': issue['id'],
-                            'number': issue['number'],
-                            'title': issue['title'],
-                            'state': issue['state'],
-                            'locked': issue['locked'],
-                            'assignees': [assignee['login'] for assignee in issue['assignees']],
-                            'labels': [label['name'] for label in issue['labels']],
-                            'milestone': issue['milestone']['title'] if issue['milestone'] else None,
-                            'created_at': issue['created_at'],
-                            'updated_at': issue['updated_at'],
-                            'closed_at': issue['closed_at'],
-                            'author_association': issue['author_association'],
-                            'body': issue['body'],
-                            'reactions': issue.get('reactions', {}),
-                            'is_pull_request': False,
-                            'timeline_events': timeline_events,
-                            'comments_data': comments if depth == 'complex' else [],
-                            'time_mined': current_timestamp
-                        }
-
-                        if depth == 'basic':
-                            # Se for mineração básica, buscar Issue existente
-                            existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
-                            if existing_issue:
-                                # Preservar dados complexos se existirem
-                                processed_issue['comments_data'] = existing_issue.comments
-                                processed_issue['timeline_events'] = existing_issue.timeline_events
-
-                        # Atualizar ou criar Issue
-                        GitHubIssue.objects.update_or_create(
-                            issue_id=processed_issue['id'],
-                            defaults={
-                                'repository': repo_name,
-                                'number': processed_issue['number'],
-                                'title': processed_issue['title'],
-                                'state': processed_issue['state'],
-                                'creator': issue['user']['login'],
-                                'assignees': processed_issue['assignees'],
-                                'labels': processed_issue['labels'],
-                                'milestone': processed_issue['milestone'],
-                                'locked': processed_issue['locked'],
-                                'created_at': processed_issue['created_at'],
-                                'updated_at': processed_issue['updated_at'],
-                                'closed_at': processed_issue['closed_at'],
-                                'body': processed_issue['body'],
-                                'comments': processed_issue.get('comments_data', existing_issue.comments if existing_issue else []),
-                                'timeline_events': processed_issue.get('timeline_events', existing_issue.timeline_events if existing_issue else []),
-                                'is_pull_request': False,
-                                'author_association': processed_issue['author_association'],
-                                'reactions': processed_issue['reactions'],
-                                'time_mined': current_timestamp
-                            }
-                        )
-
-                        all_issues.append(processed_issue)
-                        print(f"✓ Issue #{issue_number} processada", end='\r')
-
-                    if len(data['items']) < 100:
-                        has_more_pages = False
-                    else:
-                        page += 1
-
-                    time.sleep(1)
-
-                print(f"\n✅ Período concluído: {period_issues_count} issues coletadas em {page} páginas")
-
-            print("\n" + "="*50)
-            print("💾 Salvando dados em JSON...")
-            self.save_to_json(all_issues, f"{repo_name.replace('/', '_')}_issues.json")
-            print(f"✨ Extração concluída! Total de issues coletadas: {len(all_issues)}")
-            print("="*50 + "\n")
-            return all_issues
-
-        except Exception as e:
-            print(f"\n❌ Erro durante a extração: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha na extração de issues: {str(e)}") from e
-        finally:
-            self.verify_token()
 
     def split_date_range(self, start_date, end_date, interval_days=1):
         """
@@ -707,235 +524,6 @@ class GitHubMiner:
             print(f"\n⚠️ ALERTA: Apenas {remaining} requisições restantes para o token atual ({endpoint_type})", flush=True)
         
         return False
-
-    def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
-        all_prs = []
-        metrics = APIMetrics()
-        debug_buffer = []  # Buffer para acumular mensagens de debug
-        
-        def log_debug(pr_number, message):
-            """Adiciona mensagem de debug ao buffer"""
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            debug_buffer.append(f"[{timestamp}][PRs][DEBUG][PR #{pr_number}] {message}")
-
-        def log_error(pr_number, message, error=None):
-            """Loga erro e imprime imediatamente"""
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            error_message = f"[{timestamp}][PRs][ERROR][PR #{pr_number}] {message}"
-            if error:
-                error_message += f"\nDetalhes: {str(error)}"
-            print(f"\n{error_message}", flush=True)
-
-        def flush_debug_logs():
-            """Imprime e limpa o buffer de logs de debug"""
-            if debug_buffer:
-                print("\n=== Debug Logs ===", flush=True)
-                print('\n'.join(debug_buffer), flush=True)
-                print("=================\n", flush=True)
-                debug_buffer.clear()
-
-        print("\n" + "="*50)
-        print(f"[PRs] 🔍 INICIANDO EXTRAÇÃO DE PULL REQUESTS: {repo_name}")
-        print(f"[PRs] 📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
-        print(f"[PRs] 🔎 Profundidade: {depth.upper()}")
-        print("="*50 + "\n")
-
-        try:
-            for period_start, period_end in self.split_date_range(start_date, end_date):
-                print("\n" + "-"*40)
-                print(f"[PRs] 📊 Processando período: {period_start} até {period_end}")
-                print("-"*40)
-                
-                base_url = "https://api.github.com/search/issues"
-                page = 1
-                has_more_pages = True
-                period_prs_count = 0
-
-                while has_more_pages:
-                    query = f"repo:{repo_name} is:pr"
-                    if period_start:
-                        query += f" created:{period_start}"
-                    if period_end:
-                        query += f"..{period_end}"
-
-                    params = {
-                        'q': query,
-                        'per_page': 100,
-                        'page': page
-                    }
-
-                    print(f"[PRs] [Página {page}] Iniciando busca...", flush=True)
-                    print(f"[PRs] Query: {query}", flush=True)
-
-                    response = requests.get(base_url, params=params, headers=self.headers)
-                    metrics.total_requests += 1
-                    
-                    if response.status_code == 403 and 'rate limit' in response.text.lower():
-                        if not self.handle_rate_limit(response):
-                            print("[PRs] Falha ao recuperar após rate limit", flush=True)
-                            break
-                        response = requests.get(base_url, params=params, headers=self.headers)
-
-                    response.raise_for_status()
-                    data = response.json()
-
-                    if not data['items']:
-                        print("[PRs] Nenhum PR encontrado nesta página.", flush=True)
-                        break
-
-                    print(f"[PRs] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
-
-                    for pr in data.get('items', []):
-                        current_timestamp = time.time()  # Timestamp Unix em segundos
-                        try:
-                            pr_number = pr.get('number')
-                            if not pr_number:
-                                continue
-
-                            log_debug(pr_number, "Iniciando processamento")
-                            
-                            # Buscar detalhes do PR
-                            pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
-                            pr_response = requests.get(pr_url, headers=self.headers)
-                            metrics.total_requests += 1
-                            
-                            if pr_response.status_code == 403 and 'rate limit' in pr_response.text.lower():
-                                if self.handle_rate_limit(pr_response, 'core'):
-                                    # Se um novo token foi encontrado, tenta a requisição novamente
-                                    pr_response = requests.get(pr_url, headers=self.headers)
-                                    if pr_response.status_code != 200:
-                                        print(f"[PRs] Falha ao recuperar PR #{pr_number} mesmo após troca de token", flush=True)
-                                        continue
-                                else:
-                                    print(f"[PRs] Falha ao recuperar PR #{pr_number} após rate limit", flush=True)
-                                    continue
-
-                            pr_details = pr_response.json()
-                            
-                            if not pr_details:
-                                log_error(pr_number, "[PRs] Detalhes do PR vazios")
-                                continue
-                            log_debug(pr_number, "[PRs] Detalhes obtidos com sucesso")
-
-                            # Dados básicos que sempre serão coletados
-                            processed_pr = {
-                                'id': pr_details.get('id'),
-                                'number': pr_details.get('number'),
-                                'title': pr_details.get('title'),
-                                'state': pr_details.get('state'),
-                                'created_at': pr_details.get('created_at'),
-                                'updated_at': pr_details.get('updated_at'),
-                                'closed_at': pr_details.get('closed_at'),
-                                'merged_at': pr_details.get('merged_at'),
-                                'user': pr_details.get('user', {}).get('login'),
-                                'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
-                                'body': pr_details.get('body'),
-                                'time_mined': current_timestamp
-                            }
-
-                            # Dados adicionais coletados apenas no modo complexo
-                            if depth == 'complex':
-                                # Buscar commits
-                                commits_url = f'{pr_url}/commits'
-                                commits_response = requests.get(commits_url, headers=self.headers)
-                                metrics.total_requests += 1
-                                
-                                commits = []
-                                if commits_response.status_code == 200:
-                                    commits = commits_response.json() or []
-                                    log_debug(pr_number, f"[PRs] Commits encontrados: {len(commits)}")
-
-                                # Buscar comentários
-                                comments_url = f'{pr_url}/comments'
-                                comments_response = requests.get(comments_url, headers=self.headers)
-                                metrics.total_requests += 1
-                                
-                                comments = []
-                                if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
-                                    if self.handle_rate_limit(comments_response, 'core'):
-                                        comments_response = requests.get(comments_url, headers=self.headers)
-                                    else:
-                                        print(f"[PRs] Falha ao recuperar comentários #{pr_number} após rate limit", flush=True)
-                                        continue
-                                
-                                if comments_response.status_code == 200:
-                                    comments = comments_response.json() or []
-                                    log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
-
-                                processed_pr.update({
-                                    'commits_data': [
-                                        {
-                                            'sha': c.get('sha'),
-                                            'message': c.get('commit', {}).get('message')
-                                        } for c in commits
-                                    ],
-                                    'comments_data': [
-                                        {
-                                            'user': c.get('user', {}).get('login'),
-                                            'body': c.get('body')
-                                        } for c in comments
-                                    ]
-                                })
-
-                            # Dentro do método get_pull_requests
-                            if depth == 'basic':
-                                # Se for mineração básica, buscar PR existente
-                                existing_pr = GitHubPullRequest.objects.filter(pr_id=processed_pr['id']).first()
-                                if existing_pr:
-                                    # Preservar dados complexos se existirem
-                                    processed_pr['commits'] = existing_pr.commits
-                                    processed_pr['comments'] = existing_pr.comments
-
-                            # Atualizar ou criar PR
-                            GitHubPullRequest.objects.update_or_create(
-                                pr_id=processed_pr['id'],
-                                defaults={
-                                    'repository': repo_name,
-                                    'number': processed_pr['number'],
-                                    'title': processed_pr['title'],
-                                    'state': processed_pr['state'],
-                                    'creator': processed_pr['user'],
-                                    'created_at': processed_pr['created_at'],
-                                    'updated_at': processed_pr['updated_at'],
-                                    'closed_at': processed_pr['closed_at'],
-                                    'merged_at': processed_pr['merged_at'],
-                                    'labels': processed_pr['labels'],
-                                    'commits': processed_pr.get('commits_data', processed_pr.get('commits', [])),
-                                    'comments': processed_pr.get('comments_data', processed_pr.get('comments', [])),
-                                    'body': processed_pr.get('body'),
-                                    'time_mined': current_timestamp
-                                }
-                            )
-
-                            all_prs.append(processed_pr)
-                            log_debug(pr_number, "Processamento e salvamento concluídos com sucesso")
-                            flush_debug_logs()
-
-                        except Exception as e:
-                            log_error(pr_number, f"Erro ao processar PR", error=e)
-                            continue
-
-                    print(f"[PRs] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
-                    
-                    if len(data['items']) < 100:
-                        has_more_pages = False
-                    else:
-                        page += 1
-
-                    time.sleep(1)
-
-            print("\n" + "="*50)
-            print("[PRs] 💾 Salvando dados em JSON...")
-            self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
-            print(f"[PRs] ✨ Extração concluída! Total de PRs coletados: {len(all_prs)}")
-            print("="*50 + "\n")
-            return all_prs
-
-        except Exception as e:
-            print(f"[PRs] ❌ Erro durante a extração: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha na extração de PRs: {str(e)}") from e
-        finally:
-            self.verify_token()
 
     def get_branches(self, repo_name: str):
         url = f'https://api.github.com/repos/{repo_name}/branches'
@@ -1200,3 +788,421 @@ class GitHubMiner:
             url = response.links.get('next', {}).get('url')
         
         return len(total_labels)
+
+    def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
+        all_prs = []
+        metrics = APIMetrics()
+        debug_buffer = []  # Buffer para acumular mensagens de debug
+        
+        def log_debug(pr_number, message):
+            """Adiciona mensagem de debug ao buffer"""
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            debug_buffer.append(f"[{timestamp}][PRs][DEBUG][PR #{pr_number}] {message}")
+
+        def log_error(pr_number, message, error=None):
+            """Loga erro e imprime imediatamente"""
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            error_message = f"[{timestamp}][PRs][ERROR][PR #{pr_number}] {message}"
+            if error:
+                error_message += f"\nDetalhes: {str(error)}"
+            print(f"\n{error_message}", flush=True)
+
+        def flush_debug_logs():
+            """Imprime e limpa o buffer de logs de debug"""
+            if debug_buffer:
+                print("\n=== Debug Logs ===", flush=True)
+                print('\n'.join(debug_buffer), flush=True)
+                print("=================\n", flush=True)
+                debug_buffer.clear()
+
+        print("\n" + "="*50)
+        print(f"[PRs] 🔍 INICIANDO EXTRAÇÃO DE PULL REQUESTS: {repo_name}")
+        print(f"[PRs] 📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
+        print(f"[PRs] 🔎 Profundidade: {depth.upper()}")
+        print("="*50 + "\n")
+
+        try:
+            for period_start, period_end in self.split_date_range(start_date, end_date):
+                print("\n" + "-"*40)
+                print(f"[PRs] 📊 Processando período: {period_start} até {period_end}")
+                print("-"*40)
+                
+                base_url = "https://api.github.com/search/issues"
+                page = 1
+                has_more_pages = True
+                period_prs_count = 0
+
+                while has_more_pages:
+                    query = f"repo:{repo_name} is:pr"
+                    if period_start:
+                        query += f" created:{period_start}"
+                    if period_end:
+                        query += f"..{period_end}"
+
+                    params = {
+                        'q': query,
+                        'per_page': 100,
+                        'page': page
+                    }
+
+                    print(f"[PRs] [Página {page}] Iniciando busca...", flush=True)
+                    print(f"[PRs] Query: {query}", flush=True)
+
+                    response = requests.get(base_url, params=params, headers=self.headers)
+                    metrics.total_requests += 1
+                    
+                    if response.status_code == 403 and 'rate limit' in response.text.lower():
+                        if not self.handle_rate_limit(response):
+                            print("[PRs] Falha ao recuperar após rate limit", flush=True)
+                            break
+                        response = requests.get(base_url, params=params, headers=self.headers)
+
+                    response.raise_for_status()
+                    data = response.json()
+
+                    if not data['items']:
+                        print("[PRs] Nenhum PR encontrado nesta página.", flush=True)
+                        break
+
+                    print(f"[PRs] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
+
+                    for pr in data.get('items', []):
+                        current_timestamp = time.time()  # Timestamp Unix em segundos
+                        try:
+                            pr_number = pr.get('number')
+                            if not pr_number:
+                                continue
+
+                            log_debug(pr_number, "Iniciando processamento")
+                            
+                            # Buscar detalhes do PR
+                            pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
+                            pr_response = requests.get(pr_url, headers=self.headers)
+                            metrics.total_requests += 1
+                            
+                            if pr_response.status_code == 403 and 'rate limit' in pr_response.text.lower():
+                                if self.handle_rate_limit(pr_response, 'core'):
+                                    # Se um novo token foi encontrado, tenta a requisição novamente
+                                    pr_response = requests.get(pr_url, headers=self.headers)
+                                    if pr_response.status_code != 200:
+                                        print(f"[PRs] Falha ao recuperar PR #{pr_number} mesmo após troca de token", flush=True)
+                                        continue
+                                else:
+                                    print(f"[PRs] Falha ao recuperar PR #{pr_number} após rate limit", flush=True)
+                                    continue
+
+                            pr_details = pr_response.json()
+                            
+                            if not pr_details:
+                                log_error(pr_number, "[PRs] Detalhes do PR vazios")
+                                continue
+                            log_debug(pr_number, "[PRs] Detalhes obtidos com sucesso")
+
+                            # Dados básicos que sempre serão coletados
+                            processed_pr = {
+                                'id': pr_details.get('id'),
+                                'number': pr_details.get('number'),
+                                'title': pr_details.get('title'),
+                                'state': pr_details.get('state'),
+                                'created_at': pr_details.get('created_at'),
+                                'updated_at': pr_details.get('updated_at'),
+                                'closed_at': pr_details.get('closed_at'),
+                                'merged_at': pr_details.get('merged_at'),
+                                'user': pr_details.get('user', {}).get('login'),
+                                'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
+                                'body': pr_details.get('body'),
+                                'time_mined': current_timestamp,
+                                'tipo': 'pull_request'  # Adiciona o tipo como 'pull_request'
+                            }
+
+                            # Dados adicionais coletados apenas no modo complexo
+                            if depth == 'complex':
+                                # Buscar commits
+                                commits_url = f'{pr_url}/commits'
+                                commits_response = requests.get(commits_url, headers=self.headers)
+                                metrics.total_requests += 1
+                                
+                                commits = []
+                                if commits_response.status_code == 200:
+                                    commits = commits_response.json() or []
+                                    log_debug(pr_number, f"[PRs] Commits encontrados: {len(commits)}")
+
+                                # Buscar comentários
+                                comments_url = f'{pr_url}/comments'
+                                comments_response = requests.get(comments_url, headers=self.headers)
+                                metrics.total_requests += 1
+                                
+                                comments = []
+                                if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
+                                    if self.handle_rate_limit(comments_response, 'core'):
+                                        comments_response = requests.get(comments_url, headers=self.headers)
+                                    else:
+                                        print(f"[PRs] Falha ao recuperar comentários #{pr_number} após rate limit", flush=True)
+                                        continue
+                                
+                                if comments_response.status_code == 200:
+                                    comments = comments_response.json() or []
+                                    log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
+
+                                processed_pr.update({
+                                    'commits_data': [
+                                        {
+                                            'sha': c.get('sha'),
+                                            'message': c.get('commit', {}).get('message')
+                                        } for c in commits
+                                    ],
+                                    'comments_data': [
+                                        {
+                                            'user': c.get('user', {}).get('login'),
+                                            'body': c.get('body')
+                                        } for c in comments
+                                    ]
+                                })
+
+                            # Dentro do método get_pull_requests
+                            if depth == 'basic':
+                                # Se for mineração básica, buscar PR existente
+                                existing_pr = GitHubPullRequest.objects.filter(pr_id=processed_pr['id']).first()
+                                if existing_pr:
+                                    # Preservar dados complexos se existirem
+                                    processed_pr['commits'] = existing_pr.commits
+                                    processed_pr['comments'] = existing_pr.comments
+
+                            # Atualizar ou criar PR
+                            GitHubIssuePullRequest.objects.update_or_create(
+                                record_id=processed_pr['id'],
+                                defaults={
+                                    'repository': repo_name,
+                                    'number': processed_pr['number'],
+                                    'title': processed_pr['title'],
+                                    'state': processed_pr['state'],
+                                    'creator': processed_pr['user'],
+                                    'created_at': processed_pr['created_at'],
+                                    'updated_at': processed_pr['updated_at'],
+                                    'closed_at': processed_pr['closed_at'],
+                                    'merged_at': processed_pr['merged_at'],
+                                    'labels': processed_pr['labels'],
+                                    'commits': processed_pr.get('commits_data', processed_pr.get('commits', [])),
+                                    'comments': processed_pr.get('comments_data', processed_pr.get('comments', [])),
+                                    'body': processed_pr.get('body'),
+                                    'is_pull_request': True,
+                                    'time_mined': current_timestamp,
+                                    'tipo': 'pull_request'  # Adiciona o tipo como 'pull_request'
+                                }
+                            )
+
+                            all_prs.append(processed_pr)
+                            log_debug(pr_number, "Processamento e salvamento concluídos com sucesso")
+                            flush_debug_logs()
+
+                        except Exception as e:
+                            log_error(pr_number, f"Erro ao processar PR", error=e)
+                            continue
+
+                    print(f"[PRs] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
+                    
+                    if len(data['items']) < 100:
+                        has_more_pages = False
+                    else:
+                        page += 1
+
+                    time.sleep(1)
+
+            print("\n" + "="*50)
+            print("[PRs] 💾 Salvando dados em JSON...")
+            self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
+            print(f"[PRs] ✨ Extração concluída! Total de PRs coletados: {len(all_prs)}")
+            print("="*50 + "\n")
+            return all_prs
+
+        except Exception as e:
+            print(f"[PRs] ❌ Erro durante a extração: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha na extração de PRs: {str(e)}") from e
+        finally:
+            self.verify_token()
+
+    def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
+        all_issues = []
+        metrics = APIMetrics()
+        
+        print("\n" + "="*50)
+        print(f"🔍 INICIANDO EXTRAÇÃO DE ISSUES: {repo_name}")
+        print(f"📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
+        print(f"🔎 Profundidade: {depth.upper()}")
+        print("="*50 + "\n")
+
+        try:
+            for period_start, period_end in self.split_date_range(start_date, end_date):
+                print("\n" + "-"*40)
+                print(f"📊 Processando período: {period_start} até {period_end}")
+                print("-"*40)
+                
+                page = 1
+                has_more_pages = True
+                period_issues_count = 0
+
+                while has_more_pages:
+                    query = f"repo:{repo_name} is:issue"
+                    if period_start:
+                        query += f" created:{period_start}"
+                    if period_end:
+                        query += f"..{period_end}"
+
+                    params = {
+                        'q': query,
+                        'per_page': 100,
+                        'page': page
+                    }
+
+                    response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
+                    metrics.total_requests += 1
+
+                    if response.status_code == 403 and 'rate limit' in response.text.lower():
+                        if not self.handle_rate_limit(response, 'search'):
+                            print("Falha ao recuperar após rate limit", flush=True)
+                            break
+                        response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
+
+                    data = response.json()
+                    if not data.get('items'):
+                        break
+
+                    issues_in_page = len(data['items'])
+                    period_issues_count += issues_in_page
+                    print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
+
+                    for issue in data['items']:
+                        current_timestamp = time.time()  # Timestamp Unix em segundos
+                        if 'pull_request' in issue:
+                            continue
+
+                        issue_number = issue['number']
+                        
+                        # Buscar timeline events
+                        timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
+                        headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
+                        timeline_response = requests.get(timeline_url, headers=headers)
+                        metrics.total_requests += 1
+                        
+                        timeline_events = []
+                        if timeline_response.status_code == 403 and 'rate limit' in timeline_response.text.lower():
+                            if not self.handle_rate_limit(timeline_response, 'core'):
+                                print(f"[Issues] Falha ao recuperar timeline #{issue_number} após rate limit", flush=True)
+                                continue
+                            timeline_response = requests.get(timeline_url, headers=headers)
+                        
+                        if timeline_response.status_code == 200:
+                            timeline_events = [{
+                                'event': event.get('event'),
+                                'actor': event.get('actor', {}).get('login') if event.get('actor') else None,
+                                'created_at': event.get('created_at'),
+                                'assignee': event.get('assignee', {}).get('login') if event.get('assignee') else None,
+                                'label': event.get('label', {}).get('name') if event.get('label') else None
+                            } for event in timeline_response.json()]
+
+                        # Buscar comentários apenas se for mineração complexa
+                        comments = []
+                        if depth == 'complex':
+                            comments_url = issue['comments_url']
+                            comments_response = requests.get(comments_url, headers=self.headers)
+                            metrics.total_requests += 1
+                            
+                            if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
+                                if not self.handle_rate_limit(comments_response, 'core'):
+                                    print(f"[Issues] Falha ao recuperar comentários #{issue_number} após rate limit", flush=True)
+                                    continue
+                                comments_response = requests.get(comments_url, headers=self.headers)
+                            
+                            if comments_response.status_code == 200:
+                                comments = [{
+                                    'id': c['id'],
+                                    'user': c['user']['login'],
+                                    'body': c['body'],
+                                    'created_at': c['created_at'],
+                                    'updated_at': c['updated_at'],
+                                    'author_association': c['author_association'],
+                                    'reactions': c.get('reactions', {})
+                                } for c in comments_response.json()]
+
+                        # Criar objeto para salvar no banco de dados
+                        processed_issue = {
+                            'id': issue['id'],
+                            'number': issue['number'],
+                            'title': issue['title'],
+                            'state': issue['state'],
+                            'locked': issue['locked'],
+                            'assignees': [assignee['login'] for assignee in issue['assignees']],
+                            'labels': [label['name'] for label in issue['labels']],
+                            'milestone': issue['milestone']['title'] if issue['milestone'] else None,
+                            'created_at': issue['created_at'],
+                            'updated_at': issue['updated_at'],
+                            'closed_at': issue['closed_at'],
+                            'author_association': issue['author_association'],
+                            'body': issue['body'],
+                            'reactions': issue.get('reactions', {}),
+                            'is_pull_request': False,
+                            'timeline_events': timeline_events,
+                            'comments_data': comments if depth == 'complex' else [],
+                            'time_mined': current_timestamp,
+                            'tipo': 'issue'  # Adiciona o tipo como 'issue'
+                        }
+
+                        if depth == 'basic':
+                            # Se for mineração básica, buscar Issue existente
+                            existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
+                            if existing_issue:
+                                # Preservar dados complexos se existirem
+                                processed_issue['comments_data'] = existing_issue.comments
+                                processed_issue['timeline_events'] = existing_issue.timeline_events
+
+                        # Atualizar ou criar Issue
+                        GitHubIssuePullRequest.objects.update_or_create(
+                            record_id=processed_issue['id'],
+                            defaults={
+                                'repository': repo_name,
+                                'number': processed_issue['number'],
+                                'title': processed_issue['title'],
+                                'state': processed_issue['state'],
+                                'creator': issue['user']['login'],
+                                'assignees': processed_issue['assignees'],
+                                'labels': processed_issue['labels'],
+                                'milestone': processed_issue['milestone'],
+                                'locked': processed_issue['locked'],
+                                'created_at': processed_issue['created_at'],
+                                'updated_at': processed_issue['updated_at'],
+                                'closed_at': processed_issue['closed_at'],
+                                'body': processed_issue['body'],
+                                'comments': processed_issue.get('comments_data', existing_issue.comments if existing_issue else []),
+                                'timeline_events': processed_issue.get('timeline_events', existing_issue.timeline_events if existing_issue else []),
+                                'is_pull_request': False,
+                                'author_association': processed_issue['author_association'],
+                                'reactions': processed_issue['reactions'],
+                                'time_mined': current_timestamp,
+                                'tipo': 'issue'  # Adiciona o tipo como 'issue'
+                            }
+                        )
+
+                        all_issues.append(processed_issue)
+                        print(f"✓ Issue #{issue_number} processada", end='\r')
+
+                    if len(data['items']) < 100:
+                        has_more_pages = False
+                    else:
+                        page += 1
+
+                    time.sleep(1)
+
+                print(f"\n✅ Período concluído: {period_issues_count} issues coletadas em {page} páginas")
+
+            print("\n" + "="*50)
+            print("💾 Salvando dados em JSON...")
+            self.save_to_json(all_issues, f"{repo_name.replace('/', '_')}_issues.json")
+            print(f"✨ Extração concluída! Total de issues coletadas: {len(all_issues)}")
+            print("="*50 + "\n")
+            return all_issues
+
+        except Exception as e:
+            print(f"\n❌ Erro durante a extração: {str(e)}", flush=True)
+            raise RuntimeError(f"Falha na extração de issues: {str(e)}") from e
+        finally:
+            self.verify_token()

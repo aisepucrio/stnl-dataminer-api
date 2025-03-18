@@ -12,10 +12,7 @@ class GitHubAPITests(APITestCase):
         self.status_check_delay = 2  # Atraso entre verificações de status
 
         # Endpoints principais
-        self.commits_url = reverse('commit-list')
-        self.issues_url = reverse('github-issue-list')  
-        self.pull_requests_url = reverse('pullrequest-list')
-        self.branches_url = reverse('branch-list')
+        self.issue_pr_url = reverse('issuepullrequest-list')
         self.task_status_url = "http://localhost:8000/api/jobs/task/"
 
     def _add_task_id(self, response, task_list):
@@ -28,45 +25,20 @@ class GitHubAPITests(APITestCase):
         else:
             print("task_id não encontrado na resposta:", data)
 
-    def _mine_data_for_repo(self, repo_name):
+    def _mine_data_for_repo(self, repo_name, tipo):
         """Executa mineração de dados para um repositório específico e retorna lista de task_ids"""
         task_ids = []
 
-        # Testa branches
-        response = self.client.get(self.branches_url, {"repo_name": repo_name})
-        self.assertIn(response.status_code, [200, 202])
-        self._add_task_id(response, task_ids)
-        print("Branches data:", response.json())
-
-        # Testa commits
-        response = self.client.get(self.commits_url, {
+        # Testa issues ou pull requests
+        response = self.client.post(self.issue_pr_url, {
             "repo_name": repo_name,
             "start_date": self.start_date,
-            "end_date": self.end_date
+            "end_date": self.end_date,
+            "tipo": tipo
         })
         self.assertIn(response.status_code, [200, 202])
         self._add_task_id(response, task_ids)
-        print("Commits data:", response.json())
-
-        # Testa issues
-        response = self.client.get(self.issues_url, {
-            "repo_name": repo_name,
-            "start_date": self.start_date,
-            "end_date": self.end_date
-        })
-        self.assertIn(response.status_code, [200, 202])
-        self._add_task_id(response, task_ids)
-        print("Issues data:", response.json())
-
-        # Testa pull requests
-        response = self.client.get(self.pull_requests_url, {
-            "repo_name": repo_name,
-            "start_date": self.start_date,
-            "end_date": self.end_date
-        })
-        self.assertIn(response.status_code, [200, 202])
-        self._add_task_id(response, task_ids)
-        print("Pull requests data:", response.json())
+        print(f"{tipo.capitalize()} data:", response.json())
 
         return task_ids
 
@@ -97,9 +69,10 @@ class GitHubAPITests(APITestCase):
         repositories = ["grafana/github-datasource", "tensortrade-org/tensortrade", "pandas-dev/pandas"]
 
         for repo_name in repositories:
-            print(f"\nIniciando mineração para o repositório: {repo_name}")
-            task_ids = self._mine_data_for_repo(repo_name)
-            print(f"Verificando status das tasks para o repositório: {repo_name}")
-            self._check_task_statuses(task_ids)
-            # Pausa entre cada repositório
-            time.sleep(self.interval_seconds)
+            for tipo in ['issue', 'pull_request']:
+                print(f"\nIniciando mineração para o repositório: {repo_name} como {tipo}")
+                task_ids = self._mine_data_for_repo(repo_name, tipo)
+                print(f"Verificando status das tasks para o repositório: {repo_name} como {tipo}")
+                self._check_task_statuses(task_ids)
+                # Pausa entre cada repositório
+                time.sleep(self.interval_seconds)

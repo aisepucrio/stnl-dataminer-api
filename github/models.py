@@ -154,3 +154,38 @@ class GitHubMetadata(models.Model):
 
     def __str__(self):
         return f"Metadata for {self.repository}"
+
+class GitHubIssuePullRequest(models.Model):
+    repository = models.CharField(max_length=255, db_index=True, default='')
+    record_id = models.BigIntegerField(unique=True)
+    number = models.IntegerField(null=True)
+    title = models.TextField()
+    state = models.CharField(max_length=20)
+    creator = models.CharField(max_length=100)
+    assignees = models.JSONField(default=list)
+    labels = models.JSONField(default=list)
+    milestone = models.CharField(max_length=255, null=True, blank=True)
+    locked = models.BooleanField(default=False)
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+    closed_at = models.DateTimeField(null=True, blank=True)
+    body = models.TextField(null=True, blank=True)
+    comments = models.JSONField(default=list)
+    timeline_events = models.JSONField(default=list)
+    merged_at = models.DateTimeField(null=True, blank=True)
+    commits = models.JSONField(default=list)
+    is_pull_request = models.BooleanField(default=False)
+    author_association = models.CharField(max_length=50, null=True, blank=True)
+    reactions = models.JSONField(default=dict)
+    tipo = models.CharField(max_length=20)
+    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['repository', 'record_id']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['updated_at'])
+        ]
+
+    def __str__(self):
+        return f"{self.tipo.capitalize()} {self.record_id} - {self.title}"
