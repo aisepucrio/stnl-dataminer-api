@@ -167,12 +167,12 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
         }
     )
     try:
-        logger.info(f"🔄 Iniciando coleta de issues do Jira: {project_key} no domínio {jira_domain}")
+        print(f"🔄 Iniciando coleta de issues do Jira: {project_key} no domínio {jira_domain}")
         
         miner = JiraMiner(jira_domain, jira_email, jira_api_token)
         issues = miner.collect_jira_issues(project_key, issuetypes, start_date, end_date)
 
-        logger.info(f"✅ Coleta concluída: {len(issues.get('data', []))} issues coletadas.")
+        print(f"✅ Coleta concluída: {len(issues.get('data', []))} issues coletadas.")
 
         self.update_state(
             state='SUCCESS',
@@ -188,7 +188,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
             'data': issues
         }
     except Exception as e:
-        logger.error(f"❌ Erro ao coletar issues do Jira: {e}", exc_info=True)
+        print(f"❌ Erro ao coletar issues do Jira: {e}", exc_info=True)
         self.update_state(
             state='FAILURE',
             meta={
