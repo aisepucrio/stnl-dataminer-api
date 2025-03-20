@@ -8,7 +8,6 @@ from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 import time
 
-
 class JiraMiner:
     def __init__(self, jira_domain, jira_email, jira_api_token):
         self.jira_domain = jira_domain
@@ -86,17 +85,38 @@ class JiraMiner:
                 break
             
         return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
-    
-    def get_commits_for_issue(self, issue_key):
-        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueId={issue_key}&applicationType=git&dataType=repository"
 
-        response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
+    def get_issue_id(self, issue_key):
+        """
+        Obtém o ID numérico da issue com base na issue key (ex: "CSTONE-219").
+        """
+        url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}"
+        response = requests.get(url, headers=self.headers, auth=self.auth)
+
         if response.status_code != 200:
-            return []
+            raise Exception(f"Erro ao obter o ID da issue {issue_key}: {response.status_code} - {response.text}")
         
+        return response.json().get('id')  # Retorna o ID numérico da issue
+
+
+    def get_commits_for_issue(self, issue_key):
+        """
+        Obtém os commits vinculados a uma issue do Jira.
+        """
+        try:
+            issue_id = self.get_issue_id(issue_key)  # Obtém o ID numérico correto
+        except Exception as e:
+            return [str(e)]  # Retorna o erro caso a issue não seja encontrada
+
+        url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
+        response = requests.get(url, headers=self.headers, auth=self.auth)
+
+        if response.status_code != 200:
+            return [f"Erro ao buscar commits: {response.status_code} - {response.text}"]
+
         details = response.json().get('detail', [])
         commits = []
-        
+
         for detail in details:
             repositories = detail.get('repositories', [])
             for repo in repositories:

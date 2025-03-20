@@ -17,7 +17,7 @@ class JiraIssue(models.Model):
     description = models.TextField(null=True, blank=True)
     all_fields = models.JSONField(null=True, blank=True)
     time_mined = models.FloatField(null=True, blank=True, help_text="Timestamp Unix da mineração em segundos")
-    commits = models.CharField(max_length=50, null=True, blank=True)
+    commits = models.JSONField(max_length=50, null=True, blank=True)
 
     class Meta:
         constraints = [
