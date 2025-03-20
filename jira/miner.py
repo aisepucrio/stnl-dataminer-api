@@ -7,6 +7,8 @@ from .models import JiraIssue
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 import time
+from django.utils.timezone import now
+
 
 class JiraMiner:
     def __init__(self, jira_domain, jira_email, jira_api_token):
@@ -54,7 +56,7 @@ class JiraMiner:
                 break
 
             for issue_data in issues:
-                current_timestamp = time.time()
+                current_timestamp = now()
                 description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
                 commits = self.get_commits_for_issue(issue_data['key'])

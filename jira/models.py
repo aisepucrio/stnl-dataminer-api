@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.timezone import now
 
 class JiraIssue(models.Model):
     issue_id = models.CharField(max_length=100, unique=True, primary_key=True)
@@ -16,7 +17,7 @@ class JiraIssue(models.Model):
     summary = models.TextField()
     description = models.TextField(null=True, blank=True)
     all_fields = models.JSONField(null=True, blank=True)
-    time_mined = models.FloatField(null=True, blank=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(default=now)
     commits = models.JSONField(max_length=50, null=True, blank=True)
 
     class Meta:
