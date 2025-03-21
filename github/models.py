@@ -24,7 +24,7 @@ class GitHubCommit(models.Model):
     dmm_unit_size = models.FloatField(null=True)
     dmm_unit_complexity = models.FloatField(null=True)
     dmm_unit_interfacing = models.FloatField(null=True)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
 
     def __str__(self):
@@ -40,7 +40,7 @@ class GitHubModifiedFile(models.Model):
     added_lines = models.IntegerField()
     deleted_lines = models.IntegerField()
     complexity = models.IntegerField(null=True)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
 
     def __str__(self):
@@ -51,7 +51,7 @@ class GitHubMethod(models.Model):
     name = models.TextField()
     complexity = models.IntegerField(null=True)
     max_nesting = models.IntegerField(null=True)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
     def __str__(self):
         return f"Method {self.name} in File {self.modified_file.filename}"
@@ -76,7 +76,7 @@ class GitHubIssue(models.Model):
     is_pull_request = models.BooleanField(default=False)
     author_association = models.CharField(max_length=50, null=True, blank=True)
     reactions = models.JSONField(default=dict)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
     class Meta:
         indexes = [
@@ -103,7 +103,7 @@ class GitHubPullRequest(models.Model):
     commits = models.JSONField(default=list)
     comments = models.JSONField(default=list)
     body = models.TextField(null=True, blank=True)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
     class Meta:
         db_table = 'github_pull_requests'
@@ -115,7 +115,7 @@ class GitHubBranch(models.Model):
     repository = models.CharField(max_length=255, db_index=True, default='')
     name = models.CharField(max_length=500)
     sha = models.CharField(max_length=40)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
     def __str__(self):
         return f"Branch {self.name}"
@@ -143,7 +143,7 @@ class GitHubMetadata(models.Model):
     is_template = models.BooleanField(default=False)
     used_by_count = models.IntegerField(default=0)
     releases_count = models.IntegerField(default=0)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
     
     class Meta:
         indexes = [
@@ -178,7 +178,7 @@ class GitHubIssuePullRequest(models.Model):
     author_association = models.CharField(max_length=50, null=True, blank=True)
     reactions = models.JSONField(default=dict)
     tipo = models.CharField(max_length=20)
-    time_mined = models.FloatField(null=True, help_text="Timestamp Unix da mineração em segundos")
+    time_mined = models.DateTimeField(null=True, help_text="Data e hora da mineração")
 
     class Meta:
         indexes = [
