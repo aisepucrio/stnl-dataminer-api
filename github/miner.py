@@ -9,6 +9,7 @@ from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, 
 import time
 from bs4 import BeautifulSoup
 import base64
+from django.utils import timezone
 
 class APIMetrics:
     def __init__(self):
@@ -329,7 +330,7 @@ class GitHubMiner:
             essential_commits = []
 
             for commit in repo:
-                current_timestamp = time.time()  # Timestamp Unix em segundos
+                current_timestamp = timezone.now()  # Alterado para usar timezone.now()
                 print(f"[COMMITS] Processando commit: {commit.hash[:7]}", flush=True)
                 # Cria ou recupera o autor e o committer
                 author, _ = GitHubAuthor.objects.get_or_create(
@@ -539,7 +540,7 @@ class GitHubMiner:
             self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
 
             for branch in branches:
-                current_timestamp = time.time()  # Timestamp Unix em segundos
+                current_timestamp = timezone.now()  # Alterado para usar timezone.now()
                 GitHubBranch.objects.update_or_create(
                     name=branch['name'],
                     defaults={
@@ -670,7 +671,7 @@ class GitHubMiner:
             releases_count = self.get_releases_count(owner, repo)
             
             # Criar ou atualizar metadados no banco
-            current_timestamp = time.time()  # Timestamp Unix em segundos
+            current_timestamp = timezone.now()  # Alterado para usar timezone.now()
             metadata, created = GitHubMetadata.objects.update_or_create(
                 repository=repo_name,
                 defaults={
@@ -867,7 +868,7 @@ class GitHubMiner:
                     print(f"[PRs] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
 
                     for pr in data.get('items', []):
-                        current_timestamp = time.time()  # Timestamp Unix em segundos
+                        current_timestamp = timezone.now()  # Alterado para usar timezone.now()
                         try:
                             pr_number = pr.get('number')
                             if not pr_number:
@@ -1072,7 +1073,7 @@ class GitHubMiner:
                     print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
 
                     for issue in data['items']:
-                        current_timestamp = time.time()  # Timestamp Unix em segundos
+                        current_timestamp = timezone.now()  # Alterado para usar timezone.now()
                         if 'pull_request' in issue:
                             continue
 
