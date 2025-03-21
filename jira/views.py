@@ -32,7 +32,7 @@ class JiraIssueCollectView(APIView):
             logger.info(f"JIRA API Token: {jira_api_token[:5]}*****")  # Esconde parte do token por segurança
 
             # Validação de campos obrigatórios
-            if not all([jira_domain, project_key, jira_email, jira_api_token]):
+            if not all([jira_domain, project_key]):
                 return Response(
                     {"error": "Missing required fields: jira_domain, project_key, jira_email, jira_api_token"},
                     status=status.HTTP_400_BAD_REQUEST
