@@ -92,13 +92,21 @@ class GitHubMetadataSerializer(serializers.ModelSerializer):
 class GitHubIssuePullRequestSerializer(serializers.ModelSerializer):
     created_at_formatted = serializers.SerializerMethodField()
     updated_at_formatted = serializers.SerializerMethodField()
+    closed_at_formatted = serializers.SerializerMethodField()
+    merged_at_formatted = serializers.SerializerMethodField()
 
     class Meta:
         model = GitHubIssuePullRequest
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S") if obj.created_at else None
 
     def get_updated_at_formatted(self, obj):
-        return obj.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+        return obj.updated_at.strftime("%Y-%m-%d %H:%M:%S") if obj.updated_at else None
+
+    def get_closed_at_formatted(self, obj):
+        return obj.closed_at.strftime("%Y-%m-%d %H:%M:%S") if obj.closed_at else None
+
+    def get_merged_at_formatted(self, obj):
+        return obj.merged_at.strftime("%Y-%m-%d %H:%M:%S") if obj.merged_at else None

@@ -94,8 +94,20 @@ class GitHubIssuePullRequestFilter(filters.FilterSet):
     title = filters.CharFilter(lookup_expr='icontains')
     creator = filters.CharFilter(lookup_expr='icontains')
     repository = filters.CharFilter(lookup_expr='iexact')
+    repository_contains = filters.CharFilter(field_name='repository', lookup_expr='icontains')
+    repository_in = filters.CharFilter(method='filter_repository_in')
     state = filters.CharFilter(lookup_expr='iexact')
     tipo = filters.CharFilter(lookup_expr='iexact')
+    
+    # Filtro para labels (campo JSON)
+    has_label = filters.CharFilter(method='filter_has_label')
+    
+    def filter_repository_in(self, queryset, name, value):
+        repositories = [repo.strip() for repo in value.split(',')]
+        return queryset.filter(repository__in=repositories)
+    
+    def filter_has_label(self, queryset, name, value):
+        return queryset.filter(labels__contains=[value])
 
     class Meta:
         model = GitHubIssuePullRequest

@@ -3,7 +3,7 @@ import textwrap
 import pandas as pd
 import json
 
-models = ["mistral-small:24b", "deepseek-r1:14b", "qwq"]
+models = ["mistral-small:24b", "gemma3:27b", "qwq"]
 
 def serialize_response(response: str) -> dict:
     try:
@@ -26,12 +26,12 @@ You MUST return ONLY a JSON object with EXACTLY the following structure, without
 {{"sentiment": "positive/negative/neutral", "confidence": "value between 0 and 1"}}
 
 IMPORTANT: Do not include explanations, additional text, or any special characters. Return ONLY the JSON in a single line.
-    """)
+    """)    
 
     prompt = full_prompt
 
     response = ollama.generate(
-        model=models[2],
+        model=models[1],
         prompt=prompt,
         format="json"
     )

@@ -113,30 +113,30 @@ class CommitDetailView(generics.RetrieveAPIView):
     lookup_field = 'sha'
 
 class IssueListView(generics.ListAPIView):
-    queryset = GitHubIssue.objects.all()
-    serializer_class = GitHubIssueSerializer
+    queryset = GitHubIssuePullRequest.objects.filter(tipo='issue')
+    serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = GitHubIssueFilter
+    filterset_class = GitHubIssuePullRequestFilter
     search_fields = ['title', 'creator']
     ordering_fields = ['created_at', 'updated_at']
 
 class IssueDetailView(generics.RetrieveAPIView):
-    queryset = GitHubIssue.objects.all()
-    serializer_class = GitHubIssueSerializer
-    lookup_field = 'issue_id'
+    queryset = GitHubIssuePullRequest.objects.filter(tipo='issue')
+    serializer_class = GitHubIssuePullRequestSerializer
+    lookup_field = 'record_id'
 
 class PullRequestListView(generics.ListAPIView):
-    queryset = GitHubPullRequest.objects.all()
-    serializer_class = GitHubPullRequestSerializer
+    queryset = GitHubIssuePullRequest.objects.filter(tipo='pull_request')
+    serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = GitHubPullRequestFilter
+    filterset_class = GitHubIssuePullRequestFilter
     search_fields = ['title', 'creator']
     ordering_fields = ['created_at', 'updated_at']
 
 class PullRequestDetailView(generics.RetrieveAPIView):
-    queryset = GitHubPullRequest.objects.all()
-    serializer_class = GitHubPullRequestSerializer
-    lookup_field = 'pr_id'
+    queryset = GitHubIssuePullRequest.objects.filter(tipo='pull_request')
+    serializer_class = GitHubIssuePullRequestSerializer
+    lookup_field = 'record_id'
 
 class BranchListView(generics.ListAPIView):
     queryset = GitHubBranch.objects.all()
