@@ -1,6 +1,6 @@
 You are an expert in analyzing sentiment in commit messages. Your specialty is understanding the emotional context and intent behind development changes. Please analyze the message above following these guidelines:
 
-Examine the JSON field above containing commit message information. Your task is to perform sentiment analysis and classify the message into exactly one of the following categories:
+Examine the message above containing commit message information. Your task is to perform sentiment analysis and classify the message into exactly one of the following categories:
 
 - POSITIVE: When there are clear indications of:
   • Improvements or optimizations
