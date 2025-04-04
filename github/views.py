@@ -8,6 +8,9 @@ from .serializers import GitHubCommitSerializer, GitHubIssueSerializer, GitHubPu
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
+from rest_framework.views import APIView
+from django.db.models import Count
+from django.utils import timezone
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     def create(self, request):
@@ -208,3 +211,78 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
     queryset = GitHubIssuePullRequest.objects.all()
     serializer_class = GitHubIssuePullRequestSerializer
     lookup_field = 'record_id'
+
+
+class DashboardView(APIView):
+    def get(self, request):
+        # Get query parameters
+        repository = request.query_params.get('repository')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        # Set default dates if not provided
+        if not start_date:
+            start_date = "1970-01-01T00:00:00Z"  # Beginning of time for practical purposes
+        
+        if not end_date:
+            end_date = timezone.now().isoformat()
+        
+        # Filter by date range
+        issues_query = GitHubIssuePullRequest.objects.filter(
+            tipo='issue',
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
+        
+        prs_query = GitHubIssuePullRequest.objects.filter(
+            tipo='pull_request',
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
+        
+        commits_query = GitHubCommit.objects.filter(
+            date__gte=start_date,
+            date__lte=end_date
+        )
+        
+        # If repository is specified, filter by repository
+        if repository:
+            issues_query = issues_query.filter(repository=repository)
+            prs_query = prs_query.filter(repository=repository)
+            commits_query = commits_query.filter(repository=repository)
+            
+            # Get repository metadata
+            try:
+                metadata = GitHubMetadata.objects.get(repository=repository)
+                
+                response_data = {
+                    "repository": repository,
+                    "issues_count": issues_query.count(),
+                    "pull_requests_count": prs_query.count(),
+                    "commits_count": commits_query.count(),
+                    "forks_count": metadata.forks_count,
+                    "stars_count": metadata.stars_count,
+                    "watchers_count": metadata.watchers_count,
+                    "time_mined": metadata.time_mined
+                }
+            except GitHubMetadata.DoesNotExist:
+                # If metadata doesn't exist, return counts without metadata
+                response_data = {
+                    "repository": repository,
+                    "issues_count": issues_query.count(),
+                    "pull_requests_count": prs_query.count(),
+                    "commits_count": commits_query.count(),
+                    "error": "Repository metadata not found"
+                }
+        else:
+            # Aggregate data for all repositories
+            distinct_repos = GitHubMetadata.objects.values_list('repository', flat=True).distinct()
+            
+            response_data = {
+                "issues_count": issues_query.count(),
+                "pull_requests_count": prs_query.count(),
+                "commits_count": commits_query.count(),
+                "repositories_count": len(distinct_repos)
+            }
+        
+        return Response(response_data)
