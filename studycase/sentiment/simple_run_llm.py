@@ -13,11 +13,16 @@ def serialize_response(response: str) -> dict:
     except Exception as e:
         return {"error": str(e), "raw_response": str(response)}
 
-def run_llm(message: str, prompt: str) -> dict:
+def run_llm(message: str, prompt: str, data_name: str) -> dict:
+
+    print(f'\nmessage: {message}\n')
+
+    if data_name == "commits":
+        message = message['message']
 
     full_prompt = textwrap.dedent(f"""
 
-\"\"\"{message['message']}\"\"\"
+\"\"\"{message}\"\"\"
 
 {prompt}
 
@@ -79,7 +84,7 @@ def analyze_sentiment(data_name):
         print(json.dumps(structured_data, indent=2, ensure_ascii=False))
         
         try:
-            response = run_llm(structured_data, prompt)
+            response = run_llm(structured_data, prompt, data_name)
             print("✨ Resposta obtida:")
             print(json.dumps(response, indent=2, ensure_ascii=False) + "\n")
             results.append(response)
@@ -91,8 +96,9 @@ def analyze_sentiment(data_name):
     print(f"✅ Análise concluída! Resultados salvos em: studycase/sentiment/results/{data_name}.json")
 
 def main():
-    for data_name in ["commits", "Issues&PRs", "jira"]:
-        analyze_sentiment(data_name)
+    analyze_sentiment("jira")
+    # for data_name in ["commits", "Issues&PRs", "jira"]:
+    #     analyze_sentiment(data_name)
 
 if __name__ == "__main__":
     main()
