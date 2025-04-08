@@ -17,12 +17,14 @@ class GitHubCommitViewSet(viewsets.ViewSet):
         {
             "repo_name": "owner/repo",
             "start_date": "2024-01-01T00:00:00Z",  # opcional
-            "end_date": "2024-03-01T00:00:00Z"     # opcional
+            "end_date": "2024-03-01T00:00:00Z",    # opcional
+            "commit_sha": "abc123..."               # opcional, para minerar um commit específico
         }
         """
         repo_name = request.data.get('repo_name')
         start_date = request.data.get('start_date')
         end_date = request.data.get('end_date')
+        commit_sha = request.data.get('commit_sha')
 
         if not repo_name:
             return Response(
@@ -30,7 +32,7 @@ class GitHubCommitViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        task = fetch_commits.apply_async(args=[repo_name, start_date, end_date])
+        task = fetch_commits.apply_async(args=[repo_name, start_date, end_date, commit_sha])
 
         return Response({
             "task_id": task.id,
@@ -208,3 +210,30 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
     queryset = GitHubIssuePullRequest.objects.all()
     serializer_class = GitHubIssuePullRequestSerializer
     lookup_field = 'record_id'
+
+class GitHubCommitByShaViewSet(viewsets.ViewSet):
+    def create(self, request):
+        """
+        Endpoint para minerar um commit específico por sua hash SHA.
+        Aceita POST com parâmetros no body:
+        {
+            "repo_name": "owner/repo",
+            "commit_sha": "abc123..."
+        }
+        """
+        repo_name = request.data.get('repo_name')
+        commit_sha = request.data.get('commit_sha')
+
+        if not repo_name or not commit_sha:
+            return Response(
+                {"error": "repo_name e commit_sha são obrigatórios"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        task = fetch_commit_by_sha.apply_async(args=[repo_name, commit_sha])
+
+        return Response({
+            "task_id": task.id,
+            "message": "Task successfully initiated",
+            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+        }, status=status.HTTP_202_ACCEPTED)

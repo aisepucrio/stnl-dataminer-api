@@ -272,7 +272,10 @@ class GitHubMiner:
     def clone_repo(self, repo_url, clone_path):
         if not os.path.exists(clone_path):
             print(f"Cloning repo: {repo_url}", flush=True)
-            Repo.clone_from(repo_url, clone_path)
+            # Usar o token para autenticação
+            token = self.tokens[self.current_token_index]
+            auth_url = f'https://{token}@github.com/{repo_url.split("github.com/")[1]}'
+            Repo.clone_from(auth_url, clone_path)
         else:
             print(f"Repo already exists: {clone_path}", flush=True)
             self.update_repo(clone_path)
@@ -299,10 +302,14 @@ class GitHubMiner:
     def convert_to_iso8601(self, date):
         return date.isoformat()
 
-    def get_commits(self, repo_name: str, start_date: str = None, end_date: str = None, clone_path: str = None):
+    def get_commits(self, repo_name: str, start_date: str = None, end_date: str = None, clone_path: str = None, commit_sha: str = None):
         try:
             print(f"\n[COMMITS] Iniciando extração de commits para {repo_name}", flush=True)
-            print(f"[COMMITS] Período: {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+            
+            if commit_sha:
+                print(f"[COMMITS] Modo de extração: Commit específico (SHA: {commit_sha})", flush=True)
+            else:
+                print(f"[COMMITS] Modo de extração: Período de {start_date or 'início'} até {end_date or 'atual'}", flush=True)
 
             if start_date:
                 start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ')
@@ -326,7 +333,13 @@ class GitHubMiner:
                 self.update_repo(repo_path)
 
             print("[COMMITS] Iniciando análise dos commits...", flush=True)
-            repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
+            
+            # Se um commit_sha foi fornecido, use o parâmetro single do pydriller
+            if commit_sha:
+                repo = Repository(repo_path, single=commit_sha).traverse_commits()
+            else:
+                repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
+                
             essential_commits = []
 
             for commit in repo:
@@ -439,7 +452,8 @@ class GitHubMiner:
                 essential_commits.append(commit_data)
 
             print("\n[COMMITS] Salvando dados em JSON...", flush=True)
-            self.save_to_json(essential_commits, f"{repo_name.replace('/', '_')}_commits.json")
+            filename = f"{repo_name.replace('/', '_')}_commit_{commit_sha}.json" if commit_sha else f"{repo_name.replace('/', '_')}_commits.json"
+            self.save_to_json(essential_commits, filename)
             print("[COMMITS] Commits detalhados salvos no banco de dados e no JSON com sucesso.", flush=True)
             print(f"[COMMITS] Total de commits processados: {len(essential_commits)}", flush=True)
             return essential_commits

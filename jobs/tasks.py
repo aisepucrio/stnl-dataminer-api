@@ -4,28 +4,31 @@ from jira.miner import JiraMiner
 from django.conf import settings
 
 @shared_task(bind=True)
-def fetch_commits(self, repo_name, start_date=None, end_date=None):
+def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
     self.update_state(
         state='STARTED',
         meta={
             'operation': 'fetch_commits',
-            'repository': repo_name
+            'repository': repo_name,
+            'commit_sha': commit_sha
         }
     )
     try:
         miner = GitHubMiner()
-        commits = miner.get_commits(repo_name, start_date, end_date)
+        commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha)
         self.update_state(
             state='SUCCESS',
             meta={
                 'operation': 'fetch_commits',
                 'repository': repo_name,
+                'commit_sha': commit_sha,
                 'data': commits
             }
         )
         return {
             'operation': 'fetch_commits',
             'repository': repo_name,
+            'commit_sha': commit_sha,
             'data': commits
         }
     except Exception as e:
@@ -34,6 +37,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None):
             meta={
                 'operation': 'fetch_commits',
                 'repository': repo_name,
+                'commit_sha': commit_sha,
                 'error': str(e)
             }
         )

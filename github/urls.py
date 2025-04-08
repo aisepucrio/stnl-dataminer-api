@@ -4,6 +4,7 @@ from . import views
 
 router = DefaultRouter()
 router.register(r'commits/collect', views.GitHubCommitViewSet, basename='commit-collect')
+router.register(r'commits/collect-by-sha', views.GitHubCommitByShaViewSet, basename='commit-collect-by-sha')
 router.register(r'issues/collect', views.GitHubIssueViewSet, basename='issue-collect')
 router.register(r'pull-requests/collect', views.GitHubPullRequestViewSet, basename='pullrequest-collect')
 router.register(r'branches/collect', views.GitHubBranchViewSet, basename='branch-collect')
