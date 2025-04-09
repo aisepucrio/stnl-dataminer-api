@@ -8,6 +8,7 @@ from .serializers import GitHubCommitSerializer, GitHubIssueSerializer, GitHubPu
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
+from jobs.models import Task
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     def create(self, request):
@@ -33,11 +34,19 @@ class GitHubCommitViewSet(viewsets.ViewSet):
             )
 
         task = fetch_commits.apply_async(args=[repo_name, start_date, end_date, commit_sha])
+        
+        # Salva a task no banco de dados
+        Task.objects.create(
+            task_id=task.id,
+            operation='fetch_commits',
+            repository=repo_name,
+            status='PENDING'
+        )
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
 class GitHubIssueViewSet(viewsets.ViewSet):
@@ -54,11 +63,19 @@ class GitHubIssueViewSet(viewsets.ViewSet):
             )
 
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
+        
+        # Salva a task no banco de dados
+        Task.objects.create(
+            task_id=task.id,
+            operation='fetch_issues',
+            repository=repo_name,
+            status='PENDING'
+        )
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
 class GitHubPullRequestViewSet(viewsets.ViewSet):
@@ -75,11 +92,19 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
             )
 
         task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth])
+        
+        # Salva a task no banco de dados
+        Task.objects.create(
+            task_id=task.id,
+            operation='fetch_pull_requests',
+            repository=repo_name,
+            status='PENDING'
+        )
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
 class GitHubBranchViewSet(viewsets.ViewSet):
@@ -93,11 +118,19 @@ class GitHubBranchViewSet(viewsets.ViewSet):
             )
 
         task = fetch_branches.apply_async(args=[repo_name])
+        
+        # Salva a task no banco de dados
+        Task.objects.create(
+            task_id=task.id,
+            operation='fetch_branches',
+            repository=repo_name,
+            status='PENDING'
+        )
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
 # Novas views genéricas para consulta
@@ -162,11 +195,19 @@ class GitHubMetadataViewSet(viewsets.ViewSet):
             )
 
         task = fetch_metadata.apply_async(args=[repo_name])
+        
+        # Salva a task no banco de dados
+        Task.objects.create(
+            task_id=task.id,
+            operation='fetch_metadata',
+            repository=repo_name,
+            status='PENDING'
+        )
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
 class MetadataListView(generics.ListAPIView):
@@ -195,7 +236,7 @@ class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
 class IssuePullRequestListView(generics.ListAPIView):
@@ -231,9 +272,17 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
             )
 
         task = fetch_commit_by_sha.apply_async(args=[repo_name, commit_sha])
+        
+        # Salva a task no banco de dados
+        Task.objects.create(
+            task_id=task.id,
+            operation='fetch_commit_by_sha',
+            repository=repo_name,
+            status='PENDING'
+        )
 
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
-            "status_endpoint": f"http://localhost:8000/jobs/{task.id}/"
+            "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)

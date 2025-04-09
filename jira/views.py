@@ -10,6 +10,7 @@ from .filters import JiraIssueFilter
 from jobs.tasks import collect_jira_issues_task
 from django.conf import settings
 import logging
+from jobs.models import Task
 
 # Configuração de logs para debug
 logger = logging.getLogger(__name__)
@@ -46,12 +47,20 @@ class JiraIssueCollectView(APIView):
                 start_date,
                 end_date
             )
+            
+            # Salva a task no banco de dados
+            Task.objects.create(
+                task_id=task.id,
+                operation='collect_jira_issues',
+                repository=f"{jira_domain}/{project_key}",
+                status='PENDING'
+            )
 
             return Response(
                 {
                     "task_id": task.id,
                     "message": "Task successfully initiated",
-                    "status_endpoint": f"http://localhost:8000/api/jobs/task/{task.id}/"
+                    "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
                 },
                 status=status.HTTP_202_ACCEPTED
             )
