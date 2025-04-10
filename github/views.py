@@ -11,6 +11,8 @@ from .filters import GitHubCommitFilter, GitHubIssueFilter, GitHubPullRequestFil
 from rest_framework.views import APIView
 from django.db.models import Count
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     def create(self, request):
@@ -213,10 +215,100 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
     lookup_field = 'record_id'
 
 
+@extend_schema(
+    summary="Dashboard statistics",
+    description="Provides statistics about repositories, issues, pull requests, and commits. "
+                "If repository_id is provided, returns detailed stats for that repository.",
+    parameters=[
+        OpenApiParameter(
+            name="repository_id",
+            description="ID of the repository to get statistics for. If not provided, returns aggregated stats for all repositories.",
+            required=False,
+            type=int
+        ),
+        OpenApiParameter(
+            name="start_date",
+            description="Filter data from this date onwards (ISO format). Defaults to 1970-01-01.",
+            required=False,
+            type=OpenApiTypes.DATETIME
+        ),
+        OpenApiParameter(
+            name="end_date",
+            description="Filter data up to this date (ISO format). Defaults to current time.",
+            required=False,
+            type=OpenApiTypes.DATETIME
+        ),
+    ],
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "repository_id": {"type": "integer", "nullable": True},
+                "repository_name": {"type": "string", "nullable": True},
+                "issues_count": {"type": "integer"},
+                "pull_requests_count": {"type": "integer"},
+                "commits_count": {"type": "integer"},
+                "forks_count": {"type": "integer", "nullable": True},
+                "stars_count": {"type": "integer", "nullable": True},
+                "watchers_count": {"type": "integer", "nullable": True},
+                "time_mined": {"type": "string", "format": "date-time", "nullable": True},
+                "repositories_count": {"type": "integer", "nullable": True},
+                "repositories": {
+                    "type": "array", 
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "repository": {"type": "string"}
+                        }
+                    },
+                    "nullable": True
+                }
+            }
+        },
+        404: {
+            "type": "object",
+            "properties": {
+                "error": {"type": "string"}
+            }
+        }
+    },
+    examples=[
+        OpenApiExample(
+            "Repository Example",
+            value={
+                "repository_id": 1,
+                "repository_name": "owner/repo",
+                "issues_count": 120,
+                "pull_requests_count": 45,
+                "commits_count": 500,
+                "forks_count": 25,
+                "stars_count": 100,
+                "watchers_count": 30,
+                "time_mined": "2023-01-01T12:00:00Z"
+            },
+            summary="Example with repository_id"
+        ),
+        OpenApiExample(
+            "All Repositories Example",
+            value={
+                "issues_count": 500,
+                "pull_requests_count": 200,
+                "commits_count": 2000,
+                "repositories_count": 5,
+                "repositories": [
+                    {"id": 1, "repository": "owner/repo1"},
+                    {"id": 2, "repository": "owner/repo2"}
+                ]
+            },
+            summary="Example without repository_id"
+        )
+    ]
+)
 class DashboardView(APIView):
     def get(self, request):
         # Get query parameters
-        repository = request.query_params.get('repository')
+        repository_id = request.query_params.get('repository_id')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         
@@ -245,18 +337,21 @@ class DashboardView(APIView):
             date__lte=end_date
         )
         
-        # If repository is specified, filter by repository
-        if repository:
-            issues_query = issues_query.filter(repository=repository)
-            prs_query = prs_query.filter(repository=repository)
-            commits_query = commits_query.filter(repository=repository)
-            
-            # Get repository metadata
+        # If repository_id is specified, filter by repository
+        if repository_id:
             try:
-                metadata = GitHubMetadata.objects.get(repository=repository)
+                # Get repository metadata by ID
+                metadata = GitHubMetadata.objects.get(id=repository_id)
+                repository_name = metadata.repository
+                
+                # Filter queries by repository name
+                issues_query = issues_query.filter(repository=repository_name)
+                prs_query = prs_query.filter(repository=repository_name)
+                commits_query = commits_query.filter(repository=repository_name)
                 
                 response_data = {
-                    "repository": repository,
+                    "repository_id": repository_id,
+                    "repository_name": repository_name,
                     "issues_count": issues_query.count(),
                     "pull_requests_count": prs_query.count(),
                     "commits_count": commits_query.count(),
@@ -266,23 +361,21 @@ class DashboardView(APIView):
                     "time_mined": metadata.time_mined
                 }
             except GitHubMetadata.DoesNotExist:
-                # If metadata doesn't exist, return counts without metadata
-                response_data = {
-                    "repository": repository,
-                    "issues_count": issues_query.count(),
-                    "pull_requests_count": prs_query.count(),
-                    "commits_count": commits_query.count(),
-                    "error": "Repository metadata not found"
-                }
+                # If metadata doesn't exist, return error
+                return Response(
+                    {"error": f"Repository with ID {repository_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
         else:
             # Aggregate data for all repositories
-            distinct_repos = GitHubMetadata.objects.values_list('repository', flat=True).distinct()
+            repositories = GitHubMetadata.objects.values('id', 'repository')
             
             response_data = {
                 "issues_count": issues_query.count(),
                 "pull_requests_count": prs_query.count(),
                 "commits_count": commits_query.count(),
-                "repositories_count": len(distinct_repos)
+                "repositories_count": repositories.count(),
+                "repositories": list(repositories)
             }
         
         return Response(response_data)
