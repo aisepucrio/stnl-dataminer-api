@@ -228,13 +228,13 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
         ),
         OpenApiParameter(
             name="start_date",
-            description="Filter data from this date onwards (ISO format). Defaults to 1970-01-01.",
+            description="Filter data from this date onwards (ISO format).",
             required=False,
             type=OpenApiTypes.DATETIME
         ),
         OpenApiParameter(
             name="end_date",
-            description="Filter data up to this date (ISO format). Defaults to current time.",
+            description="Filter data up to this date (ISO format).",
             required=False,
             type=OpenApiTypes.DATETIME
         ),
@@ -266,11 +266,19 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
                 }
             }
         },
+        400: {
+            "type": "object",
+            "properties": {
+                "error": {"type": "string"}
+            },
+            "description": "Bad request due to invalid parameters (repository_id not an integer, invalid date format, start_date after end_date)"
+        },
         404: {
             "type": "object",
             "properties": {
                 "error": {"type": "string"}
-            }
+            },
+            "description": "Repository with specified ID not found"
         }
     },
     examples=[
@@ -307,44 +315,61 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
 )
 class DashboardView(APIView):
     def get(self, request):
-        # Get query parameters
         repository_id = request.query_params.get('repository_id')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
         
-        # Set default dates if not provided
-        if not start_date:
-            start_date = "1970-01-01T00:00:00Z"  # Beginning of time for practical purposes
-        
-        if not end_date:
-            end_date = timezone.now().isoformat()
-        
-        # Filter by date range
-        issues_query = GitHubIssuePullRequest.objects.filter(
-            tipo='issue',
-            created_at__gte=start_date,
-            created_at__lte=end_date
-        )
-        
-        prs_query = GitHubIssuePullRequest.objects.filter(
-            tipo='pull_request',
-            created_at__gte=start_date,
-            created_at__lte=end_date
-        )
-        
-        commits_query = GitHubCommit.objects.filter(
-            date__gte=start_date,
-            date__lte=end_date
-        )
-        
-        # If repository_id is specified, filter by repository
         if repository_id:
             try:
-                # Get repository metadata by ID
+                repository_id = int(repository_id)
+            except ValueError:
+                return Response(
+                    {"error": "repository_id must be an integer"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if start_date or end_date:
+            try:
+                if start_date:
+                    start_datetime = timezone.datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                
+                if end_date:
+                    end_datetime = timezone.datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                
+                if start_date and end_date and start_datetime > end_datetime:
+                    return Response(
+                        {"error": "start_date must be before end_date"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        issue_filters = {'tipo': 'issue'}
+        pr_filters = {'tipo': 'pull_request'}
+        commit_filters = {}
+        
+        if start_date:
+            issue_filters['created_at__gte'] = start_date
+            pr_filters['created_at__gte'] = start_date
+            commit_filters['date__gte'] = start_date
+            
+        if end_date:
+            issue_filters['created_at__lte'] = end_date
+            pr_filters['created_at__lte'] = end_date
+            commit_filters['date__lte'] = end_date
+        
+        issues_query = GitHubIssuePullRequest.objects.filter(**issue_filters)
+        prs_query = GitHubIssuePullRequest.objects.filter(**pr_filters)
+        commits_query = GitHubCommit.objects.filter(**commit_filters)
+        
+        if repository_id:
+            try:
                 metadata = GitHubMetadata.objects.get(id=repository_id)
                 repository_name = metadata.repository
                 
-                # Filter queries by repository name
                 issues_query = issues_query.filter(repository=repository_name)
                 prs_query = prs_query.filter(repository=repository_name)
                 commits_query = commits_query.filter(repository=repository_name)
@@ -361,13 +386,11 @@ class DashboardView(APIView):
                     "time_mined": metadata.time_mined
                 }
             except GitHubMetadata.DoesNotExist:
-                # If metadata doesn't exist, return error
                 return Response(
                     {"error": f"Repository with ID {repository_id} not found"},
                     status=status.HTTP_404_NOT_FOUND
                 )
         else:
-            # Aggregate data for all repositories
             repositories = GitHubMetadata.objects.values('id', 'repository')
             
             response_data = {
