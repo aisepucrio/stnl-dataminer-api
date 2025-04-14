@@ -89,7 +89,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
             name="project_id",
             description="ID of the project to get statistics for. If not provided, returns aggregated stats for all projects.",
             required=False,
-            type=str
+            type=int
         ),
         OpenApiParameter(
             name="start_date",
@@ -108,7 +108,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
         200: {
             "type": "object",
             "properties": {
-                "project_id": {"type": "string", "nullable": True},
+                "project_id": {"type": "integer", "nullable": True},
                 "project_name": {"type": "string", "nullable": True},
                 "issues_count": {"type": "integer"},
                 "time_mined": {"type": "string", "format": "date-time", "nullable": True},
@@ -118,7 +118,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
                     "items": {
                         "type": "object",
                         "properties": {
-                            "id": {"type": "string"},
+                            "id": {"type": "integer"},
                             "project": {"type": "string"}
                         }
                     },
@@ -137,7 +137,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
         OpenApiExample(
             "Project Example",
             value={
-                "project_id": "PROJECT-1",
+                "project_id": 1,
                 "project_name": "Sample Project",
                 "issues_count": 120,
                 "time_mined": "2023-01-01T12:00:00Z"
@@ -150,8 +150,8 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
                 "issues_count": 500,
                 "projects_count": 5,
                 "projects": [
-                    {"id": "PROJ1", "project": "Project One"},
-                    {"id": "PROJ2", "project": "Project Two"}
+                    {"id": 1, "project": "Project One"},
+                    {"id": 2, "project": "Project Two"}
                 ]
             },
             summary="Example without project_id"
