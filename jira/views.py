@@ -126,11 +126,26 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
                 }
             }
         },
+        400: {
+            "type": "object",
+            "properties": {
+                "error": {"type": "string"}
+            },
+            "description": "Invalid request parameters (invalid date format or project_id)"
+        },
         404: {
             "type": "object",
             "properties": {
                 "error": {"type": "string"}
-            }
+            },
+            "description": "Project not found"
+        },
+        500: {
+            "type": "object",
+            "properties": {
+                "error": {"type": "string"}
+            },
+            "description": "Internal server error"
         }
     },
     examples=[
@@ -155,6 +170,24 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
                 ]
             },
             summary="Example without project_id"
+        ),
+        OpenApiExample(
+            "Error Example - Invalid Date",
+            value={
+                "error": "Invalid start_date format. Please use ISO format (YYYY-MM-DDTHH:MM:SSZ)."
+            },
+            summary="Example of invalid date format error",
+            response_only=True,
+            status_codes=["400"]
+        ),
+        OpenApiExample(
+            "Error Example - Invalid Project ID",
+            value={
+                "error": "Invalid project_id. Must be an integer."
+            },
+            summary="Example of invalid project_id error",
+            response_only=True,
+            status_codes=["400"]
         )
     ]
 )
@@ -169,7 +202,6 @@ class JiraDashboardView(APIView):
             'created__lte': end_date
         }
         
-        
         issues_query = JiraIssue.objects.filter(**filters)
         
         if project_id:
@@ -179,12 +211,15 @@ class JiraDashboardView(APIView):
                 project_name = project_id
                 if project_issues.exists():
                     project_name = project_issues.first().project
+                    latest_time_mined = project_issues.order_by('-time_mined').first().time_mined
+                else:
+                    latest_time_mined = None
                 
                 response_data = {
                     "project_id": project_id,
                     "project_name": project_name,
                     "issues_count": project_issues.count(),
-                    "time_mined": timezone.now().isoformat()
+                    "time_mined": latest_time_mined.isoformat()
                 }
             except Exception as e:
                 return Response(
