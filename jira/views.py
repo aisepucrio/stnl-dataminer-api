@@ -17,6 +17,36 @@ from drf_spectacular.types import OpenApiTypes
 # Configuração de logs para debug
 logger = logging.getLogger(__name__)
 
+@extend_schema(
+    tags=['Jira'],
+    summary="Collect Jira Issues",
+    description="Initiates a task to collect issues from a Jira project",
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'jira_domain': {'type': 'string', 'description': 'Jira instance domain'},
+                'project_key': {'type': 'string', 'description': 'Jira project key'},
+                'issuetypes': {'type': 'array', 'items': {'type': 'string'}, 'description': 'List of issue types to collect'},
+                'start_date': {'type': 'string', 'format': 'date-time', 'nullable': True},
+                'end_date': {'type': 'string', 'format': 'date-time', 'nullable': True}
+            },
+            'required': ['jira_domain', 'project_key']
+        }
+    },
+    responses={
+        202: {
+            'type': 'object',
+            'properties': {
+                'task_id': {'type': 'string'},
+                'message': {'type': 'string'},
+                'status_endpoint': {'type': 'string'}
+            }
+        },
+        400: {'description': 'Missing required fields'},
+        500: {'description': 'Internal server error'}
+    }
+)
 class JiraIssueCollectView(APIView):
     def post(self, request, *args, **kwargs):
         try:
@@ -66,6 +96,28 @@ class JiraIssueCollectView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+@extend_schema(
+    tags=['Jira'],
+    summary="List Jira Issues",
+    description="Returns a paginated list of Jira issues with filtering and search capabilities",
+    parameters=[
+        OpenApiParameter(
+            name='search',
+            description='Search in summary, description, creator, and assignee fields',
+            required=False,
+            type=str
+        ),
+        OpenApiParameter(
+            name='ordering',
+            description='Order by created, updated, priority, or status (prefix with - for descending)',
+            required=False,
+            type=str
+        )
+    ],
+    responses={
+        200: JiraIssueSerializer(many=True)
+    }
+)
 class JiraIssueListView(generics.ListAPIView):
     queryset = JiraIssue.objects.all()
     serializer_class = JiraIssueSerializer
@@ -74,6 +126,24 @@ class JiraIssueListView(generics.ListAPIView):
     search_fields = ['summary', 'description', 'creator', 'assignee']
     ordering_fields = ['created', 'updated', 'priority', 'status']
 
+@extend_schema(
+    tags=['Jira'],
+    summary="Retrieve Jira Issue",
+    description="Returns detailed information about a specific Jira issue",
+    parameters=[
+        OpenApiParameter(
+            name='issue_key',
+            description='The Jira issue key (e.g., PROJECT-123)',
+            required=True,
+            type=str,
+            location=OpenApiParameter.PATH
+        )
+    ],
+    responses={
+        200: JiraIssueSerializer,
+        404: {'description': 'Issue not found'}
+    }
+)
 class JiraIssueDetailView(generics.RetrieveAPIView):
     queryset = JiraIssue.objects.all()
     serializer_class = JiraIssueSerializer
@@ -81,6 +151,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
 
 
 @extend_schema(
+    tags=['Jira'],
     summary="Jira Dashboard statistics",
     description="Provides statistics about Jira issues. "
                 "If project_name is provided, returns detailed stats for that project.",

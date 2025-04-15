@@ -3,8 +3,33 @@ from rest_framework.response import Response
 from rest_framework import status
 from celery.result import AsyncResult
 from celery import current_app
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 class TaskStatusView(APIView):
+    @extend_schema(
+        summary="Get task status",
+        tags=['Jobs'],
+        parameters=[
+            OpenApiParameter(name='task_id', type=str, location=OpenApiParameter.PATH, description='Celery task ID'),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string"}
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"},
+                    "task_id": {"type": "string"}
+                }
+            }
+        },
+        description='Get the status of a Celery task'
+    )
     def get(self, request, task_id):
         task_result = AsyncResult(task_id, app=current_app)
 
@@ -41,6 +66,35 @@ class TaskStatusView(APIView):
                 "task_id": task_id
             }, status=status.HTTP_404_NOT_FOUND)
 
+    @extend_schema(
+        summary="Cancel running task",
+        tags=['Jobs'],
+        parameters=[
+            OpenApiParameter(name='task_id', type=str, location=OpenApiParameter.PATH, description='Celery task ID'),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string"}
+                }
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"}
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"}
+                }
+            }
+        },
+        description='Cancel a running Celery task'
+    )
     def delete(self, request, task_id):
         task_result = AsyncResult(task_id, app=current_app)
 
