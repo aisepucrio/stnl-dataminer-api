@@ -83,13 +83,13 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
 @extend_schema(
     summary="Jira Dashboard statistics",
     description="Provides statistics about Jira issues. "
-                "If project_id is provided, returns detailed stats for that project.",
+                "If project_name is provided, returns detailed stats for that project.",
     parameters=[
         OpenApiParameter(
-            name="project_id",
-            description="ID of the project to get statistics for. If not provided, returns aggregated stats for all projects.",
+            name="project_name",
+            description="Name of the project to get statistics for. If not provided, returns aggregated stats for all projects.",
             required=False,
-            type=int
+            type=str
         ),
         OpenApiParameter(
             name="start_date",
@@ -108,20 +108,13 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
         200: {
             "type": "object",
             "properties": {
-                "project_id": {"type": "integer", "nullable": True},
                 "project_name": {"type": "string", "nullable": True},
                 "issues_count": {"type": "integer"},
                 "time_mined": {"type": "string", "format": "date-time", "nullable": True},
                 "projects_count": {"type": "integer", "nullable": True},
                 "projects": {
                     "type": "array", 
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "integer"},
-                            "project": {"type": "string"}
-                        }
-                    },
+                    "items": {"type": "string"},
                     "nullable": True
                 }
             }
@@ -131,7 +124,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
             "properties": {
                 "error": {"type": "string"}
             },
-            "description": "Invalid request parameters (invalid date format or project_id)"
+            "description": "Invalid request parameters (invalid date format)"
         },
         404: {
             "type": "object",
@@ -152,24 +145,20 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
         OpenApiExample(
             "Project Example",
             value={
-                "project_id": 1,
                 "project_name": "Sample Project",
                 "issues_count": 120,
                 "time_mined": "2023-01-01T12:00:00Z"
             },
-            summary="Example with project_id"
+            summary="Example with project_name"
         ),
         OpenApiExample(
             "All Projects Example",
             value={
                 "issues_count": 500,
                 "projects_count": 5,
-                "projects": [
-                    {"id": 1, "project": "Project One"},
-                    {"id": 2, "project": "Project Two"}
-                ]
+                "projects": ["Project One", "Project Two", "Project Three"]
             },
-            summary="Example without project_id"
+            summary="Example without project_name"
         ),
         OpenApiExample(
             "Error Example - Invalid Date",
@@ -179,22 +168,13 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
             summary="Example of invalid date format error",
             response_only=True,
             status_codes=["400"]
-        ),
-        OpenApiExample(
-            "Error Example - Invalid Project ID",
-            value={
-                "error": "Invalid project_id. Must be an integer."
-            },
-            summary="Example of invalid project_id error",
-            response_only=True,
-            status_codes=["400"]
         )
     ]
 )
 class JiraDashboardView(APIView):
     def get(self, request):
         try:
-            project_id = request.query_params.get('project_id')
+            project_name = request.query_params.get('project_id')
             start_date = request.query_params.get('start_date')
             end_date = request.query_params.get('end_date')
 
@@ -207,11 +187,10 @@ class JiraDashboardView(APIView):
 
             issues_query = JiraIssue.objects.filter(**filters)
 
-            if project_id:
+            if project_name:
                 try:
-                    project_issues = issues_query.filter(project__issue_id=project_id)
+                    project_issues = issues_query.filter(project=project_name)
 
-                    project_name = project_id
                     if project_issues.exists():
                         project_name = project_issues.first().project
                         latest_time_mined = project_issues.order_by('-time_mined').first().time_mined
@@ -219,7 +198,6 @@ class JiraDashboardView(APIView):
                         latest_time_mined = None
 
                     response_data = {
-                        "project_id": project_id,
                         "project_name": project_name,
                         "issues_count": project_issues.count(),
                         "time_mined": latest_time_mined.isoformat()
@@ -231,7 +209,7 @@ class JiraDashboardView(APIView):
                     )
             else:
                 projects = issues_query.values('project').distinct()
-                projects_list = [{"id": p['issue_id'], "project": p['project']} for p in projects]
+                projects_list = [p['project'] for p in projects]
 
                 response_data = {
                     "issues_count": issues_query.count(),
