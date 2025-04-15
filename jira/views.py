@@ -15,7 +15,7 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
-# Configuração de logs para debug
+# Debug logging configuration
 logger = logging.getLogger(__name__)
 
 @extend_schema(
@@ -57,26 +57,26 @@ class JiraIssueCollectView(APIView):
             start_date = request.data.get('start_date', None)
             end_date = request.data.get('end_date', None)
 
-            # Captura variáveis do .env
+            # Get variables from .env
             jira_email = settings.JIRA_EMAIL
             jira_api_token = settings.JIRA_API_TOKEN
 
-            # Debug: Verifica se as credenciais do JIRA foram carregadas corretamente
+            # Debug: Check if JIRA credentials were loaded correctly
             logger.info(f"JIRA Email: {jira_email}")
-            logger.info(f"JIRA API Token: {jira_api_token[:5]}*****")  # Esconde parte do token por segurança
+            logger.info(f"JIRA API Token: {jira_api_token[:5]}*****")  # Hides part of the token for security
 
-            # Validação de campos obrigatórios
+            # Validation of required fields
             if not all([jira_domain, project_key]):
                 return Response(
                     {"error": "Missing required fields: jira_domain, project_key, jira_email, jira_api_token"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Inicia a tarefa Celery (Removido jira_email e jira_api_token da chamada)
+            # Start Celery task (Removed jira_email and jira_api_token from the call)
             task = collect_jira_issues_task.delay(
                 jira_domain,
                 project_key,
-                issuetypes if issuetypes else [],  # Garante que sempre seja uma lista
+                issuetypes if issuetypes else [],  # Ensures it's always a list
                 start_date,
                 end_date
             )
@@ -99,7 +99,7 @@ class JiraIssueCollectView(APIView):
             )
         
         except Exception as e:
-            logger.error(f"Erro no JiraIssueCollectView: {e}", exc_info=True)
+            logger.error(f"Error in JiraIssueCollectView: {e}", exc_info=True)
             return Response(
                 {"error": "Internal Server Error", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

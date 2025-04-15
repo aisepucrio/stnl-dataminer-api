@@ -49,7 +49,7 @@ class GitHubCommitViewSet(viewsets.ViewSet):
 
         task = fetch_commits.apply_async(args=[repo_name, start_date, end_date, commit_sha])
         
-        # Salva a task no banco de dados
+        # Save the task in the database
         Task.objects.create(
             task_id=task.id,
             operation='fetch_commits',
@@ -99,7 +99,7 @@ class GitHubIssueViewSet(viewsets.ViewSet):
 
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
         
-        # Salva a task no banco de dados
+        # Save the task in the database
         Task.objects.create(
             task_id=task.id,
             operation='fetch_issues',
@@ -149,7 +149,7 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
 
         task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth])
         
-        # Salva a task no banco de dados
+        # Save the task in the database
         Task.objects.create(
             task_id=task.id,
             operation='fetch_pull_requests',
@@ -193,7 +193,6 @@ class GitHubBranchViewSet(viewsets.ViewSet):
 
         task = fetch_branches.apply_async(args=[repo_name])
         
-        # Salva a task no banco de dados
         Task.objects.create(
             task_id=task.id,
             operation='fetch_branches',
@@ -376,27 +375,37 @@ class IssuePullRequestDetailView(generics.RetrieveAPIView):
     lookup_field = 'record_id'
 
 class GitHubCommitByShaViewSet(viewsets.ViewSet):
-    def create(self, request):
-        """
-        Endpoint para minerar um commit específico por sua hash SHA.
-        Aceita POST com parâmetros no body:
-        {
-            "repo_name": "owner/repo",
-            "commit_sha": "abc123..."
+    @extend_schema(
+        summary="Mine a specific GitHub commit by SHA",
+        tags=["GitHub"],
+        description="Endpoint to mine a specific commit by its SHA hash from a repository",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "repo_name": {"type": "string", "description": "Repository name in format owner/repo"},
+                    "commit_sha": {"type": "string", "description": "SHA hash of the commit to fetch"}
+                },
+                "required": ["repo_name", "commit_sha"]
+            }
+        },
+        responses={
+            202: OpenApiResponse(description="Task successfully initiated"),
+            400: OpenApiResponse(description="Bad request - missing required parameters")
         }
-        """
+    )
+    def create(self, request):
         repo_name = request.data.get('repo_name')
         commit_sha = request.data.get('commit_sha')
 
         if not repo_name or not commit_sha:
             return Response(
-                {"error": "repo_name e commit_sha são obrigatórios"}, 
+                {"error": "repo_name and commit_sha are required"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         task = fetch_commit_by_sha.apply_async(args=[repo_name, commit_sha])
         
-        # Salva a task no banco de dados
         Task.objects.create(
             task_id=task.id,
             operation='fetch_commit_by_sha',
