@@ -209,7 +209,7 @@ class JiraDashboardView(APIView):
 
             if project_id:
                 try:
-                    project_issues = issues_query.filter(project__id=project_id)
+                    project_issues = issues_query.filter(project__issue_id=project_id)
 
                     project_name = project_id
                     if project_issues.exists():
@@ -231,7 +231,7 @@ class JiraDashboardView(APIView):
                     )
             else:
                 projects = issues_query.values('project').distinct()
-                projects_list = [{"id": p['id'], "project": p['project']} for p in projects]
+                projects_list = [{"id": p['issue_id'], "project": p['project']} for p in projects]
 
                 response_data = {
                     "issues_count": issues_query.count(),
