@@ -9,6 +9,7 @@ from .serializers import TaskSerializer
 import logging
 import json
 from datetime import datetime
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 # Configuração de logs
 logger = logging.getLogger(__name__)
@@ -67,6 +68,30 @@ class TaskListView(generics.ListAPIView):
         }, status=status.HTTP_200_OK)
 
 class TaskStatusView(APIView):
+    @extend_schema(
+        summary="Get task status",
+        tags=['Jobs'],
+        parameters=[
+            OpenApiParameter(name='task_id', type=str, location=OpenApiParameter.PATH, description='Celery task ID'),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string"}
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"},
+                    "task_id": {"type": "string"}
+                }
+            }
+        },
+        description='Get the status of a Celery task'
+    )
     def get(self, request, task_id):
         logger.info(f"Consultando status da task: {task_id}")
         
@@ -125,6 +150,35 @@ class TaskStatusView(APIView):
                 "details": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @extend_schema(
+        summary="Cancel running task",
+        tags=['Jobs'],
+        parameters=[
+            OpenApiParameter(name='task_id', type=str, location=OpenApiParameter.PATH, description='Celery task ID'),
+        ],
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string"},
+                    "status": {"type": "string"}
+                }
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"}
+                }
+            },
+            404: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"}
+                }
+            }
+        },
+        description='Cancel a running Celery task'
+    )
     def delete(self, request, task_id):
         logger.info(f"Cancelando task: {task_id}")
         
