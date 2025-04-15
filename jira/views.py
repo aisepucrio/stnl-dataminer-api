@@ -193,47 +193,54 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
 )
 class JiraDashboardView(APIView):
     def get(self, request):
-        project_id = request.query_params.get('project_id')
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
+        try:
+            project_id = request.query_params.get('project_id')
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
 
-        filters = {
-            'created__gte': start_date,
-            'created__lte': end_date
-        }
-        
-        issues_query = JiraIssue.objects.filter(**filters)
-        
-        if project_id:
-            try:
-                project_issues = issues_query.filter(project__id=project_id)
-                
-                project_name = project_id
-                if project_issues.exists():
-                    project_name = project_issues.first().project
-                    latest_time_mined = project_issues.order_by('-time_mined').first().time_mined
-                else:
-                    latest_time_mined = None
-                
+            filters = {}
+
+            if start_date:
+                filters['created__gte'] = start_date
+            if end_date:
+                filters['created__lte'] = end_date
+
+            issues_query = JiraIssue.objects.filter(**filters)
+
+            if project_id:
+                try:
+                    project_issues = issues_query.filter(project__id=project_id)
+
+                    project_name = project_id
+                    if project_issues.exists():
+                        project_name = project_issues.first().project
+                        latest_time_mined = project_issues.order_by('-time_mined').first().time_mined
+                    else:
+                        latest_time_mined = None
+
+                    response_data = {
+                        "project_id": project_id,
+                        "project_name": project_name,
+                        "issues_count": project_issues.count(),
+                        "time_mined": latest_time_mined.isoformat()
+                    }
+                except Exception as e:
+                    return Response(
+                        {"error": f"Error retrieving project with ID {project_id}: {str(e)}"},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+            else:
+                projects = issues_query.values('project').distinct()
+                projects_list = [{"id": p['id'], "project": p['project']} for p in projects]
+
                 response_data = {
-                    "project_id": project_id,
-                    "project_name": project_name,
-                    "issues_count": project_issues.count(),
-                    "time_mined": latest_time_mined.isoformat()
+                    "issues_count": issues_query.count(),
+                    "projects_count": len(projects_list),
+                    "projects": projects_list
                 }
-            except Exception as e:
-                return Response(
-                    {"error": f"Error retrieving project with ID {project_id}: {str(e)}"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-        else:
-            projects = issues_query.values('project').distinct()
-            projects_list = [{"id": p['id'], "project": p['project']} for p in projects]
-            
-            response_data = {
-                "issues_count": issues_query.count(),
-                "projects_count": len(projects_list),
-                "projects": projects_list
-            }
-        
-        return Response(response_data)
+
+
+            return Response(response_data)
+        except Exception as e:
+            print(e)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
