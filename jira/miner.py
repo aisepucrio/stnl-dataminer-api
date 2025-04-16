@@ -8,46 +8,53 @@ from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 import time
 from django.utils.timezone import now
+from .models import JiraIssue, JiraCredential
+
 
 
 class JiraMiner:
-    def __init__(self, jira_domain, jira_email, jira_api_token):
+    def __init__(self, jira_domain):
         self.jira_domain = jira_domain
-        self.jira_email = jira_email
-        self.jira_api_token = jira_api_token
-        self.auth = HTTPBasicAuth(self.jira_email, self.jira_api_token)
+        self.credentials = JiraCredential.objects.filter(active=True)
+        self.current_cred_index = 0
+        self.update_auth()
+
+    def update_auth(self):
+        cred = self.credentials[self.current_cred_index]
+        self.auth = HTTPBasicAuth(cred.email, cred.api_token)
         self.headers = {"Accept": "application/json"}
+
+    def rotate_token(self):
+        self.current_cred_index = (self.current_cred_index + 1) % len(self.credentials)
+        self.update_auth()
+
+    def make_request(self, url):
+        response = requests.get(url, headers=self.headers, auth=self.auth)
+        if response.status_code in [401, 403, 429]:
+            self.rotate_token()
+            response = requests.get(url, headers=self.headers, auth=self.auth)
+        return response
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         max_results, start_at, total_collected = 100, 0, 0
-        custom_fields_mapping = self.get_custom_fields_mapping(self.jira_domain, self.jira_email, self.jira_api_token)
+        custom_fields_mapping = self.get_custom_fields_mapping()
         jql_query = f'project="{project_key}"'
         
         if issuetypes:
             issuetypes_jql = " OR ".join([f'issuetype="{issuetype}"' for issuetype in issuetypes])
             jql_query += f' AND ({issuetypes_jql})'
         
-        # Validação do formato das datas
         if start_date:
-            try:
-                start_date_parsed = self.validate_and_parse_date(start_date)
-                # Usa as datas no formato "yyyy-MM-dd HH:mm"
-                jql_query += f' AND created >= "{start_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
-            except ValueError as e:
-                return {"error": str(e)}
+            start_date_parsed = self.validate_and_parse_date(start_date)
+            jql_query += f' AND created >= "{start_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
         if end_date:
-            try:
-                end_date_parsed = self.validate_and_parse_date(end_date)
-                # Usa as datas no formato "yyyy-MM-dd HH:mm"
-                jql_query += f' AND created <= "{end_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
-            except ValueError as e:
-                return {"error": str(e)}
-
+            end_date_parsed = self.validate_and_parse_date(end_date)
+            jql_query += f' AND created <= "{end_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
 
         encoded_jql = quote(jql_query)
         while True:
             jira_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&startAt={start_at}&maxResults={max_results}"
-            response = requests.get(jira_url, headers=self.headers, auth=self.auth)
+            response = self.make_request(jira_url)
             if response.status_code != 200:
                 return {"error": f"Failed to collect issues: {response.status_code} - {response.text}"}
 
@@ -60,7 +67,8 @@ class JiraMiner:
                 description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
                 commits = self.get_commits_for_issue(issue_data['key'])
-                
+                comments = self.get_comments_for_issue(issue_data['key'])
+
                 JiraIssue.objects.update_or_create(
                     issue_id=issue_data['id'],
                     defaults={
@@ -77,8 +85,9 @@ class JiraMiner:
                         'creator': issue_data['fields']['creator']['displayName'],
                         'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
                         'all_fields': issue_data['fields'],
-                        'time_mined': current_timestamp, # precisa ser convertido de timestamp para datetime
-                        'commits': commits  # Adicionando os commits
+                        'time_mined': current_timestamp,
+                        'commits': commits,
+                        'comments': comments
                     }
                 )
             total_collected += len(issues)
@@ -131,6 +140,37 @@ class JiraMiner:
                     })
         return commits
     
+    def get_comments_for_issue(self, issue_key):
+        comments_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}/comment"
+        response = requests.get(comments_url, headers=self.headers, auth=self.auth)
+
+        if self.handle_rate_limit(response):
+            return self.get_comments_for_issue(issue_key)
+
+        if response.status_code != 200:
+            print(f"[JiraMiner] ⚠️ Falha ao obter comentários da issue {issue_key}: {response.status_code}")
+            return []
+
+        try:
+            comments_data = response.json().get('comments', [])
+            parsed_comments = []
+
+            for comment in comments_data:
+                body = self.extract_words_from_description(comment.get("body", {}))
+                parsed_comments.append({
+                    "id": comment.get("id"),
+                    "author": comment.get("author", {}).get("displayName"),
+                    "body": body,
+                    "created": comment.get("created"),
+                    "updated": comment.get("updated"),
+                })
+
+            return parsed_comments
+
+        except Exception as e:
+            print(f"[JiraMiner] ❌ Erro ao processar comentários da issue {issue_key}: {e}")
+            return []
+
     def get_custom_fields_mapping(self, jira_domain, jira_email, jira_api_token):
         url = f"https://{jira_domain}/rest/api/3/field"
         
