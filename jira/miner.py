@@ -121,6 +121,7 @@ class JiraMiner:
                 description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
                 commits = self.get_commits_for_issue(issue_data['key'])
+                comments = self.get_comments_for_issue(issue_data['key'])
 
                 JiraIssue.objects.update_or_create(
                     issue_id=issue_data['id'],
@@ -139,7 +140,8 @@ class JiraMiner:
                         'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
                         'all_fields': issue_data['fields'],
                         'time_mined': current_timestamp,
-                        'commits': commits
+                        'commits': commits,
+                        'comments': comments
                     }
                 )
 
@@ -171,6 +173,42 @@ class JiraMiner:
                         'url': commit.get('url')
                     })
         return commits
+
+    def get_comments_for_issue(self, issue_key):
+        """
+        Coleta os comentários de uma issue do Jira.
+        
+        Args:
+            issue_key (str): A chave da issue (ex: PROJ-123)
+            
+        Returns:
+            list: Lista de comentários com suas informações
+        """
+        comments_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}/comment"
+        
+        response = requests.get(comments_url, headers=self.headers, auth=self.auth)
+        
+        if self.handle_rate_limit(response):
+            return self.get_comments_for_issue(issue_key)
+            
+        if response.status_code != 200:
+            print(f"[JiraMiner] ⚠️ Erro ao coletar comentários da issue {issue_key}: {response.status_code}", flush=True)
+            return []
+            
+        comments_data = response.json()
+        comments = []
+        
+        for comment in comments_data.get('comments', []):
+            comments.append({
+                'id': comment.get('id'),
+                'body': self.extract_words_from_description(comment.get('body', '')),
+                'author': comment.get('author', {}).get('displayName'),
+                'created': comment.get('created'),
+                'updated': comment.get('updated'),
+                'reactions': comment.get('reactions', {})
+            })
+            
+        return comments
     
     def get_custom_fields_mapping(self):
         url = f"https://{self.jira_domain}/rest/api/3/field"

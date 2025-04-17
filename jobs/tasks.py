@@ -183,7 +183,9 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
 
         issues = miner.collect_jira_issues(project_key, issuetypes, start_date, end_date)
 
-        print(f"✅ Coleta concluída: {len(issues.get('data', []))} issues coletadas.")
+        print(f'Printing issues: {issues}', flush=True)
+
+        print(f"✅ Coleta concluída: {issues['total_issues']} issues coletadas.")
 
         self.update_state(
             state='SUCCESS',

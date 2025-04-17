@@ -19,6 +19,7 @@ class JiraIssue(models.Model):
     all_fields = models.JSONField(null=True, blank=True)
     time_mined = models.DateTimeField(default=now)
     commits = models.JSONField(max_length=50, null=True, blank=True)
+    comments = models.JSONField(default=list, null=True, blank=True)
 
     class Meta:
         constraints = [
