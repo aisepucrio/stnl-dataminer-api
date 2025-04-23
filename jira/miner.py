@@ -122,6 +122,11 @@ class JiraMiner:
                 issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
                 commits = self.get_commits_for_issue(issue_data['key'])
                 comments = self.get_comments_for_issue(issue_data['key'])
+                
+                # Coletando os novos dados
+                history = self.get_issue_history(issue_data['key'])
+                activity_log = self.get_activity_log(issue_data['key'])
+                checklist = self.get_checklist(issue_data['key'])
 
                 JiraIssue.objects.update_or_create(
                     issue_id=issue_data['id'],
@@ -141,7 +146,10 @@ class JiraMiner:
                         'all_fields': issue_data['fields'],
                         'time_mined': current_timestamp,
                         'commits': commits,
-                        'comments': comments
+                        'comments': comments,
+                        'history': history,
+                        'activity_log': activity_log,
+                        'checklist': checklist
                     }
                 )
 
@@ -209,6 +217,228 @@ class JiraMiner:
             })
             
         return comments
+    
+    def get_issue_history(self, issue_key):
+        """
+        Coleta o histórico de alterações de uma issue do Jira.
+        
+        Args:
+            issue_key (str): A chave da issue (ex: PROJ-123)
+            
+        Returns:
+            list: Lista de alterações com suas informações
+        """
+        history_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?expand=changelog"
+        
+        response = requests.get(history_url, headers=self.headers, auth=self.auth)
+        
+        if self.handle_rate_limit(response):
+            return self.get_issue_history(issue_key)
+            
+        if response.status_code != 200:
+            print(f"[JiraMiner] ⚠️ Erro ao coletar histórico da issue {issue_key}: {response.status_code}", flush=True)
+            return []
+            
+        history_data = response.json()
+        history = []
+        
+        for change in history_data.get('changelog', {}).get('histories', []):
+            history.append({
+                'id': change.get('id'),
+                'author': change.get('author', {}).get('displayName'),
+                'created': change.get('created'),
+                'items': [
+                    {
+                        'field': item.get('field'),
+                        'fieldtype': item.get('fieldtype'),
+                        'from': item.get('from'),
+                        'fromString': item.get('fromString'),
+                        'to': item.get('to'),
+                        'toString': item.get('toString')
+                    } for item in change.get('items', [])
+                ]
+            })
+            
+        return history
+    
+    def get_activity_log(self, issue_key):
+        """
+        Coleta o registro de atividades de uma issue do Jira, focando em:
+        - Mudanças de status
+        - Atualizações de resolução
+        - Atualizações de estimativa
+        - Registro de tempo
+        
+        Args:
+            issue_key (str): A chave da issue (ex: PROJ-123)
+            
+        Returns:
+            list: Lista de atividades com suas informações
+        """
+        # Primeiro, vamos obter o histórico completo da issue
+        history_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?expand=changelog"
+        
+        response = requests.get(history_url, headers=self.headers, auth=self.auth)
+        
+        if self.handle_rate_limit(response):
+            return self.get_activity_log(issue_key)
+            
+        if response.status_code != 200:
+            print(f"[JiraMiner] ⚠️ Erro ao coletar registro de atividades da issue {issue_key}: {response.status_code}", flush=True)
+            return []
+            
+        history_data = response.json()
+        activities = []
+        
+        # Processar o histórico de mudanças
+        for change in history_data.get('changelog', {}).get('histories', []):
+            author = change.get('author', {}).get('displayName')
+            created = change.get('created')
+            
+            for item in change.get('items', []):
+                field = item.get('field')
+                from_value = item.get('fromString')
+                to_value = item.get('toString')
+                
+                # Mudanças de status
+                if field == 'status':
+                    activities.append({
+                        'type': 'status_change',
+                        'author': author,
+                        'created': created,
+                        'from': from_value,
+                        'to': to_value,
+                        'description': f"{author} alterou o Status {from_value} → {to_value}"
+                    })
+                
+                # Atualizações de resolução
+                elif field == 'resolution':
+                    from_text = from_value if from_value else "Nenhuma"
+                    to_text = to_value if to_value else "Done"
+                    activities.append({
+                        'type': 'resolution_change',
+                        'author': author,
+                        'created': created,
+                        'from': from_text,
+                        'to': to_text,
+                        'description': f"{author} atualizou a Resolução {from_text} → {to_text}"
+                    })
+                
+                # Atualizações de estimativa
+                elif field == 'timeestimate' or field == 'remainingEstimate':
+                    from_hours = str(int(float(from_value or '0') / 3600)) + 'H' if from_value else '0H'
+                    to_hours = str(int(float(to_value or '0') / 3600)) + 'H' if to_value else '0H'
+                    activities.append({
+                        'type': 'estimate_change',
+                        'author': author,
+                        'created': created,
+                        'from': from_hours,
+                        'to': to_hours,
+                        'description': f"{author} atualizou a Estimativa de trabalho restante {from_hours} → {to_hours}"
+                    })
+                
+                # Registro de tempo
+                elif field == 'timespent':
+                    time_spent = str(int(float(to_value or '0') / 3600)) + 'h'
+                    activities.append({
+                        'type': 'time_logged',
+                        'author': author,
+                        'created': created,
+                        'time': time_spent,
+                        'description': f"{author} registrou o {time_spent}"
+                    })
+        
+        # Ordenar atividades por data de criação (mais recentes primeiro)
+        activities.sort(key=lambda x: x['created'], reverse=True)
+        return activities
+    
+    def get_checklist(self, issue_key):
+        """
+        Coleta o checklist de uma issue do Jira.
+        
+        Args:
+            issue_key (str): A chave da issue (ex: PROJ-123)
+            
+        Returns:
+            list: Lista de itens do checklist com suas informações
+        """
+        # Nota: A API do Jira não tem um endpoint específico para checklist
+        # Vamos tentar obter isso dos campos personalizados ou da descrição
+        issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}"
+        
+        response = requests.get(issue_url, headers=self.headers, auth=self.auth)
+        
+        if self.handle_rate_limit(response):
+            return self.get_checklist(issue_key)
+            
+        if response.status_code != 200:
+            print(f"[JiraMiner] ⚠️ Erro ao coletar checklist da issue {issue_key}: {response.status_code}", flush=True)
+            return []
+            
+        issue_data = response.json()
+        checklist = []
+        
+        # Verificar se há um campo personalizado para checklist
+        fields = issue_data.get('fields', {})
+        
+        # Procurar por campos que possam conter checklist
+        for field_id, field_value in fields.items():
+            if isinstance(field_value, dict) and field_value.get('type') == 'checklist':
+                for item in field_value.get('items', []):
+                    checklist.append({
+                        'id': item.get('id'),
+                        'text': item.get('text'),
+                        'status': item.get('status'),
+                        'created': item.get('created'),
+                        'updated': item.get('updated'),
+                        'completed': item.get('completed'),
+                        'completed_by': item.get('completedBy', {}).get('displayName') if item.get('completedBy') else None
+                    })
+        
+        # Se não encontrou um campo de checklist, tentar extrair da descrição
+        if not checklist and 'description' in fields:
+            description = fields.get('description', {})
+            if description and 'content' in description:
+                # Procurar por listas de verificação na descrição
+                checklist_items = self.extract_checklist_from_description(description)
+                if checklist_items:
+                    checklist = checklist_items
+        
+        return checklist
+    
+    def extract_checklist_from_description(self, description):
+        """
+        Tenta extrair itens de checklist da descrição de uma issue.
+        
+        Args:
+            description (dict): A descrição da issue em formato JSON
+            
+        Returns:
+            list: Lista de itens do checklist extraídos da descrição
+        """
+        checklist_items = []
+        
+        def traverse_content(content):
+            if isinstance(content, list):
+                for item in content:
+                    traverse_content(item)
+            elif isinstance(content, dict):
+                # Verificar se é um item de checklist
+                if content.get('type') == 'checkbox':
+                    checklist_items.append({
+                        'text': content.get('text', ''),
+                        'status': 'completed' if content.get('checked', False) else 'pending',
+                        'created': None,  # Não temos essa informação na descrição
+                        'updated': None,
+                        'completed': content.get('checked', False),
+                        'completed_by': None
+                    })
+                # Continuar a travessia em outras chaves
+                if 'content' in content:
+                    traverse_content(content['content'])
+        
+        traverse_content(description.get('content', []))
+        return checklist_items
     
     def get_custom_fields_mapping(self):
         url = f"https://{self.jira_domain}/rest/api/3/field"

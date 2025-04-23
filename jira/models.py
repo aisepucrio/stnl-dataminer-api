@@ -20,6 +20,9 @@ class JiraIssue(models.Model):
     time_mined = models.DateTimeField(default=now)
     commits = models.JSONField(max_length=50, null=True, blank=True)
     comments = models.JSONField(default=list, null=True, blank=True)
+    history = models.JSONField(default=list, null=True, blank=True, help_text="Histórico de alterações da issue")
+    activity_log = models.JSONField(default=list, null=True, blank=True, help_text="Registro de atividades da issue")
+    checklist = models.JSONField(default=list, null=True, blank=True, help_text="Checklist com informações de datas")
 
     class Meta:
         constraints = [
@@ -29,4 +32,4 @@ class JiraIssue(models.Model):
         unique_together = (('issue_id', 'project'),)
 
     def __str__(self):
-        return f"{self.key} - {self.summary}"
+        return f"{self.issue_key} - {self.summary}"

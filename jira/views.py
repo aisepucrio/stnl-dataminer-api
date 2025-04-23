@@ -124,7 +124,40 @@ class JiraIssueCollectView(APIView):
         )
     ],
     responses={
-        200: JiraIssueSerializer(many=True)
+        200: {
+            'type': 'object',
+            'properties': {
+                'count': {'type': 'integer'},
+                'next': {'type': 'string', 'nullable': True},
+                'previous': {'type': 'string', 'nullable': True},
+                'results': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'issue_id': {'type': 'string'},
+                            'issue_key': {'type': 'string'},
+                            'issuetype': {'type': 'string'},
+                            'project': {'type': 'string'},
+                            'priority': {'type': 'string', 'nullable': True},
+                            'status': {'type': 'string'},
+                            'assignee': {'type': 'string', 'nullable': True},
+                            'creator': {'type': 'string'},
+                            'created': {'type': 'string', 'format': 'date-time'},
+                            'updated': {'type': 'string', 'format': 'date-time'},
+                            'summary': {'type': 'string'},
+                            'description': {'type': 'string', 'nullable': True},
+                            'history': {'type': 'array', 'items': {'type': 'object'}},
+                            'activity_log': {'type': 'array', 'items': {'type': 'object'}},
+                            'checklist': {'type': 'array', 'items': {'type': 'object'}},
+                            'history_formatted': {'type': 'array', 'items': {'type': 'object'}},
+                            'activity_log_formatted': {'type': 'array', 'items': {'type': 'object'}},
+                            'checklist_formatted': {'type': 'array', 'items': {'type': 'object'}}
+                        }
+                    }
+                }
+            }
+        }
     }
 )
 class JiraIssueListView(generics.ListAPIView):
@@ -149,7 +182,29 @@ class JiraIssueListView(generics.ListAPIView):
         )
     ],
     responses={
-        200: JiraIssueSerializer,
+        200: {
+            'type': 'object',
+            'properties': {
+                'issue_id': {'type': 'string'},
+                'issue_key': {'type': 'string'},
+                'issuetype': {'type': 'string'},
+                'project': {'type': 'string'},
+                'priority': {'type': 'string', 'nullable': True},
+                'status': {'type': 'string'},
+                'assignee': {'type': 'string', 'nullable': True},
+                'creator': {'type': 'string'},
+                'created': {'type': 'string', 'format': 'date-time'},
+                'updated': {'type': 'string', 'format': 'date-time'},
+                'summary': {'type': 'string'},
+                'description': {'type': 'string', 'nullable': True},
+                'history': {'type': 'array', 'items': {'type': 'object'}},
+                'activity_log': {'type': 'array', 'items': {'type': 'object'}},
+                'checklist': {'type': 'array', 'items': {'type': 'object'}},
+                'history_formatted': {'type': 'array', 'items': {'type': 'object'}},
+                'activity_log_formatted': {'type': 'array', 'items': {'type': 'object'}},
+                'checklist_formatted': {'type': 'array', 'items': {'type': 'object'}}
+            }
+        },
         404: {'description': 'Issue not found'}
     }
 )
