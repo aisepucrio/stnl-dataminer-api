@@ -2,10 +2,8 @@ import ollama
 import textwrap
 import json
 
-# Nome do modelo
 MODEL = "gemma3:27b"
 
-# Prompt fixo para classificação de sentimento de requisitos
 SENTIMENT_PROMPT = """
 You are a software engineering expert specialized in requirements analysis.
 Analyze the sentiment expressed in the following non-functional requirement:
@@ -71,8 +69,8 @@ def analyze_nfr_sentiment_from_json(input_path: str, output_path: str, field_nam
     print(f"\n✅ Análise concluída! Resultados salvos em: {output_path}")
 
 def main():
-    input_path = fr"C:\Users\breno\OneDrive\Documentos\GitHub\stnl-dataminer-api\studycase\NFR\data\github_results.json"  # um JSON com uma lista de objetos
-    output_path = fr"C:\Users\breno\OneDrive\Documentos\GitHub\stnl-dataminer-api\studycase\NFR\data\nfrs_sentiment.json"
+    input_path = fr"Path to the input file"  
+    output_path = fr"Path to save the output file"
     analyze_nfr_sentiment_from_json(input_path, output_path)
 
 if __name__ == "__main__":

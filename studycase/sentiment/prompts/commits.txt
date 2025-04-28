@@ -43,9 +43,9 @@ Use this strict methodology:
      * Temporary solutions ("Temporary fix for issue #123", "Workaround for API limitation")
 
 3. TONE ANALYSIS:
-   - Positive: Enthusiastic tone, use of exclamations, positive emojis (✨, 🚀, ✅)
+   - Positive: Enthusiastic tone, use of exclamations, positive emojis
    - Neutral: Technical tone, descriptive, without qualifying adjectives or emojis
-   - Negative: Urgent tone, use of negative emojis (🐛, 🔥, ⚠️), exclamation marks in alert contexts
+   - Negative: Urgent tone, use of negative emojis, exclamation marks in alert contexts
 
 4. TIEBREAKER CRITERIA:
    - If there's a mix of positive and negative elements:

@@ -3,7 +3,7 @@ import textwrap
 import pandas as pd
 import json
 
-models = ["mistral-small:24b", "gemma3:27b", "qwq"]
+models = ["mistral-small:24b", "gemma3:27b"]
 
 def serialize_response(response: str) -> dict:
     try:
@@ -94,11 +94,3 @@ def analyze_sentiment(data_name):
     print(f"\n💾 Salvando {len(results)} resultados...")
     save_response(results, data_name)
     print(f"✅ Análise concluída! Resultados salvos em: studycase/sentiment/results/{data_name}.json")
-
-def main():
-    analyze_sentiment("jira")
-    # for data_name in ["commits", "Issues&PRs", "jira"]:
-    #     analyze_sentiment(data_name)
-
-if __name__ == "__main__":
-    main()
