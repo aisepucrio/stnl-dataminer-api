@@ -1,4 +1,4 @@
-# Diggit
+# RAISE
 
 ## Description
 
@@ -100,13 +100,13 @@ If all commands return the program versions, you're ready to proceed with the pr
    
    Create a file named `.env` (this is the complete filename, not a file extension) at the root of the project with the following information:
    ```
-   GITHUB_TOKENS="seu_token_github"
-   JIRA_API_TOKEN="seu_token_jira"
-   JIRA_EMAIL="seu_email_jira"
-   DJANGO_SUPERUSER_PASSWORD="sua_senha_superuser"
-   POSTGRES_DB=nome_do_banco
-   POSTGRES_USER=usuario_postgres
-   POSTGRES_PASSWORD=senha_postgres
+   GITHUB_TOKENS="your_github_token"
+   JIRA_API_TOKEN="your_jira_token"
+   JIRA_EMAIL="your_jira_email"
+   DJANGO_SUPERUSER_PASSWORD="your_superuser_password"
+   POSTGRES_DB=your_database_name
+   POSTGRES_USER=your_postgres_user
+   POSTGRES_PASSWORD=your_postgres_password
    POSTGRES_HOST=postgres
    POSTGRES_PORT=5432
    ```
@@ -150,7 +150,7 @@ If all commands return the program versions, you're ready to proceed with the pr
 
 1. Go to [Jira API Tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
 2. Click on **Create API token**.
-3. Enter a label/name for your token (e.g., "Diggit API Access") and click **Create**.
+3. Enter a label/name for your token (e.g., "RAISE API Access") and click **Create**.
 4. Click **Copy to clipboard** to copy your new token.  
    **Important:** You will not be able to see this token again, so save it securely.
 5. Use this token in your `.env` file as the value for `JIRA_API_TOKEN`.
@@ -766,6 +766,3 @@ You can access and explore the mined data using your favorite database client. H
 5. Save and connect.
 
 ---
-**Note:**  
-- The PostgreSQL database is accessible on `localhost:5432` as long as the Docker containers are running.
-- Make sure Docker is up and the containers are started with `docker compose up` before trying to connect.
