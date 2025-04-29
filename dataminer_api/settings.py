@@ -155,103 +155,43 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-# Define a URL do broker (Redis) que o Celery usará para mensageria
+# Defines the broker URL (Redis) that Celery will use for messaging
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 
-# Define onde os resultados das tarefas serão armazenados
+# Defines where the task results will be stored
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 
-# Define quais formatos de serialização são aceitos para as mensagens
-# Neste caso, apenas JSON é permitido
+# Defines which serialization formats are accepted for the messages
+# In this case, only JSON is allowed
 CELERY_ACCEPT_CONTENT = ['json']
 
-# Define o serializador usado para as tarefas
+# Defines the serializer used for tasks
 CELERY_TASK_SERIALIZER = 'json'
 
-# Define o serializador usado para os resultados
+# Defines the serializer used for results
 CELERY_RESULT_SERIALIZER = 'json'
 
-# Define o fuso horário para o Celery
+# Defines the timezone for Celery
 CELERY_TIMEZONE = 'UTC'
 
-# Define quanto tempo os resultados das tarefas são mantidos
-# Neste caso: 3 dias (60 segundos * 60 minutos * 24 horas * 3 dias)
+# Defines how long task results are kept
+# In this case: 3 days (60 seconds * 60 minutes * 24 hours * 3 days)
 CELERY_TASK_RESULT_EXPIRES = 60 * 60 * 24 * 3
 
-# Permite que o Celery tente reconectar ao broker em caso de falha durante o startup
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Allows Celery to attempt to reconnect to the broker in case of failure during startup
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
-# Habilita o rastreamento do estado "STARTED" das tarefas
+# Enables tracking of the "STARTED" state of tasks
 CELERY_TASK_TRACK_STARTED = True
 
-# Força o armazenamento dos resultados mesmo em modo eager (útil para testes)
+# Forces the storage of results even in eager mode (useful for testing)
 CELERY_TASK_STORE_EAGER_RESULT = True
 
-# Duplicata do CELERY_TASK_TRACK_STARTED (pode ser removido)
+# Duplicate of CELERY_TASK_TRACK_STARTED (can be removed)
 CELERY_TRACK_STARTED = True
 
-# Define o limite máximo de memória por processo worker (2MB neste caso)
+# Defines the maximum memory limit per worker process (2MB in this case)
 CELERY_MAX_MEMORY_PER_CHILD = 1024*1024*2
 
-# Define o número de processos workers concorrentes
+# Defines the number of concurrent worker processes
 CELERY_CONCURRENCY = 4

@@ -13,16 +13,31 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='jiraissue',
             name='activity_log',
-            field=models.JSONField(blank=True, default=list, help_text='Registro de atividades da issue', null=True),
+            field=models.JSONField(
+                blank=True, 
+                default=list, 
+                help_text='Activity log of the issue', 
+                null=True
+            ),
         ),
         migrations.AddField(
             model_name='jiraissue',
             name='checklist',
-            field=models.JSONField(blank=True, default=list, help_text='Checklist com informações de datas', null=True),
+            field=models.JSONField(
+                blank=True, 
+                default=list, 
+                help_text='Checklist with date information', 
+                null=True
+            ),
         ),
         migrations.AddField(
             model_name='jiraissue',
             name='history',
-            field=models.JSONField(blank=True, default=list, help_text='Histórico de alterações da issue', null=True),
+            field=models.JSONField(
+                blank=True, 
+                default=list, 
+                help_text='Change history of the issue', 
+                null=True
+            ),
         ),
     ]

@@ -86,11 +86,11 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
 @shared_task(bind=True)
 def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic'):
     """
-    self - primeiro argumento automático do Celery devido ao bind=True
-    repo_name - nome do repositório
-    start_date - data inicial (opcional)
-    end_date - data final (opcional)
-    depth - profundidade da mineração (opcional, default='basic')
+    self - first argument automatically passed by Celery due to bind=True
+    repo_name - repository name
+    start_date - start date (optional)
+    end_date - end date (optional)
+    depth - mining depth (optional, default='basic')
     """
     self.update_state(
         state='STARTED',
@@ -166,9 +166,6 @@ def fetch_branches(self, repo_name):
 
 @shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None):
-    jira_email = settings.JIRA_EMAIL
-    jira_api_token = settings.JIRA_API_TOKEN
-
     self.update_state(
         state='STARTED',
         meta={
@@ -177,7 +174,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
         }
     )
     try:
-        print(f"🔄 Iniciando coleta de issues do Jira: {project_key} no domínio {jira_domain}")
+        print(f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}")
         
         miner = JiraMiner(jira_domain)
 
@@ -185,7 +182,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
 
         print(f'Printing issues: {issues}', flush=True)
 
-        print(f"✅ Coleta concluída: {issues['total_issues']} issues coletadas.")
+        print(f"✅ Collection completed: {issues['total_issues']} issues collected.")
 
         self.update_state(
             state='SUCCESS',
@@ -201,7 +198,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
             'data': issues
         }
     except Exception as e:
-        print(f"❌ Erro ao coletar issues do Jira: {e}\n{traceback.format_exc()}")
+        print(f"❌ Error collecting Jira issues: {e}\n{traceback.format_exc()}")
         self.update_state(
             state='FAILURE',
             meta={
@@ -225,7 +222,7 @@ def fetch_metadata(self, repo_name):
         miner = GitHubMiner()
         metadata = miner.get_repository_metadata(repo_name)
         
-        # Serializar os dados antes de retornar
+        # Serialize the data before returning
         metadata_dict = {
             'repository': metadata.repository,
             'stars_count': metadata.stars_count,

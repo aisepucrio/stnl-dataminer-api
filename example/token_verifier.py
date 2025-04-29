@@ -6,7 +6,7 @@ import argparse
 
 load_dotenv()
 
-def verificar_token_github(token):
+def check_github_token(token):
     headers = {
         'Authorization': f'token {token}',
         'Accept': 'application/vnd.github.v3+json'
@@ -15,27 +15,27 @@ def verificar_token_github(token):
     response = requests.get('https://api.github.com/rate_limit', headers=headers)
     
     if response.status_code == 200:
-        dados = response.json()
-        rate = dados['rate']
+        data = response.json()
+        rate = data['rate']
         
-        limite_total = rate['limit']
-        restantes = rate['remaining']
+        total_limit = rate['limit']
+        remaining = rate['remaining']
         reset_time = datetime.fromtimestamp(rate['reset'])
         
-        print(f"Status do Token GitHub:")
-        print(f"Limite total de requisições: {limite_total}")
-        print(f"Requisições restantes: {restantes}")
-        print(f"Limite será resetado em: {reset_time}")
+        print(f"GitHub Token Status:")
+        print(f"Total request limit: {total_limit}")
+        print(f"Remaining requests: {remaining}")
+        print(f"Limit will reset at: {reset_time}")
         
-        return restantes
+        return remaining
     else:
-        print(f"Erro ao verificar token. Status code: {response.status_code}")
+        print(f"Error checking token. Status code: {response.status_code}")
         return None
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Verifica o status de um token do GitHub')
+    parser = argparse.ArgumentParser(description='Check the status of a GitHub token')
     parser.add_argument('-i', '--index', type=int, default=0,
-                       help='Índice do token a ser verificado (começando em 0)')
+                        help='Index of the token to check (starting at 0)')
     
     args = parser.parse_args()
     
@@ -43,8 +43,8 @@ if __name__ == "__main__":
     token = token.split(',')
     
     if args.index >= len(token):
-        print(f"Erro: índice {args.index} é maior que o número de tokens disponíveis ({len(token)})")
+        print(f"Error: index {args.index} is greater than the number of available tokens ({len(token)})")
         exit(1)
         
     token = token[args.index]
-    verificar_token_github(token)
+    check_github_token(token)

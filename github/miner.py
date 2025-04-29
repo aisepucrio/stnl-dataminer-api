@@ -17,11 +17,11 @@ class APIMetrics:
         self.total_requests = 0
         self.total_prs_collected = 0
         self.pages_processed = 0
-        # Métricas para core
+        # Core metrics
         self.core_limit_remaining = None
         self.core_limit_reset = None
         self.core_limit_limit = None
-        # Métricas para search
+        # Search metrics
         self.search_limit_remaining = None
         self.search_limit_reset = None
         self.search_limit_limit = None
@@ -39,14 +39,14 @@ class APIMetrics:
         if endpoint_type == 'search':
             self.search_limit_remaining = headers.get('X-RateLimit-Remaining')
             self.search_limit_reset = headers.get('X-RateLimit-Reset')
-            self.search_limit_limit = headers.get('X-RateLimit-Limit', 30)  # Search tem limite de 30/min
+            self.search_limit_limit = headers.get('X-RateLimit-Limit', 30)  # Search has a limit of 30/min
             
             if self.search_limit_limit and self.search_limit_remaining:
                 self.requests_used = int(self.search_limit_limit) - int(self.search_limit_remaining)
         else:  # core
             self.core_limit_remaining = headers.get('X-RateLimit-Remaining')
             self.core_limit_reset = headers.get('X-RateLimit-Reset')
-            self.core_limit_limit = headers.get('X-RateLimit-Limit', 5000)  # Core tem limite de 5000/hora
+            self.core_limit_limit = headers.get('X-RateLimit-Limit', 5000)  # Core has a limit of 5000/hour
             
             if self.core_limit_limit and self.core_limit_remaining:
                 self.requests_used = int(self.core_limit_limit) - int(self.core_limit_remaining)
@@ -56,30 +56,30 @@ class APIMetrics:
             self.average_time_per_request = total_time / self.total_requests
 
     def format_reset_time(self, endpoint_type='core'):
-        """Converte o timestamp Unix para formato legível e considera fuso horário local"""
+        """Converts the Unix timestamp to a readable format considering the local timezone"""
         reset_time = self.core_limit_reset if endpoint_type == 'core' else self.search_limit_reset
         if reset_time:
             try:
-                # Converte timestamp UTC para datetime local
-                reset_time_utc = datetime.fromtimestamp(int(reset_time), tz=timezone.utc)
-                reset_time_local = reset_time_utc.astimezone(timezone(timedelta(hours=-3)))  # Forçando timezone de Brasília
                 
-                time_until_reset = reset_time_local - datetime.now().astimezone(timezone(timedelta(hours=-3)))  # Mesmo timezone para comparação
+                reset_time_utc = datetime.fromtimestamp(int(reset_time), tz=timezone.utc)
+                reset_time_local = reset_time_utc.astimezone(timezone(timedelta(hours=-3)))  # Brasília timezone
+                
+                time_until_reset = reset_time_local - datetime.now().astimezone(timezone(timedelta(hours=-3))) # Same timezone
                 seconds_until_reset = int(time_until_reset.total_seconds())
                 
-                return f"{reset_time_local.strftime('%Y-%m-%d %H:%M:%S')} (em {seconds_until_reset} segundos)"
+                return f"{reset_time_local.strftime('%Y-%m-%d %H:%M:%S')} (in {seconds_until_reset} seconds)"
             except Exception as e:
-                print(f"Erro ao formatar tempo: {e}")
+                print(f"Error formatting reset time: {e}")
                 return "Unknown"
         return "Unknown"
 
     def get_remaining_requests(self, endpoint_type='core'):
-        """Retorna o número de requisições restantes para o tipo de endpoint"""
+        """Returns the number of remaining requests for the specified endpoint type"""
         return (self.core_limit_remaining if endpoint_type == 'core' 
                 else self.search_limit_remaining)
 
     def get_execution_time(self):
-        """Calculate execution time metrics"""
+        """Calculates execution time metrics"""
         total_time = time.time() - self.execution_start
         return {
             "seconds": round(total_time, 2),
@@ -93,95 +93,93 @@ class GitHubMiner:
         self.current_token_index = 0
         
         if not self.load_tokens():
-            raise Exception("Falha ao inicializar tokens do GitHub. Verifique suas credenciais.")
+            raise Exception("Failed to initialize GitHub tokens. Check your credentials.")
         
         self.update_auth_header()
 
     def verify_token(self):
-        """Verifica se o token atual é válido e tem permissões adequadas"""
+        """Verifies if the current token is valid and has proper permissions"""
         try:
             url = "https://api.github.com/rate_limit"
             response = requests.get(url, headers=self.headers)
             metrics = APIMetrics()
             
             if response.status_code != 200:
-                print(f"Erro ao verificar token: {response.status_code}", flush=True)
+                print(f"Error verifying token: {response.status_code}", flush=True)
                 return False
 
-            # Usar a função unificada para mostrar o status
-            self.check_and_log_rate_limit(response, metrics, 'core', "Verificação de Token")
+            # Use the unified function to show status
+            self.check_and_log_rate_limit(response, metrics, 'core', "Token Verification")
             return True
 
         except Exception as e:
-            print(f"Erro ao verificar token: {e}", flush=True)
+            print(f"Error verifying token: {e}", flush=True)
             return False
 
     def load_tokens(self):
-        """Carrega tokens do GitHub a partir de um arquivo .env ou variável de ambiente"""
+        """Loads GitHub tokens from .env file or environment variables"""
         load_dotenv()
         tokens_str = os.getenv("GITHUB_TOKENS")
         if not tokens_str:
-            print("Nenhum token encontrado. Verifique se GITHUB_TOKENS está definido no .env", flush=True)
+            print("No token found. Make sure GITHUB_TOKENS is set in your .env file.", flush=True)
             return False
         
         self.tokens = [token.strip() for token in tokens_str.split(",") if token.strip()]
         if not self.tokens:
-            print("Nenhum token válido encontrado após processamento", flush=True)
+            print("No valid tokens found after processing.", flush=True)
             return False
         
-        print(f"Carregados {len(self.tokens)} tokens", flush=True)
+        print(f"{len(self.tokens)} tokens loaded.", flush=True)
         return self.verify_token()
 
     def update_auth_header(self):
-        """Atualiza o cabeçalho Authorization com o token atual"""
+        """Updates the Authorization header with the current token"""
         if self.tokens:
             self.headers['Authorization'] = f'token {self.tokens[self.current_token_index]}'
 
     def switch_token(self):
-        """Alterna para o próximo token se disponível"""
+        """Switches to the next available token"""
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
         self.update_auth_header()
-        print(f"Alternando para o próximo token. Token atual: {self.current_token_index + 1}/{len(self.tokens)}", flush=True)
+        print(f"Switching to the next token. Current token: {self.current_token_index + 1}/{len(self.tokens)}", flush=True)
 
     def wait_for_rate_limit_reset(self, endpoint_type='core'):
-        """Aguarda o reset do rate limit com margem de segurança"""
+        """Waits for the rate limit to reset with a safety margin"""
         try:
             response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
             metrics = APIMetrics()
             
-            # Usar a função unificada para mostrar o status
-            self.check_and_log_rate_limit(response, metrics, endpoint_type, "Aguardando Reset")
+            # Use the unified function to show status
+            self.check_and_log_rate_limit(response, metrics, endpoint_type, "Waiting for Reset")
             
             rate_limits = response.json()['resources'][endpoint_type]
             reset_time = int(rate_limits['reset'])
             current_time = int(time.time())
             
-            # Adiciona margem de segurança de 5 segundos
+            # Adding 5 seconds safety margin
             wait_time = reset_time - current_time + 5
             
             if wait_time > 0:
-                print(f"\n⏳ [RATE LIMIT] Aguardando {wait_time} segundos para reset (incluindo margem de segurança)...", flush=True)
+                print(f"\n⏳ [RATE LIMIT] Waiting {wait_time} seconds for reset (including safety margin)...", flush=True)
                 time.sleep(wait_time)
-                print("✅ [RATE LIMIT] Reset concluído! Retomando operações...\n", flush=True)
+                print("✅ [RATE LIMIT] Reset complete! Resuming operations...\n", flush=True)
                 
-                # Verifica novamente o rate limit após a espera
                 response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
                 if response.status_code == 200:
                     new_limits = response.json()['resources'][endpoint_type]
                     if int(new_limits['remaining']) > 0:
                         return True
                     else:
-                        # Se ainda não resetou, aguarda mais 5 segundos
-                        print("⚠️ [RATE LIMIT] Token ainda não resetou, aguardando mais 5 segundos...", flush=True)
+                        print("⚠️ [RATE LIMIT] Token not reset yet, waiting another 5 seconds...", flush=True)
                         time.sleep(5)
                         return True
         except Exception as e:
-            print(f"❌ [RATE LIMIT] Erro ao aguardar reset: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha ao aguardar reset do rate limit: {str(e)}")
+            print(f"❌ [RATE LIMIT] Error while waiting for reset: {str(e)}", flush=True)
+            raise RuntimeError(f"Failed to wait for rate limit reset: {str(e)}")
         return False
 
     def handle_rate_limit(self, response, endpoint_type='core'):
-        """Gerencia o rate limit baseado no tipo de endpoint"""
+        """Handles the rate limit based on the endpoint type"""
         if response.status_code == 403 and 'rate limit' in response.text.lower():
             reset_time = response.headers.get('X-RateLimit-Reset')
             if reset_time:
@@ -189,76 +187,75 @@ class GitHubMiner:
                 wait_time = (reset_datetime - datetime.now()).total_seconds()
                 
                 print("\n" + "="*50)
-                print("🚫 RATE LIMIT ATINGIDO!")
-                print(f"Tipo de endpoint: {endpoint_type.upper()}")
-                print(f"Reset programado para: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-                print(f"Tempo de espera necessário: {int(wait_time)} segundos")
+                print("🚫 RATE LIMIT REACHED!")
+                print(f"Endpoint type: {endpoint_type.upper()}")
+                print(f"Reset scheduled for: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Waiting time required: {int(wait_time)} seconds")
                 print("="*50 + "\n")
                 
             if endpoint_type == 'search':
-                print("[RATE LIMIT] Limite de busca atingido. Aguardando reset...", flush=True)
+                print("[RATE LIMIT] Search limit reached. Waiting for reset...", flush=True)
                 return self.wait_for_rate_limit_reset('search')
             else:
                 if len(self.tokens) > 1:
-                    print("[RATE LIMIT] Procurando token alternativo disponível...", flush=True)
+                    print("[RATE LIMIT] Searching for an available alternative token...", flush=True)
                     best_token = self.find_best_available_token()
                     
                     if best_token is not None:
                         self.current_token_index = best_token
                         self.update_auth_header()
-                        print(f"[RATE LIMIT] Token alternativo encontrado! Usando token {best_token + 1}/{len(self.tokens)}", flush=True)
+                        print(f"[RATE LIMIT] Alternative token found! Using token {best_token + 1}/{len(self.tokens)}", flush=True)
                         return True
                     else:
-                        print("[RATE LIMIT] Nenhum token alternativo disponível. Aguardando reset...", flush=True)
+                        print("[RATE LIMIT] No alternative tokens available. Waiting for reset...", flush=True)
                         return self.wait_for_rate_limit_reset()
                 else:
-                    print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos!", flush=True)
+                    print("[RATE LIMIT] ⚠️ WARNING: Limit reached and no alternative tokens available!", flush=True)
                     return self.wait_for_rate_limit_reset()
         return False
 
     def find_best_available_token(self):
         """
-        Verifica todos os tokens e retorna o índice do melhor token disponível
-        ou None se todos estiverem indisponíveis
+        Checks all tokens and returns the index of the best available token,
+        or None if all tokens are unavailable.
         """
         best_token = None
         max_remaining = 0
         original_token_index = self.current_token_index
-        
+
         for i in range(len(self.tokens)):
-            # Não testar o token atual novamente
+            # Skip the current token
             if i == original_token_index:
                 continue
-            
+
             self.current_token_index = i
             self.update_auth_header()
-            
+
             try:
                 response = requests.get("https://api.github.com/rate_limit", headers=self.headers)
                 if response.status_code == 200:
                     rate_data = response.json()['resources']
                     core_remaining = int(rate_data['core']['remaining'])
-                    
-                    # Se encontrar um token com mais requisições disponíveis
+
+                    # If a token with more requests available is found
                     if core_remaining > max_remaining:
                         max_remaining = core_remaining
                         best_token = i
-                        
-                        # Se encontrar um token com requisições suficientes, usar imediatamente
+
+                        # If a token with enough requests is found, use it immediately
                         if core_remaining > 100:
-                            print(f"[TOKEN] Encontrado token {i + 1} com {core_remaining} requisições disponíveis", flush=True)
+                            print(f"[TOKEN] Found token {i + 1} with {core_remaining} requests available", flush=True)
                             return i
-                            
+
             except Exception as e:
-                print(f"Erro ao verificar token {i + 1}: {str(e)}", flush=True)
-        
-        # Se não encontrou nenhum token com mais de 100 requisições,
-        # mas encontrou algum com requisições disponíveis
+                print(f"Error checking token {i + 1}: {str(e)}", flush=True)
+
+        # If no token with more than 100 requests was found but some are available
         if best_token is not None and max_remaining > 0:
-            print(f"[TOKEN] Usando token {best_token + 1} com {max_remaining} requisições restantes", flush=True)
+            print(f"[TOKEN] Using token {best_token + 1} with {max_remaining} requests remaining", flush=True)
             return best_token
-        
-        # Se não encontrou nenhum token disponível, volta para o token original
+
+        # If no available token was found, revert to the original token
         self.current_token_index = original_token_index
         self.update_auth_header()
         return None
@@ -272,7 +269,7 @@ class GitHubMiner:
     def clone_repo(self, repo_url, clone_path):
         if not os.path.exists(clone_path):
             print(f"Cloning repo: {repo_url}", flush=True)
-            # Usar o token para autenticação
+            # Use token for authentication
             token = self.tokens[self.current_token_index]
             auth_url = f'https://{token}@github.com/{repo_url.split("github.com/")[1]}'
             Repo.clone_from(auth_url, clone_path)
@@ -304,12 +301,12 @@ class GitHubMiner:
 
     def get_commits(self, repo_name: str, start_date: str = None, end_date: str = None, clone_path: str = None, commit_sha: str = None):
         try:
-            print(f"\n[COMMITS] Iniciando extração de commits para {repo_name}", flush=True)
-            
+            print(f"\n[COMMITS] Starting commits extraction for {repo_name}", flush=True)
+
             if commit_sha:
-                print(f"[COMMITS] Modo de extração: Commit específico (SHA: {commit_sha})", flush=True)
+                print(f"[COMMITS] Extraction mode: Specific commit (SHA: {commit_sha})", flush=True)
             else:
-                print(f"[COMMITS] Modo de extração: Período de {start_date or 'início'} até {end_date or 'atual'}", flush=True)
+                print(f"[COMMITS] Extraction mode: Period from {start_date or 'beginning'} to {end_date or 'now'}", flush=True)
 
             if start_date:
                 start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ')
@@ -326,32 +323,31 @@ class GitHubMiner:
 
             if not os.path.exists(repo_path):
                 repo_url = f'https://github.com/{repo_name}'
-                print(f"[COMMITS] Clonando repositório: {repo_url}", flush=True)
+                print(f"[COMMITS] Cloning repository: {repo_url}", flush=True)
                 self.clone_repo(repo_url, repo_path)
             else:
-                print(f"[COMMITS] Repositório já existe: {repo_path}", flush=True)
+                print(f"[COMMITS] Repository already exists: {repo_path}", flush=True)
                 self.update_repo(repo_path)
 
-            print("[COMMITS] Iniciando análise dos commits...", flush=True)
-            
-            # Se um commit_sha foi fornecido, use o parâmetro single do pydriller
+            print("[COMMITS] Starting commits analysis...", flush=True)
+
             if commit_sha:
                 repo = Repository(repo_path, single=commit_sha).traverse_commits()
             else:
                 repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
-                
+
             essential_commits = []
 
             for commit in repo:
-                current_timestamp = timezone.now()  # Alterado para usar timezone.now()
-                print(f"[COMMITS] Processando commit: {commit.hash[:7]}", flush=True)
-                # Cria ou recupera o autor e o committer
+                current_timestamp = timezone.now()
+                print(f"[COMMITS] Processing commit: {commit.hash[:7]}", flush=True)
+                # Create or get author and committer
                 author, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.author.name, email=commit.author.email if commit.author else None)
                 committer, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.committer.name, email=commit.committer.email if commit.committer else None)
 
-                # Cria ou atualiza o commit no banco de dados com o timestamp
+                # Create or update commit in the database with timestamp
                 db_commit, created = GitHubCommit.objects.update_or_create(
                     sha=commit.hash,
                     defaults={
@@ -372,7 +368,7 @@ class GitHubMiner:
                     }
                 )
 
-                # Prepara dados para JSON
+                # Prepare data for JSON
                 commit_data = {
                     'sha': commit.hash,
                     'message': commit.msg,
@@ -398,7 +394,7 @@ class GitHubMiner:
                     'modified_files': []
                 }
 
-                # Processa arquivos modificados, evita duplicados
+                # Process modified files, avoid duplicates
                 for mod in commit.modified_files:
                     db_mod_file, _ = GitHubModifiedFile.objects.update_or_create(
                         commit=db_commit,
@@ -414,8 +410,8 @@ class GitHubMiner:
                             'time_mined': current_timestamp
                         }
                     )
-                    
-                    # Adiciona dados do arquivo modificado ao JSON
+
+                    # Add modified file data to JSON
                     mod_data = {
                         'old_path': mod.old_path,
                         'new_path': mod.new_path,
@@ -428,7 +424,7 @@ class GitHubMiner:
                         'methods': []
                     }
 
-                    # Processa métodos, evita duplicados
+                    # Process methods, avoid duplicates
                     for method in mod.methods:
                         GitHubMethod.objects.update_or_create(
                             modified_file=db_mod_file,
@@ -447,48 +443,46 @@ class GitHubMiner:
                         }
                         mod_data['methods'].append(method_data)
 
-                    commit_data['modified_files'].append(mod_data)
+                commit_data['modified_files'].append(mod_data)
 
-                essential_commits.append(commit_data)
+            essential_commits.append(commit_data)
 
-            print("\n[COMMITS] Salvando dados em JSON...", flush=True)
+            print("\n[COMMITS] Saving data to JSON...", flush=True)
             filename = f"{repo_name.replace('/', '_')}_commit_{commit_sha}.json" if commit_sha else f"{repo_name.replace('/', '_')}_commits.json"
             self.save_to_json(essential_commits, filename)
-            print("[COMMITS] Commits detalhados salvos no banco de dados e no JSON com sucesso.", flush=True)
-            print(f"[COMMITS] Total de commits processados: {len(essential_commits)}", flush=True)
+            print("[COMMITS] Detailed commits saved to database and JSON successfully.", flush=True)
+            print(f"[COMMITS] Total commits processed: {len(essential_commits)}", flush=True)
             return essential_commits
 
         except Exception as e:
-            print(f"[COMMITS] Erro ao acessar o repositório: {e}", flush=True)
+            print(f"[COMMITS] Error accessing repository: {e}", flush=True)
             return []
         finally:
             self.verify_token()
 
     def sanitize_text(self, text):
-        """Remove ou substitui caracteres inválidos do texto"""
+        """Remove or replace invalid characters from text"""
         if text is None:
             return None
-        # Substitui caracteres nulos por espaço
+        # Replace null characters with space
         return text.replace('\u0000', ' ')
-
 
     def split_date_range(self, start_date, end_date, interval_days=1):
         """
-        Divide o intervalo de datas em períodos menores
+        Split the date range into smaller periods
         
         Args:
-            start_date (str): Data inicial no formato ISO8601 (YYYY-MM-DDTHH:MM:SSZ)
-            end_date (str): Data final no formato ISO8601 (YYYY-MM-DDTHH:MM:SSZ)
-            interval_days (int): Número de dias por intervalo
+            start_date (str): Start date in ISO8601 format (YYYY-MM-DDTHH:MM:SSZ)
+            end_date (str): End date in ISO8601 format (YYYY-MM-DDTHH:MM:SSZ)
+            interval_days (int): Number of days per interval
             
         Returns:
-            generator: Gera tuplas de (data_inicio, data_fim) para cada intervalo
+            generator: Yields tuples of (start_date, end_date) for each interval
         """
         if not start_date or not end_date:
             yield (start_date, end_date)
             return
 
-        # Remove o 'Z' do final e converte para datetime
         start = datetime.strptime(start_date.rstrip('Z'), "%Y-%m-%dT%H:%M:%S")
         end = datetime.strptime(end_date.rstrip('Z'), "%Y-%m-%dT%H:%M:%S")
         
@@ -502,41 +496,39 @@ class GitHubMiner:
             current = interval_end + timedelta(days=1)
 
     def check_and_log_rate_limit(self, response, metrics, endpoint_type='core', context=""):
-        """Função unificada para verificar e logar status do rate limit"""
+        """Unified function to check and log rate limit status"""
         metrics.update_rate_limit(response.headers, endpoint_type)
         
-        # Verifica se atingiu o rate limit
         if response.status_code == 403 and 'rate limit' in response.text.lower():
             print("\n" + "="*50)
-            print(f"🚫 RATE LIMIT ATINGIDO! {context}")
-            print(f"Tipo de endpoint: {endpoint_type.upper()}")
+            print(f"🚫 RATE LIMIT REACHED! {context}")
+            print(f"Endpoint type: {endpoint_type.upper()}")
             
             reset_time = response.headers.get('X-RateLimit-Reset')
             if reset_time:
                 reset_datetime = datetime.fromtimestamp(int(reset_time))
                 wait_time = (reset_datetime - datetime.now()).total_seconds()
-                print(f"Reset programado para: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-                print(f"Tempo de espera necessário: {int(wait_time)} segundos")
+                print(f"Reset scheduled for: {reset_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                print(f"Wait time required: {int(wait_time)} seconds")
             print("="*50 + "\n")
             
             if endpoint_type == 'search':
-                print("[RATE LIMIT] Limite de busca atingido. Aguardando reset...", flush=True)
+                print("[RATE LIMIT] Search limit reached. Waiting for reset...", flush=True)
                 self.wait_for_rate_limit_reset('search')
             else:
                 if len(self.tokens) > 1:
-                    print("[RATE LIMIT] Limite core atingido. Alternando para próximo token...", flush=True)
+                    print("[RATE LIMIT] Core limit reached. Switching to next token...", flush=True)
                     self.switch_token()
                     self.verify_token()
                 else:
-                    print("[RATE LIMIT] ⚠️ ATENÇÃO: Limite atingido e não há tokens alternativos!", flush=True)
+                    print("[RATE LIMIT] ⚠️ WARNING: Limit reached and no alternative tokens available!", flush=True)
                     self.wait_for_rate_limit_reset()
             return True
-        
-        # Alerta apenas quando estiver muito próximo do limite
+
         remaining = (metrics.search_limit_remaining if endpoint_type == 'search' 
                     else metrics.core_limit_remaining)
         if remaining and int(remaining) < 50:
-            print(f"\n⚠️ ALERTA: Apenas {remaining} requisições restantes para o token atual ({endpoint_type})", flush=True)
+            print(f"\n⚠️ WARNING: Only {remaining} requests remaining for the current token ({endpoint_type})", flush=True)
         
         return False
 
@@ -546,7 +538,7 @@ class GitHubMiner:
             response = requests.get(url, headers=self.headers)
             if response.status_code == 403 and 'rate limit' in response.text.lower():
                 if not self.handle_rate_limit(response, 'core'):
-                    print("[Branches] Falha ao recuperar após rate limit", flush=True)
+                    print("[Branches] Failed to recover after rate limit", flush=True)
                     return []
                 response = requests.get(url, headers=self.headers)
             response.raise_for_status()
@@ -554,7 +546,7 @@ class GitHubMiner:
             self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
 
             for branch in branches:
-                current_timestamp = timezone.now()  # Alterado para usar timezone.now()
+                current_timestamp = timezone.now()
                 GitHubBranch.objects.update_or_create(
                     name=branch['name'],
                     defaults={
@@ -563,34 +555,34 @@ class GitHubMiner:
                         'time_mined': current_timestamp
                     }
                 )
-            print("Branches salvas no banco de dados e no JSON com sucesso.", flush=True)
+            print("Branches successfully saved to database and JSON.", flush=True)
             return branches
         except requests.exceptions.RequestException as e:
-            print(f"Erro ao acessar branches: {e}", flush=True)
+            print(f"Error accessing branches: {e}", flush=True)
             return []
         finally:
             self.verify_token()
 
     def calculate_period_days(self, start_date, end_date):
         """
-        Calcula o número de dias entre duas datas
+        Calculates the number of days between two dates
         
         Args:
-            start_date (str): Data inicial no formato YYYY-MM-DD
-            end_date (str): Data final no formato YYYY-MM-DD
+            start_date (str): Start date in YYYY-MM-DD format
+            end_date (str): End date in YYYY-MM-DD format
             
         Returns:
-            int: Número de dias entre as datas
+            int: Number of days between the dates
         """
         if not start_date or not end_date:
-            return "período completo"
+            return "full period"
             
         start = datetime.strptime(start_date, "%Y-%m-%d")
         end = datetime.strptime(end_date, "%Y-%m-%d")
-        return (end - start).days + 1  # +1 para incluir o próprio dia
+        return (end - start).days + 1
 
     def get_watchers_from_html(self, owner: str, repo: str):
-        """Obtém o número de watchers do repositório através do HTML"""
+        """Fetches the number of watchers from the repository's HTML page"""
         url = f'https://github.com/{owner}/{repo}'
         try:
             response = requests.get(url)
@@ -606,35 +598,31 @@ class GitHubMiner:
                         return int(text.replace(',', ''))
             return 0
         except Exception as e:
-            print(f"[METADATA] Erro ao obter watchers: {e}", flush=True)
+            print(f"[METADATA] Error fetching watchers: {e}", flush=True)
             return 0
 
     def get_used_by_from_html(self, owner: str, repo: str):
-        """Obtém o número de 'Used by' do repositório através da API"""
+        """Fetches the 'Used by' count from the repository API"""
         url = f'https://api.github.com/repos/{owner}/{repo}/network/dependents'
         try:
             response = requests.get(url, headers=self.headers)
             if response.status_code == 200:
-                # A resposta inclui o número total de dependentes no cabeçalho Link
                 if 'Link' in response.headers:
                     link_header = response.headers['Link']
-                    # Procura pelo último número de página na URL
                     if 'page=' in link_header:
                         last_page = int(link_header.split('page=')[-1].split('>')[0])
-                        # Cada página tem 30 itens por padrão
                         return last_page * 30
-                # Se não houver cabeçalho Link, conta os itens na primeira página
                 soup = BeautifulSoup(response.content, 'lxml')
                 dependents = soup.find_all('div', class_='Box-row')
 
                 return len(dependents)
             return 0
         except Exception as e:
-            print(f"[METADATA] Erro ao obter Used by: {e}", flush=True)
+            print(f"[METADATA] Error fetching Used by: {e}", flush=True)
             return 0
 
     def get_releases_count(self, owner: str, repo: str):
-        """Obtém o número de releases do repositório através do HTML"""
+        """Fetches the number of releases from the repository's HTML page"""
         url = f'https://github.com/{owner}/{repo}'
         try:
             response = requests.get(url)
@@ -647,14 +635,14 @@ class GitHubMiner:
                         return int(span_element.text.strip().replace(',', ''))
             return 0
         except Exception as e:
-            print(f"[METADATA] Erro ao obter releases: {e}", flush=True)
+            print(f"[METADATA] Error fetching releases: {e}", flush=True)
             return 0
 
     def get_repository_metadata(self, repo_name: str):
         """
-        Obtém metadados do repositório GitHub
+        Fetches repository metadata from GitHub
         """
-        print(f"\n[METADATA] Iniciando extração de metadados para {repo_name}", flush=True)
+        print(f"\n[METADATA] Starting metadata extraction for {repo_name}", flush=True)
         
         try:
             owner, repo = repo_name.split('/')
@@ -663,38 +651,35 @@ class GitHubMiner:
             
             if response.status_code == 403 and 'rate limit' in response.text.lower():
                 if not self.handle_rate_limit(response, 'core'):
-                    print("[METADATA] Falha ao recuperar após rate limit", flush=True)
+                    print("[METADATA] Failed to recover after rate limit", flush=True)
                     return None
                 response = requests.get(url, headers=self.headers)
             
             if response.status_code != 200:
-                print(f"[METADATA] Erro ao obter metadados: {response.status_code}", flush=True)
+                print(f"[METADATA] Error fetching metadata: {response.status_code}", flush=True)
                 return None
 
             data = response.json()
             
-            # Obter dados adicionais
             languages = self.get_repo_languages(owner, repo)
             readme = self.get_repo_readme(owner, repo)
             contributors_count = self.get_contributors_from_html(owner, repo)
             labels_count = self.get_repo_labels_count(owner, repo)
             
-            # Novos dados
             watchers_count = self.get_watchers_from_html(owner, repo)
             used_by_count = self.get_used_by_from_html(owner, repo)
             releases_count = self.get_releases_count(owner, repo)
             
-            # Criar ou atualizar metadados no banco
-            current_timestamp = timezone.now()  # Alterado para usar timezone.now()
+            current_timestamp = timezone.now()
             metadata, created = GitHubMetadata.objects.update_or_create(
                 repository=repo_name,
                 defaults={
                     'owner': data.get('owner', {}).get('login'),
                     'organization': data.get('organization', {}).get('login') if data.get('organization') else None,
                     'stars_count': data.get('stargazers_count', 0),
-                    'watchers_count': watchers_count,  # Usando o valor obtido do HTML
-                    'used_by_count': used_by_count,    # Novo campo
-                    'releases_count': releases_count,   # Novo campo
+                    'watchers_count': watchers_count,
+                    'used_by_count': used_by_count,
+                    'releases_count': releases_count,
                     'forks_count': data.get('forks_count', 0),
                     'open_issues_count': data.get('open_issues_count', 0),
                     'default_branch': data.get('default_branch'),
@@ -713,12 +698,11 @@ class GitHubMiner:
                 }
             )
             
-            print(f"[METADATA] Metadados {'criados' if created else 'atualizados'} com sucesso", flush=True)
+            print(f"[METADATA] Metadata {'created' if created else 'updated'} successfully", flush=True)
             return metadata
 
         except Exception as e:
-            print(f"[METADATA] Erro durante a extração: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha na extração de metadados: {str(e)}") from e
+            print(f"[METADATA] Error during extraction: {str(e)}", flush=True)
 
     def get_repo_languages(self, owner: str, repo: str):
         url = f'https://api.github.com/repos/{owner}/{repo}/languages'
@@ -739,8 +723,8 @@ class GitHubMiner:
             
     def get_repo_readme(self, owner: str, repo: str):
         """
-        Obtém o conteúdo do README do repositório usando a API do GitHub
-        e decodifica o conteúdo Base64 retornado.
+        Gets the content of the repository's README using the GitHub API
+        and decodes the returned Base64 content.
         """
         url = f'https://api.github.com/repos/{owner}/{repo}/readme'
         headers = {**self.headers, 'Accept': 'application/vnd.github.v3+json'}
@@ -756,14 +740,14 @@ class GitHubMiner:
             if response.status_code == 200:
                 content = response.json()
                 if 'content' in content:
-                    # Decodifica o conteúdo Base64 e converte para string
+                    # Decodes the Base64 content and converts it to a string
                     readme_content = base64.b64decode(content['content']).decode('utf-8')
                     return readme_content
             
             return None
         
         except Exception as e:
-            print(f"[README] Erro ao obter README: {str(e)}", flush=True)
+            print(f"[README] Error getting README: {str(e)}", flush=True)
             return None
 
     def get_contributors_from_html(self, owner: str, repo: str):
@@ -783,7 +767,7 @@ class GitHubMiner:
 
     def get_repo_labels_count(self, owner: str, repo: str):
         """
-        Obtém a contagem total de labels de um repositório, considerando todas as páginas
+        Gets the total count of labels for a repository, considering all pages.
         """
         url = f'https://api.github.com/repos/{owner}/{repo}/labels'
         total_labels = []
@@ -807,23 +791,23 @@ class GitHubMiner:
     def get_pull_requests(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
         all_prs = []
         metrics = APIMetrics()
-        debug_buffer = []  # Buffer para acumular mensagens de debug
+        debug_buffer = []  # Buffer to accumulate debug messages
         
         def log_debug(pr_number, message):
-            """Adiciona mensagem de debug ao buffer"""
+            """Adds a debug message to the buffer"""
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             debug_buffer.append(f"[{timestamp}][PRs][DEBUG][PR #{pr_number}] {message}")
 
         def log_error(pr_number, message, error=None):
-            """Loga erro e imprime imediatamente"""
+            """Logs error and prints immediately"""
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             error_message = f"[{timestamp}][PRs][ERROR][PR #{pr_number}] {message}"
             if error:
-                error_message += f"\nDetalhes: {str(error)}"
+                error_message += f"\nDetails: {str(error)}"
             print(f"\n{error_message}", flush=True)
 
         def flush_debug_logs():
-            """Imprime e limpa o buffer de logs de debug"""
+            """Prints and clears the debug log buffer"""
             if debug_buffer:
                 print("\n=== Debug Logs ===", flush=True)
                 print('\n'.join(debug_buffer), flush=True)
@@ -831,15 +815,15 @@ class GitHubMiner:
                 debug_buffer.clear()
 
         print("\n" + "="*50)
-        print(f"[PRs] 🔍 INICIANDO EXTRAÇÃO DE PULL REQUESTS: {repo_name}")
-        print(f"[PRs] 📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
-        print(f"[PRs] 🔎 Profundidade: {depth.upper()}")
+        print(f"[PRs] 🔍 STARTING PULL REQUEST EXTRACTION: {repo_name}")
+        print(f"[PRs] 📅 Period: {start_date or 'start'} to {end_date or 'current'}")
+        print(f"[PRs] 🔎 Depth: {depth.upper()}")
         print("="*50 + "\n")
 
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
                 print("\n" + "-"*40)
-                print(f"[PRs] 📊 Processando período: {period_start} até {period_end}")
+                print(f"[PRs] 📊 Processing period: {period_start} to {period_end}")
                 print("-"*40)
                 
                 base_url = "https://api.github.com/search/issues"
@@ -860,7 +844,7 @@ class GitHubMiner:
                         'page': page
                     }
 
-                    print(f"[PRs] [Página {page}] Iniciando busca...", flush=True)
+                    print(f"[PRs] [Page {page}] Starting search...", flush=True)
                     print(f"[PRs] Query: {query}", flush=True)
 
                     response = requests.get(base_url, params=params, headers=self.headers)
@@ -868,7 +852,7 @@ class GitHubMiner:
                     
                     if response.status_code == 403 and 'rate limit' in response.text.lower():
                         if not self.handle_rate_limit(response):
-                            print("[PRs] Falha ao recuperar após rate limit", flush=True)
+                            print("[PRs] Failed to recover after rate limit", flush=True)
                             break
                         response = requests.get(base_url, params=params, headers=self.headers)
 
@@ -876,44 +860,44 @@ class GitHubMiner:
                     data = response.json()
 
                     if not data['items']:
-                        print("[PRs] Nenhum PR encontrado nesta página.", flush=True)
+                        print("[PRs] No PRs found on this page.", flush=True)
                         break
 
-                    print(f"[PRs] [Página {page}] Encontrados {len(data['items'])} PRs", flush=True)
+                    print(f"[PRs] [Page {page}] Found {len(data['items'])} PRs", flush=True)
 
                     for pr in data.get('items', []):
-                        current_timestamp = timezone.now()  # Alterado para usar timezone.now()
+                        current_timestamp = timezone.now()  # Changed to use timezone.now()
                         try:
                             pr_number = pr.get('number')
                             if not pr_number:
                                 continue
 
-                            log_debug(pr_number, "Iniciando processamento")
+                            log_debug(pr_number, "Starting processing")
                             
-                            # Buscar detalhes do PR
+                            # Get PR details
                             pr_url = f'https://api.github.com/repos/{repo_name}/pulls/{pr_number}'
                             pr_response = requests.get(pr_url, headers=self.headers)
                             metrics.total_requests += 1
                             
                             if pr_response.status_code == 403 and 'rate limit' in pr_response.text.lower():
                                 if self.handle_rate_limit(pr_response, 'core'):
-                                    # Se um novo token foi encontrado, tenta a requisição novamente
+                                    # If a new token is found, try the request again
                                     pr_response = requests.get(pr_url, headers=self.headers)
                                     if pr_response.status_code != 200:
-                                        print(f"[PRs] Falha ao recuperar PR #{pr_number} mesmo após troca de token", flush=True)
+                                        print(f"[PRs] Failed to recover PR #{pr_number} even after token swap", flush=True)
                                         continue
                                 else:
-                                    print(f"[PRs] Falha ao recuperar PR #{pr_number} após rate limit", flush=True)
+                                    print(f"[PRs] Failed to recover PR #{pr_number} after rate limit", flush=True)
                                     continue
 
                             pr_details = pr_response.json()
                             
                             if not pr_details:
-                                log_error(pr_number, "[PRs] Detalhes do PR vazios")
+                                log_error(pr_number, "[PRs] Empty PR details")
                                 continue
-                            log_debug(pr_number, "[PRs] Detalhes obtidos com sucesso")
+                            log_debug(pr_number, "[PRs] Details successfully obtained")
 
-                            # Dados básicos que sempre serão coletados
+                            # Basic data that will always be collected
                             processed_pr = {
                                 'id': pr_details.get('id'),
                                 'number': pr_details.get('number'),
@@ -927,12 +911,12 @@ class GitHubMiner:
                                 'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
                                 'body': pr_details.get('body'),
                                 'time_mined': current_timestamp,
-                                'tipo': 'pull_request'  # Adiciona o tipo como 'pull_request'
+                                'type': 'pull_request'  # Adds the type as 'pull_request'
                             }
 
-                            # Dados adicionais coletados apenas no modo complexo
+                            # Additional data collected only in complex mode
                             if depth == 'complex':
-                                # Buscar commits
+                                # Get commits
                                 commits_url = f'{pr_url}/commits'
                                 commits_response = requests.get(commits_url, headers=self.headers)
                                 metrics.total_requests += 1
@@ -940,9 +924,9 @@ class GitHubMiner:
                                 commits = []
                                 if commits_response.status_code == 200:
                                     commits = commits_response.json() or []
-                                    log_debug(pr_number, f"[PRs] Commits encontrados: {len(commits)}")
+                                    log_debug(pr_number, f"[PRs] Commits found: {len(commits)}")
 
-                                # Buscar comentários
+                                # Get comments
                                 comments_url = f'{pr_url}/comments'
                                 comments_response = requests.get(comments_url, headers=self.headers)
                                 metrics.total_requests += 1
@@ -952,12 +936,12 @@ class GitHubMiner:
                                     if self.handle_rate_limit(comments_response, 'core'):
                                         comments_response = requests.get(comments_url, headers=self.headers)
                                     else:
-                                        print(f"[PRs] Falha ao recuperar comentários #{pr_number} após rate limit", flush=True)
+                                        print(f"[PRs] Failed to recover comments for PR #{pr_number} after rate limit", flush=True)
                                         continue
                                 
                                 if comments_response.status_code == 200:
                                     comments = comments_response.json() or []
-                                    log_debug(pr_number, f"[PRs] Comentários encontrados: {len(comments)}")
+                                    log_debug(pr_number, f"[PRs] Comments found: {len(comments)}")
 
                                 processed_pr.update({
                                     'commits_data': [
@@ -974,16 +958,16 @@ class GitHubMiner:
                                     ]
                                 })
 
-                            # Dentro do método get_pull_requests
+                            # Inside the get_pull_requests method
                             if depth == 'basic':
-                                # Se for mineração básica, buscar PR existente
+                                # If it's basic mining, check for existing PR
                                 existing_pr = GitHubPullRequest.objects.filter(pr_id=processed_pr['id']).first()
                                 if existing_pr:
-                                    # Preservar dados complexos se existirem
+                                    # Preserve complex data if it exists
                                     processed_pr['commits'] = existing_pr.commits
                                     processed_pr['comments'] = existing_pr.comments
 
-                            # Atualizar ou criar PR
+                            # Update or create PR
                             GitHubIssuePullRequest.objects.update_or_create(
                                 record_id=processed_pr['id'],
                                 defaults={
@@ -1002,19 +986,19 @@ class GitHubMiner:
                                     'body': processed_pr.get('body'),
                                     'is_pull_request': True,
                                     'time_mined': current_timestamp,
-                                    'tipo': 'pull_request'  # Adiciona o tipo como 'pull_request'
+                                    'type': 'pull_request'  # Adds the type as 'pull_request'
                                 }
                             )
 
                             all_prs.append(processed_pr)
-                            log_debug(pr_number, "Processamento e salvamento concluídos com sucesso")
+                            log_debug(pr_number, "Processing and saving completed successfully")
                             flush_debug_logs()
 
                         except Exception as e:
-                            log_error(pr_number, f"Erro ao processar PR", error=e)
+                            log_error(pr_number, f"Error processing PR", error=e)
                             continue
 
-                    print(f"[PRs] Progresso do período atual: {len(all_prs)} PRs coletados em {page} páginas", flush=True)
+                    print(f"[PRs] Progress of current period: {len(all_prs)} PRs collected in {page} pages", flush=True)
                     
                     if len(data['items']) < 100:
                         has_more_pages = False
@@ -1024,17 +1008,18 @@ class GitHubMiner:
                     time.sleep(1)
 
             print("\n" + "="*50)
-            print("[PRs] 💾 Salvando dados em JSON...")
+            print("[PRs] 💾 Saving data to JSON...")
             self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
-            print(f"[PRs] ✨ Extração concluída! Total de PRs coletados: {len(all_prs)}")
+            print(f"[PRs] ✨ Extraction completed! Total PRs collected: {len(all_prs)}")
             print("="*50 + "\n")
             return all_prs
 
         except Exception as e:
-            print(f"[PRs] ❌ Erro durante a extração: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha na extração de PRs: {str(e)}") from e
+            print(f"[PRs] ❌ Error during extraction: {str(e)}", flush=True)
+            raise RuntimeError(f"Failed to extract PRs: {str(e)}") from e
         finally:
             self.verify_token()
+
 
     def get_issues(self, repo_name: str, start_date: str = None, end_date: str = None, depth: str = 'basic'):
         all_issues = []
@@ -1093,7 +1078,7 @@ class GitHubMiner:
 
                         issue_number = issue['number']
                         
-                        # Buscar timeline events
+                        # Buscar eventos da linha do tempo
                         timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
                         headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
                         timeline_response = requests.get(timeline_url, headers=headers)

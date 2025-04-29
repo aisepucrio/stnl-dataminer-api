@@ -11,7 +11,7 @@ class JiraIssueSerializer(serializers.ModelSerializer):
         fields = '__all__'
     
     def get_history_formatted(self, obj):
-        """Formata o histórico para exibição"""
+        """Formats the issue's change history for display."""
         if not obj.history:
             return []
         
@@ -36,7 +36,7 @@ class JiraIssueSerializer(serializers.ModelSerializer):
         return formatted_history
     
     def get_activity_log_formatted(self, obj):
-        """Formata o registro de atividades para exibição similar à interface do Jira"""
+        """Formats the activity log similar to the Jira interface."""
         if not obj.activity_log:
             return []
         
@@ -52,7 +52,7 @@ class JiraIssueSerializer(serializers.ModelSerializer):
                 'type': activity_type,
             }
             
-            # Adicionar informações específicas baseadas no tipo
+            # Add specific fields based on activity type
             if activity_type == 'status_change':
                 formatted_activity.update({
                     'from_status': activity.get('from'),
@@ -78,7 +78,7 @@ class JiraIssueSerializer(serializers.ModelSerializer):
         return formatted_activities
     
     def get_checklist_formatted(self, obj):
-        """Formata o checklist para exibição"""
+        """Formats the checklist for display."""
         if not obj.checklist:
             return []
         

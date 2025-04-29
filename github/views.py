@@ -206,7 +206,6 @@ class GitHubBranchViewSet(viewsets.ViewSet):
             "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
         }, status=status.HTTP_202_ACCEPTED)
 
-# Novas views genéricas para consulta
 @extend_schema(tags=["GitHub"], summary="List all GitHub commits")
 class CommitListView(generics.ListAPIView):
     queryset = GitHubCommit.objects.all()
@@ -295,7 +294,7 @@ class GitHubMetadataViewSet(viewsets.ViewSet):
 
         task = fetch_metadata.apply_async(args=[repo_name])
         
-        # Salva a task no banco de dados
+        # Save tasks
         Task.objects.create(
             task_id=task.id,
             operation='fetch_metadata',

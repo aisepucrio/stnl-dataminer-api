@@ -2,11 +2,11 @@ from django_filters import rest_framework as filters
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubIssuePullRequest
 
 class GitHubCommitFilter(filters.FilterSet):
-    # Filtros para datas
+    # Filters for dates
     created_after = filters.DateTimeFilter(field_name='date', lookup_expr='gte')
     created_before = filters.DateTimeFilter(field_name='date', lookup_expr='lte')
     
-    # Filtros de texto
+    # Text filters
     message = filters.CharFilter(lookup_expr='icontains')
     author_name = filters.CharFilter(field_name='author__name', lookup_expr='icontains')
     repository = filters.CharFilter(lookup_expr='iexact')
@@ -16,13 +16,13 @@ class GitHubCommitFilter(filters.FilterSet):
         fields = ['sha', 'repository']
 
 class GitHubIssueFilter(filters.FilterSet):
-    # Filtros para datas
+    # Filters for dates
     created_after = filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
     created_before = filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')
     updated_after = filters.DateTimeFilter(field_name='updated_at', lookup_expr='gte')
     updated_before = filters.DateTimeFilter(field_name='updated_at', lookup_expr='lte')
     
-    # Filtros de texto
+    # Text filters
     title = filters.CharFilter(lookup_expr='icontains')
     creator = filters.CharFilter(lookup_expr='icontains')
     repository = filters.CharFilter(lookup_expr='iexact')
@@ -39,13 +39,13 @@ class GitHubIssueFilter(filters.FilterSet):
         fields = ['issue_id', 'state', 'repository']
 
 class GitHubPullRequestFilter(filters.FilterSet):
-    # Filtros para datas
+    # Filters for dates
     created_after = filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
     created_before = filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')
     updated_after = filters.DateTimeFilter(field_name='updated_at', lookup_expr='gte')
     updated_before = filters.DateTimeFilter(field_name='updated_at', lookup_expr='lte')
     
-    # Filtros de texto
+    # Text filters
     title = filters.CharFilter(lookup_expr='icontains')
     creator = filters.CharFilter(lookup_expr='icontains')
     repository = filters.CharFilter(lookup_expr='iexact')
@@ -53,7 +53,7 @@ class GitHubPullRequestFilter(filters.FilterSet):
     repository_in = filters.CharFilter(method='filter_repository_in')
     state = filters.CharFilter(lookup_expr='iexact')
     
-    # Filtro para labels (campo JSON)
+    # Filter for labels (JSON field)
     has_label = filters.CharFilter(method='filter_has_label')
     
     def filter_repository_in(self, queryset, name, value):
@@ -86,11 +86,13 @@ class GitHubBranchFilter(filters.FilterSet):
         }
 
 class GitHubIssuePullRequestFilter(filters.FilterSet):
+    # Filters for dates
     created_after = filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
     created_before = filters.DateTimeFilter(field_name='created_at', lookup_expr='lte')
     updated_after = filters.DateTimeFilter(field_name='updated_at', lookup_expr='gte')
     updated_before = filters.DateTimeFilter(field_name='updated_at', lookup_expr='lte')
     
+    # Text filters
     title = filters.CharFilter(lookup_expr='icontains')
     creator = filters.CharFilter(lookup_expr='icontains')
     repository = filters.CharFilter(lookup_expr='iexact')
@@ -99,7 +101,7 @@ class GitHubIssuePullRequestFilter(filters.FilterSet):
     state = filters.CharFilter(lookup_expr='iexact')
     tipo = filters.CharFilter(lookup_expr='iexact')
     
-    # Filtro para labels (campo JSON)
+    # Filter for labels (JSON field)
     has_label = filters.CharFilter(method='filter_has_label')
     
     def filter_repository_in(self, queryset, name, value):
