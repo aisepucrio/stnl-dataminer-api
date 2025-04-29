@@ -1,0 +1,371 @@
+type,requirement
+security,The system should meet all regulatory compliance standards.
+security,System must protect user data with encryption.
+performance,The system should process at least 100 requests per second.
+maintainability,all repositories should be configured according to best practices
+security,Ensure data at rest and in transit is encrypted
+documentation,"including templates for README, documentação, estrutura de pastas, arquivos de configuração, licenças and other documentos essenciais"
+security,The system should protect user data and prevent unauthorized access.
+maintenance,The repository should ensure consistency across projects
+maintainability,including the documentação essencial for new members
+documentation,Link do repositório deve ser fornecido
+performance,identify endpoints quickly for efficient data retrieval
+documentation,"Documentar o processo de mineração de dados, requisitos da API e critérios para referência futura."
+security,Ensure data encryption at rest and in transit.
+usability,Add a stop button for code execution to prevent users from waiting for all commits/issues/pull requests/branches.
+maintenance,Dedicated to maintaining and updating the repository
+performance,"The system must handle at least 10,000 requests per minute"
+performance,The system should handle at least 5000 requests per minute.
+documentation,Documentar o processo de mineração de dados e critérios para referência futura.
+security,The application should ensure data protection.
+security,The system should have robust security measures
+performance,Maximize performance by optimizing resource usage
+functional,Linkar o nome das funcionalidades/features do dataset de configurações do Linux com os artefatos do repositório do Linux no GitHub.
+operational,Explorar como fazer o link entre o dataset de features do Linux e a documentação oficial.
+performance,to perform random sampling efficiently
+performance,system should respond to user inputs within two seconds
+security,ensure secure transmission of data
+security,All links should be secure and access-controlled
+usability,The tool should automate machine learning tasks without requiring user expertise.
+performance,"The system should process up to 10,000 requests per second."
+security,The system should protect sensitive user data by implementing encryption.
+security,Passwords must be encrypted and never stored in plaintext.
+performance,The system should process at least 100 requests per second
+performance,predict variant properties accurately
+performance,garantir performance
+usability,The system should have an intuitive user interface.
+performance,Mojo is extremely efficient in relation to mathematical calculations
+security,The system must comply with all relevant security standards and regulations.
+learning,Pesquisar e aprender sobre Redes Neurais.
+maintenance,focusing also on the pré-processamento
+usability,The library scipy.stats offers a variety of statistical tools that can be useful for analyzing a dataset.
+performance,maintain high performance under heavy load
+performance,"The system should process at least 10,000 requests per second."
+security,Data encryption is mandatory for all data transfers
+performance,Utilizar GPU em operações com arrays para aumentar desempenho.
+performance,The notebook has a time of conclusion of approximately 2h: 30min
+performance,Increase velocity and efficiency of execution
+security,Configurar ferramentas de análise estática de segurança (como o Dependabot) para verificar automaticamente vulnerabilidades em dependências de código e recomendar atualizações.
+maintainability,to facilitate manutenção and evolução dos softwares produzidos no projeto
+performance,The system should support at least 100 concurrent users.
+maintainability,Facilitate further optimizations and re-usability policies
+performance,To ensure efficient operation without interruptions due to request limitations.
+security,Token rotation upon reaching request limit.
+maintainability,all pull requests must pass through code review before being merged
+security,Ensure all user passwords are hashed and salted.
+performance,evitar o bloqueio de requisições pela API do GitHub devido ao limite de taxa de requisições
+performance,improve its performance
+performance,comparar o desempenho com o modelo atual
+maintainability,The code should not use object orientation
+maintainability,ensure all data operations are structured and integrated
+performance,The system should handle at least 100 concurrent users.
+security,Protect datasets using different anonimization libraries.
+performance,Improve window selection for fields
+performance,The system should complete tasks within 5 seconds.
+security,The system should implement encryption for data at rest and in transit.
+security,All user input must be validated to prevent SQL injection.
+security,suggestion to improve security
+performance,"The system should handle at least 10,000 concurrent users."
+performance,The library should provide fast and efficient traversal of Git repositories.
+performance,The system should have high availability with minimal downtime.
+learning,Wants to learn Jira independently
+security,The system must be resistant to unauthorized access
+usability,Prevent duplication of task selection frame when selecting new fields for task mining
+security,Ensure that all data is encrypted both at rest and in transit
+maintenance,ir regularmente manualmente se essa separacao esta boa
+maintainability,The system should have an easy-to-use admin interface.
+process,Remover os campos que estão sendo menos usados nessa etapa do projeto.
+performance,Improve search performance by reducing time taken to retrieve results.
+performance,improve efficiency
+performance,The system should have low latency and high throughput.
+performance,The system should process requests within 5 milliseconds.
+security,The system should be resistant to unauthorized access.
+security,Ensure data encryption for secure transmission.
+operational,configure a calendar for a bot to remind and notify about birthdays
+usability,The form should be easy to fill out
+maintainability,guarantee that all information is correct and updated
+performance,The system should process at least 100 transactions per second.
+maintainability,notebooks need to have minor changes made for easier maintenance
+maintainability,Exist many notebooks that need to be removed and others that require small changes to make them more manageable.
+performance,The system should have fast response times to user inputs.
+performance,The system should maintain responsiveness during peak load
+process,Alterar regras para mandar e-mail para revisor ao invés de reporter
+learning,understand detaillately the structure and functioning of .git directory
+security,ensure data integrity and confidentiality
+usability,"Allow Estimativa Original to accept decimal hours (e.g., 1.5) instead of only hour and minute inputs."
+performance,The system should respond to user inputs within one second.
+security,All communications must be encrypted
+performance,The system should be able to handle at least 1000 concurrent users
+maintainability,Limit the quantity of models saved to top15
+maintainability,The system should have modular code that allows easy updates and maintenance.
+maintainability,Code should be legible and well-structured for future updates
+performance,to automate processes to improve efficiency
+security,Ensure user authentication for accessing resources.
+functional,Testanto algumas APIS para buscar artigos que citam o artigo original
+process,The meeting lasted approximately 2 hours.
+security,All data at rest and in transit must be encrypted.
+security,System must comply with all data protection regulations
+performance,validate scalability with more complex projects
+performance,Garantir que a solução seja escalável e possa lidar com repositórios de diferentes tamanhos.
+maintenance,Integrar os arquivos view_jira.py e view_gh.py em um único arquivo view.py
+maintainability,Integrar os arquivos controller_jira.py e controller_gh.py em um único arquivo controller.py.
+security,User authentication is required for access
+maintainability,unify all selected articles in one location for the next stage of literature review
+maintainability,Integrar os arquivos view_jira.py e view_gh.py em um único arquivo view.py
+security,Ensure user data is encrypted at rest.
+performance,The system shall respond to user inputs within 2 seconds.
+security,The system should implement encryption to protect user data.
+performance,The system should process transactions within 5 milliseconds
+performance,Integrar os arquivos api_jira.py e api_gh.py em um único arquivo api.py.
+maintenance,Integrar os arquivos controller_jira.py e controller_gh.py em um único arquivo controller.py.
+usability,Criação de um menu inicial para o framework contendo a opção do Jira e do GitHub para selecionar
+maintainability,must be capable of reading a set of files in a directory
+security,Ensure secure communication with encrypted data transfer.
+functional,Minerar dados dos repositórios estruturados encontrados.
+security,Ensure data encryption both at rest and in transit.
+maintenance,Integrar os arquivos api_jira.py e api_gh.py em um único arquivo api.py.
+performance,The system should respond to user requests within 3 seconds.
+performance,The system should process at least 1000 transactions per second.
+performance,the system should respond within 2 seconds for 95% of transactions
+maintainability,Aprimorar o código de busca de features para capturar pequenas variações na escrita de cada uma
+performance,capturar pequenas variações na escrita de cada uma
+maintainability,GitHub well-structured to accommodate and standardize all users
+usability,The interface should be designed using Figma to minimize changes later.
+security,Ensure data privacy by encrypting sensitive information
+usability,Centralizar as views das plataformas Jira e GitHub ao serem abertas para garantir uma experiência de usuário mais harmoniosa
+performance,The system should handle at least 1000 requests per second.
+performance,The system should respond within 3 seconds for 95% of requests.
+performance,high performance
+security,All user passwords must be stored as secure hashes.
+performance,The system should respond to user inputs within 3 seconds.
+performance,The system should respond to user inputs within 2 seconds.
+performance,garantir maior eficiência e estabilidade
+maintainability,obter os labels das pull requests através das requisições
+usability,The close button of the interface should immediately shut down the framework upon being clicked
+maintainability,Verificar possíveis conflitos causados pelo comando git pull
+maintainability,The framework should allow immediate reading of updated keys from .env file without requiring a restart
+security,Implement role-based access control to restrict user actions based on their roles.
+maintainability,Improve the way GitHub tokens are validated to avoid reading problems
+maintainability,Obter correlação entre commits e pull requests através de labels
+security,Adicionar pop-up de erro caso o token do GitHub seja inválido
+usability,Adicionar pop-up de sucesso ao final da mineração
+performance,The system should handle at least 100 requests per second
+security,Ensure all data is encrypted both at rest and in transit.
+security,The system shall prevent unauthorized access by implementing role-based access control.
+security,Implement role-based access control
+security,Ensure user authentication and authorization to restrict access to authorized users only.
+maintainability,Developed as libraries separated
+performance,"The system should process at least 10,000 requests per second."
+security,User authentication should be implemented.
+security,The system should ensure that user authentication is performed securely
+security,The API should implement authentication and authorization mechanisms to ensure secure access.
+usability,corrigir os erros no funcionamento do botão de Stop da interface do Jira
+security,All user data must be encrypted at rest and in transit.
+performance,Finalizar script para conseguir pegar todos os citados por do Google Acadêmico.
+usability,Allow users to choose whether to use a database via a checkbox
+maintainability,The application needs to be refactored.
+maintainability,Corrigir o problema na atualização das variáveis de ambiente após alteração nas settings do minerador
+performance,The system must respond within two seconds for at least 95% of requests.
+security,Otimização e aprimoramento do método utilizado para verificar a autenticidade e validade dos tokens de acesso da API do GitHub
+usability,The 'Browse' button should open with the current directory as its initial path
+security,validar os API tokens do Jira utilizando regex
+performance,The system should process at least 1000 transactions per second.
+maintainability,É necessário salvar os dados de abstract para os usuários conseguirem confirmar que o paper faz ou não sentido de ser adicionado a revisão.
+performance,It is important that we decide on a database and its structure to help with performance and portability issues.
+usability,The product should be easy to use for non-expert users.
+performance,The system should process at least 1000 transactions per second.
+security,The system shall ensure data confidentiality.
+maintainability,The script should recognize spaces between features and return the regex
+performance,The system should handle at least 100 requests per second.
+performance,Utilize half of the available threads by default
+security,Ensure user authentication and authorization
+performance,The system should handle at least 100 simultaneous users.
+functional,Adicionar função de commits e pull requests no minerador de features usando o Pydriller separadamente
+learning,to learn about mining repositories
+security,Ensure that data mining practices comply with GitHub's terms of service and respect users' privacy.
+maintainability,The system should be configurable
+learning,Estudar e explorar Django para fazer a API
+maintainability,Isso pode ser mudado de acordo com a evolução do front end.
+security,All user passwords should be hashed using bcrypt
+learning,understand how docker works
+maintainability,The API should be modularized using container structure for easy integration into other projects.
+learning,Estudar a estrutura de containers
+performance,The system must handle at least 100 concurrent users.
+security,Ensure user authentication and authorization to prevent unauthorized access.
+performance,"The system should handle at least 10,000 requests per second."
+performance,The system should process at least 100 requests per second.
+performance,PANDORA should ensure continuous mining and real-time processing.
+performance,Scalable solution to handle large amounts of data
+security,Ensure user authentication for access
+process,Reavaliar os outros 50% dos commits não coincidentes pelo João
+performance,The system should handle at least 100 requests per second.
+security,The system must prevent unauthorized access to user data.
+security,The API must authenticate requests using JWT tokens
+security,The system must comply with all relevant security regulations.
+performance,"The system should handle at least 10,000 requests per second."
+maintainability,initiate configurations
+security,Access control measures should be implemented to prevent unauthorized access.
+maintenance,"Limpar dados da tabela de commits e tags para ter apenas tags úteis e informativas, como ‘bug’, ‘ux’, ‘security’, etc…"
+performance,The system should process requests within 1 second.
+operational,the project AutoSLR will also utilize Docker
+security,Ensure data confidentiality and integrity
+maintainability,garantindo clareza sobre como os dados são armazenados e organizados
+performance,increase efficiency of the search mechanism
+operational,adjust settings of Django
+maintainability,reduce code complexity by using Lightning
+maintainability,padronizar e permitir polimorfismo dentro do código para evitar repetição de código
+performance,The system should handle at least 1000 requests per second.
+operational,Tarefa deve ser realizada após as melhorias do dockerfile e antes de colocar a imagem finalizada no dockerhub para os membros darem pull.
+security,Criar variáveis de ambiente no docker para melhorar segurança
+security,Ensure that user data is encrypted to protect privacy.
+security,The system must ensure data privacy and integrity.
+maintainability,automatize a mineração de features em repositórios do GitHub
+performance,to refine the choice and schema of the database to prevent performance issues
+maintainability,Improve development
+maintainability,The API should be used in other projects of research
+usability,facilitate the use of an application
+performance,The system should process user requests within a maximum of 500ms
+security,All data should be encrypted both at rest and in transit
+usability,Make it easy for users to access and use the API
+performance,Identify the difference of space and performance in accessing information
+functional,"develop all requirements for collection, consultation and deletion of issuetypes"
+learning,realizar um estudo sobre Docker
+security,Ensure that the system is secure and protects against unauthorized access.
+maintenance,merge all branches with Docker after improvements to dockerfile
+performance,Tarefas devem ser enfileiradas e processadas conforme esperado
+operational,The script should be able to access the API of GitHub from within the Docker container.
+security,Implement secure authentication and authorization mechanisms.
+maintainability,The project structure should facilitate future development.
+maintainability,Reorganize code into multiple files/módulos for better manageability
+maintainability,Avoid hardcoding config variables to minimize places needing modification during changes.
+documentation,Currently scattered across Jira and a GitHub issue; needs to be consolidated into one repository file.
+performance,implement download of articles and obtain metadata for RAG
+performance,The system should have the capability to handle at least 100 concurrent users
+learning,Eu Quero estudar e implementar o RAG
+security,The system should have secure login functionality.
+maintainability,"Remove strings like 'Signed-off-by', 'Co-authored-by', 'cherry picked from commit' that do not contribute to analysis."
+performance,The system should handle at least 100 requests per second.
+security,All data should be encrypted both at rest and in transit.
+maintainability,It should be possible to execute tests using 'python manage.py test'.
+security,Ensure all data is encrypted at rest and in transit
+functional,Identify Explicit Non-Functional Requirements
+performance,The application should respond to user inputs within 2 seconds
+performance,The system should respond within 3 seconds for 95% of requests.
+maintainability,Memory should be properly allocated and deallocated within loops to prevent memory leaks.
+security,Ensure data encryption for all data at rest and in transit
+performance,minimized overhead on feature extraction
+performance,Tasks executed by celery should be saved in the database.
+security,The system must ensure data integrity and confidentiality.
+security,The system must ensure data privacy and prevent unauthorized access.
+maintainability,Dockerfile or docker-compose.yaml must be adjusted to install and include Rust library for API functionality
+maintainability,The Django should execute tests automatically.
+security,To ensure that information remains confidential and is not exposed within code
+maintainability,Easy to understand and maintain
+usability,The system should provide an intuitive and user-friendly interface.
+performance,melhorar o balanceamento entre os requisitos e a qualidade da classificação
+maintainability,Explorar o treshold Testar a remoção de tags bem definidas que aparecerem em algum outro requisito
+security,ensure user data is encrypted at rest
+performance,Testar o uso de proximidade com outros requisitos em caso de sucesso com a Performance
+performance,Para que essa API possa ser usada em outros projetos de pesquisa
+performance,The system must provide high performance with low latency.
+maintainability,The script iterates through folders to filter and collect documentation files (.rst) for pre-processing.
+performance,optimizing the model using techniques like batch processing and adjusting epochs
+documentation,All files and steps of the project process can be downloaded from the provided link
+performance,Ranking of features based on proximity to performance-related words
+performance,reduce Loss
+security,All data should be encrypted at rest and in transit
+documentation,To document and disseminar its potential use in projects of research.
+performance,The system should process at least 100 requests per second.
+performance,the system should support at least 100 concurrent users
+maintainability,Move queue verification to Django's tests.py file for centralized testing.
+maintainability,All data obtained by mining should be saved
+security,The system should comply with all relevant security standards and regulations.
+security,Ensure system is hacker-proof
+security,Ensure all data transmissions are encrypted
+maintainability,Avoid conflicts with existing records when saving mined data
+performance,The system should process requests within 100 ms
+security,The system must comply with data protection regulations
+security,All user passwords must be hashed and salted.
+performance,The system should respond to user inputs within 3 seconds
+security,System should maintain user data confidentiality
+security,Ensure user data is encrypted both at rest and in transit.
+performance,The system shall process each feature within a maximum of 30 seconds.
+performance,diminuir o tempo para processar todas as features para pelo menos um quarto do tempo atual
+security,The system should support multi-factor authentication for enhanced security.
+performance,"Features are divided into three categories based on their relation to performance: highly related, somewhat related, and not related."
+security,Ensure all data is encrypted at rest and in transit.
+maintainability,Corrigir o problema de acesso ao banco de dados pelo pgAdmin
+performance,issues are being saved in the database
+maintenance,"Foi criado, mas será necessário atualizar."
+performance,Identify NFRs explicitly mentioned in the description.
+performance,The system should respond within 3 seconds for 95% of requests.
+security,User authentication must ensure that only authorized users can access the system.
+maintenance,Atualizar script para exportar os metadados de todos os artigos selecionados.
+performance,comparing with results obtained in deep learning tests
+performance,Separar as features em conjuntos relacionados à performance.
+security,The system must have strong user authentication
+performance,The system should process at least 100 transactions per second.
+performance,The system should respond to user input within 3 seconds
+performance,The system should respond within 3 seconds for 99% of requests.
+security,The system shall implement authentication measures to ensure only authorized users can access it.
+security,Ensure user authentication before accessing personal data.
+performance,The system should have high throughput and low latency.
+performance,The system should respond to user inputs within 3 seconds.
+performance,"The system should handle at least 10,000 requests per minute."
+performance,the system should respond within two seconds for 95% of requests
+performance,The system should provide high availability with less than 5 minutes of downtime per month.
+security,User authentication should be implemented
+maintainability,update for use in new studies
+security,The system must ensure user authentication for all transactions.
+performance,The system should handle at least 1000 requests per second.
+performance,"The system should handle at least 10,000 requests per second."
+security,All data must be encrypted
+process,Copiar todas as revisões do sistema em um documento compartilhado na pasta do Stone Lab até terça.
+operational,Kali Linux should be virtualized for pentests
+security,Ensure data encryption both at rest and in transit.
+maintainability,create documents that consolidate feedbacks
+performance,The system should respond within 2 seconds for user inputs.
+maintenance,Otimização do notebook para utilização do garbage collector
+functional,Subir o código do Word2Vec no repo de DL4SPL2
+performance,The system should handle at least 100 requests per second.
+security,System shall comply with ISO 27001 standards
+performance,The API should respond to requests within 50ms
+usability,The system should have an intuitive user interface
+performance,avoid 'ping-pong of tokens' to minimize latency and prevent request failures
+security,Ensure encryption of sensitive data
+performance,The system should have response times of less than 3 seconds for 95% of requests.
+performance,Increase efficiency
+security,The system must comply with data protection regulations
+usability,User-friendly interface
+performance,mineração de Issues e Pull Requests (PRs) na API atualmente é lenta
+maintainability,garantindo que o texto completo das Issues e PRs seja armazenado junto aos demais dados
+performance,The system should handle at least 5000 requests per second
+security,Substitute expired credentials correctly to ensure continued API access
+security,Each instância must receive a unique token that is valid for its corresponding execution.
+performance,garantindo que os dados retornados sejam limitados de acordo com os critérios definidos
+performance,The system should respond to user inputs within 3 seconds
+security,The system must comply with all applicable security regulations
+security,The system must comply with all relevant security standards and regulations.
+performance,The system should handle at least 100 concurrent users without noticeable performance degradation.
+maintainability,implement betteries and modifications
+usability,user can continue marking questions until they are all answered correctly without being limited by score
+security,The system should have an authentication mechanism to ensure only authorized users can access it.
+maintainability,falar com Johnny sobre AtlasDB
+security,padronizar a comunicação com a API e melhorar a segurança no envio de dados
+maintainability,Add information about database connection issues and solutions (relinking and IP adjustment) in the README.
+security,Ensure data encryption at rest
+performance,Implementar responsividade
+security,garantir que o acesso à API permaneça seguro e funcional
+performance,The system should process requests within milliseconds.
+performance,The system should respond to user inputs within 2 seconds.
+performance,Minimize CPU usage
+security,All data at rest and in transit must be encrypted.
+performance,"The system should handle at least 10,000 users concurrently without significant degradation."
+performance,the API should return results in less than 30 milliseconds
+performance,The system should process 10 million transactions per second
+security,Ensure classified information is properly handled and protected
+documentation,"Revisar e atualizar a documentação do código da API para garantir clareza, consistência e acessibilidade"
+performance,Develop front-end of data miner
+performance,The system shall process transactions within 5 milliseconds.
+performance,develop CLI with high performance for data mining
+performance,"Adicionar filtros por hash e tag no processo de coleta de dados da API do GitHub, permitindo uma recuperação mais precisa e eficiente das informações."

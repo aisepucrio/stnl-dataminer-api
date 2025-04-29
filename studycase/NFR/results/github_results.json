@@ -1,0 +1,683 @@
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Exclude Byte-compiled / optimized / DLL files to improve code readability and maintainability\"\n}"}
+{"response": "{\"requirement\": \"pre-commit hooks are used for code linting and formatting\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"The system should have an intuitive and user-friendly interface\"}\n \t"}
+{"response": "{\"requirement\": \"The project must follow a consistent and easy-to-use structure to ensure maintainability.\", \"type\": \"maintainability\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The system should have encrypted data storage\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The system should handle at least 100 simultaneous users\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure all functionalities meet specified requirements\" }"}
+{"response": "{}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Delete docs/project_documentation.md\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"All endpoints are documented using DRF Spectacular.\"}"}
+{"response": "{\"requirement\": \"Add new API base\", \"type\": \"correctness\"}"}
+{"response": "{ \"type\": \"documentation\", \"requirement\": \"The provided description includes documentation for an ASGI configuration for a Django project.\" }"}
+{"response": "{\"requirements\":[{\"type\":\"security\",\"requirement\":\"keep the secret key used in production secret!\"},{\"type\":\"correctness\",\"requirement\":\"Password validation\"}]}\n\n   "}
+{"response": "{ \"requirement\": \"The API base URL is documented for use within the project\", \"type\": \"documentation\" }"}
+{"response": "{\n\"requirement\": \"Expose the WSGI callable as a module-level variable named 'application'.\",\n\"type\": \"correctness\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The script includes comments explaining its purpose and functionality.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The new API base should accurately process and provide data\"}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements found\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The mining result should accurately reflect the data mined from the repository.\"\n}"}
+{"response": "{}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure functionality of new API base.\" }"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Update project structure so that manage.py is at the root of the repository\"}"}
+{"response": "{\"requirement\": \"Commit message should clearly describe the purpose of the update to help with future maintenance.\", \"type\": \"documentation\"}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Update folder structure to keep manage.py at root of repository\" }"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Structure project so that manage.py is located at the root of the repository\"}"}
+{"response": "{\"requirement\":\"Restructure project files so that manage.py is located in the root of the repository\",\"type\":\"maintainability\"}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Reestructure the project to place manage.py at the root of the repository for better maintainability\" }"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements identified\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Ensure that manage.py is located at the root of the repository\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Structure code to keep manage.py at the root of the repository\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Reestruturei as pastas para que o manage.py fique na raiz do reposit\u00f3rio\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Structure the project so that manage.py is at the root of the repository\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that data retrieval from GitHub API is successful to return valid JSON data.\"}"}
+{"response": "{\"requirement\": \"Using sqlite3 instead of PostgreSQL for simplicity and maintainability.\", \"type\": \"maintainability\"}"}
+{"response": "{}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Adding initial GitHub information\"}"}
+{"response": "{\"requirement\": \"Adding initial GitHub information\", \"type\": \"documentation\"}"}
+{"response": "{}"}
+{"response": "{ \"requirement\": \"The system must maintain data consistency across branches and commits.\", \"type\": \"correctness\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The system should accurately mine and store data from GitHub repositories based on configured switches\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure all GitHub entities (Commit, Issue, PullRequest, Branch) are serialized correctly.\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Adding initial information about GitHub\"}\n\n   "}
+{"response": "{ \"type\": \"none\", \"requirement\": \"This commit message does not explicitly mention any non-functional requirements.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Improving function to save json locally\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Improving the function to save the json locally without errors.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Improve functionality to save json locally\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The commit message should clearly describe the change made and include relevant JIRA ticket numbers.\"}"}
+{"response": "{\"requirement\": \"Improving the function of saving the json locally\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Improve saving json locally functionality and add commit retrieval feature\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that the commit function saves the json locally correctly.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure commits are saved correctly and retrieved accurately\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The function to save json locally should work correctly without errors.\"}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Code should be easy to understand and modify.\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The function to retrieve commits should return correct data for given parameters.\"\n}"}
+{"response": "{}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure all functionalities are implemented correctly according to their requirements\"}"}
+{"response": "{\"requirement\": \"Create an admin interface for models\", \"type\": \"none\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The application should ensure data consistency and accuracy.\"\n}"}
+{"response": "{\n\"type\": \"usability\",\n\"requirement\": \"Creation of features to improve user experience\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure all tests pass\"}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements identified.\"}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements were mentioned.\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Updating gitignore to exclude specific files and directories.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The database connection settings should work correctly.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure commit messages follow JIRA format\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Extract only explicitly stated NFRs\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that the commit message accurately describes the change made.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The application should ensure the integrity of data and handle exceptions appropriately\"}"}
+{"response": "{\"requirement\": \"Create Django models\", \"type\": \"maintainability\"}"}
+{"response": "{\"requirement\": \"Create views for the Django application\", \"type\": \"usability\"}\n"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The 'finished_at' field should store the date and time when the mining process is completed.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Optimize for fast loading times\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The API documentation should clearly describe the functionality and usage of each endpoint.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure the code runs without errors\"\n}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"The provided description contains no explicitly mentioned non-functional requirements.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure Rust code executes successfully without errors.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Diff should return exact changes\"}"}
+{"response": "{\"requirement\":\"Create an admin interface for Jira app\",\"type\":\"usability\"}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The Django App 'jira' should have default_auto_field set to 'django.db.models.BigAutoField'\" }"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The commit message includes an explanation of what was changed (feat: Cria\u00e7\u00e3o do App Jira)\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure all tasks are correctly implemented\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Documentation has been updated\"}"}
+{"response": "{\n\"type\": \"maintainability\",\n\"requirement\": \"Refactoring improves code readability and maintainability\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The commit message describes the change made and includes relevant JIRA tickets.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensures tasks from Django apps are discovered and loaded automatically\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Use Celery for asynchronous task execution to improve performance\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that no exceptions are thrown during repository access.\"\n}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"The system should process data within 1 second.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure commits, issues, pull requests, and branches are fetched correctly\"}"}
+{"response": "{\"requirement\": \"Consertando o problema do servidor do Redis n\u00e3o iniciar\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fix the issue causing the Redis server not to start.\"}"}
+{"response": "{\"requirement\": \"Fix issue causing Redis server to fail to start\", \"type\": \"correctness\"}"}
+{"response": "{\"requirement\": \"Fix the issue where Redis server does not start.\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that all commits are correctly fetched from GitHub\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure the server of Redis initiates correctly without errors\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Fix issues related to tasks discovery\"\n}"}
+{"response": "{\"requirement\":\"Add 'jobs' to the list of installed apps for better maintainability\",\"type\":\"maintainability\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Storing Jira API tokens securely\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure newly created views function as expected for mining new issues and querying existing ones.\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Collect issues asynchronously to improve system performance\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The Django project's settings.py file should be updated to include 'jira' and 'features' apps for better maintainability.\"\n}"}
+{"response": "{\"requirement\": \"The serializer should handle all fields of the JiraIssue model\", \"type\": \"correctness\"}"}
+{"response": "{\n\"requirement\": \"Fetch issue types from Jira and save them in the database\",\n\"type\": \"none\"\n}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The issue detail view should display the correct issue information.\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"The provided code snippet does not explicitly mention any non-functional requirements.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Fetch only up to 1000 issues at a time\"\n}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Authentication required for API calls with jira_email and jira_api_token\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The Dockerfile defines how to create and maintain the application's image.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The Dockerfile ensures that the application runs as intended by using an official Python image and copying necessary files.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The code runs correctly within its Docker container\"}"}
+{"response": "{\"requirements\":[{\"type\":\"security\",\"requirement\":\"KEEP THE SECRET KEY USED IN PRODUCTION SECRET\"},{\"type\":\"usability\",\"requirement\":\"DEBUG MODE IS ENABLED FOR DEVELOPMENT\"}]}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Keep the secret key used in production secret!\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Environment variables for database credentials are exposed but should be hidden or encrypted.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Environment variables for PostgreSQL credentials are set.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The PostgreSQL image has its password explicitly set to '#St@n3L@b2@24!'\"\n}"}
+{"response": "{\"requirement\": \"The Django application should be able to run on a Docker container.\", \"type\": \"correctness\"}\n"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The Dockerfile should ensure that the containers are built using trusted base images and that all necessary security updates are applied.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Volumes are used to maintain data persistently beyond container lifecycle.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The container should run the Django application using 'python manage.py runserver'\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Password should be strong and comply with security standards\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The Django app should be able to run successfully and serve requests at its specified port within the Docker container.\"\n}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"Add Docker support\"}"}
+{"response": "{\"requirement\":\"Use an official Python image as base\", \"type\":\"none\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The Dockerfile should contain comments explaining its purpose and steps\"\n}"}
+{"response": "{\"requirement\": \"Usar uma imagem oficial do Python como imagem base\", \"type\": \"correctness\"}\n\n    "}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The Dockerfile contains comments explaining its purpose and steps.\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The Dockerfile provides comments explaining its purpose and steps\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The Dockerfile includes comments explaining each step of the process.\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Dockerfile and Docker-compose.yaml have comments explaining their purpose.\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"# DOCKERFILE: Script que define como criar a IMAGEM de um docker\\n# DOCKER-COMPOSE.yaml: Arq. de config. que define, gerencia e orquestra multiplos CONTAINERS (inst\u00e2ncias de imagens).\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The Dockerfile is documented with comments explaining its purpose and steps.\"}"}
+{"response": "{\n\"requirement\": \"The web container should expose its internal port 7000 and map it to host's port 7000 for external access.\",\n\"type\": \"usability\"\n}"}
+{"response": "{\"requirement\": \"The database container should persist its data even if the container is deleted\", \"type\": \"maintainability\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Password for POSTGRES_USER contains special characters and uppercase letters\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Volumes are used for data persistence beyond container lifecycle.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Asynchronous task execution for improved performance\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The application should respond to requests within an acceptable time frame.\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The system should facilitate easy updates and modifications without disrupting existing functionality.\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The system should have minimal dependencies to ensure easy updates and maintenance.\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure all commits have meaningful messages\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure correctness of mathematical operations\"}"}
+{"response": "{\"requirement\": \"All comments should have descriptive and meaningful content.\", \"type\": \"documentation\"}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The system must provide accurate results.\" }"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The Dockerfile should clearly document the purpose and steps for creating the Docker image.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The webapp container depends on the db container to ensure correctness.\"}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"Extract only the explicitly stated non-functional requirements.\"\n}"}
+{"response": "{\"requirement\": \"add comments\", \"type\": \"documentation\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The Dockerfile ensures that all dependencies are correctly installed using pip.\"}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Expose port 7000 to listen for incoming requests\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Dockerfile and docker-compose.yaml files are provided for container creation and management.\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Instale o Redis para melhorar o desempenho da aplica\u00e7\u00e3o\"\n}"}
+{"response": "{\"requirements\":[{\"type\":\"maintainability\",\"requirement\":\"The Dockerfile defines how to create an image for easy replication and maintenance.\"},{\"type\":\"correctness\",\"requirement\":\"Ensure that Redis is correctly installed using apt-get update && apt-get install -y redis-server\"},{\"type\":\"correctness\",\"requirement\":\"Install Celery with pip install celery redis\"},{\"type\":\"correctness\",\"requirement\":\"Define WORKDIR as /app for consistent project structure\"},{\"type\":\"correctness\",\"requirement\":\"Copy requirements.txt and run pip install -r requirements.txt to ensure dependencies are correctly installed.\"},{\"type\":\"correctness\",\"requirement\":\"Copy project code to the container's app directory\"},{\"type\":\"performance\",\"requirement\":\"Expose ports 8000 for Django server and 6379 for Redis\"},{\"type\":\"correctness\",\"requirement\":\"Run the Django development server with CMD [\"}]}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Exposes ports for Redis (6379) and Django (8000) to improve communication efficiency.\"\n}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"do not run with debug turned on in production\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"DEBUG = True\"\n}"}
+{"response": "{\"requirement\": \"The Docker containers for webapp and database services should maintain their data even if they crash or are reinstated.\", \"type\": \"maintainability\"}"}
+{"response": "{\n\"type\": \"maintainability\",\n\"requirement\": \"Volumes are used to store data generated and utilized by containerized applications.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The webapp django should listen on port 8000 inside the container.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that Redis container starts before Celery worker.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The Django app should listen on port 8000 internally and expose it externally for accessibility.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The Django server should listen on port 8000 within the container.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The database service (db) uses the PostgreSQL image version 13\"\n}"}
+{"response": "{\"requirement\": \"Define the directory of work within the container\", \"type\": \"correctness\"}\n      "}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Celery tasks should have consistent serialization and deserialization formats.\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The Celery worker container should start and connect to Redis for message queueing.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"User authentication is required for access to certain features.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Implementa\u00e7\u00e3o do c\u00f3digo em Rust como biblioteca python\"\n}"}
+{"response": "{\"requirement\": \"Implement the code in Rust as a library for Python\", \"type\": \"correctness\"}"}
+{"response": "{\"requirement\": \"The system should be secure\", \"type\": \"security\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Implementa\u00e7\u00e3o do c\u00f3digo em Rust como biblioteca Python\"}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"The search function should complete quickly for large numbers of files.\"}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Ensure data integrity during migrations\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The migration ensures that the 'Repositorio' model is managed by Django.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The function 'conectar_banco()' ensures correct connection to PostgreSQL database.\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The database configuration should correctly reflect all repositories' details.\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Implementa\u00e7\u00e3o do c\u00f3digo em Rust como biblioteca python\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The software should facilitate easy updating and maintenance\"}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Implement code in Rust as Python library\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that all data types and constraints are correctly defined for each column in the tables.\"\n}"}
+{"response": "{\"requirement\": \"The system should have good maintainability\", \"type\": \"maintainability\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that mining functions execute only if provided paths exist and are valid\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Implementa\u00e7\u00e3o do c\u00f3digo em Rust como biblioteca python\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Implementa\u00e7\u00e3o do c\u00f3digo em Rust como biblioteca python\"}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"The code should handle requests to retrieve commits, issues, pull requests, and branches for a specific repository within a given date range.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure status codes are checked and handled appropriately\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The system should accurately retrieve and display data for commits given specific parameters.\"\n}"}
+{"response": "{\"requirement\": \"The API should provide endpoints to retrieve commits data based on repository name and date range.\", \"type\": \"correctness\"}\n"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Retrieve commits with status code 200 and display data if successful\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Retrieve commits for specified repo_name and date range.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that the status codes for responses are checked (200 or 202) and appropriate messages are printed based on the response.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The API should return a status code of 200 or 202 for successful retrieval of commits, issues, pull requests, and branches.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The function should return status codes and data for successful requests (200, 202).\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Retrieve commits data correctly.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure API responses contain appropriate status codes and handle errors gracefully\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"The script prints status codes and data for successful API responses.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Retrieve commits, issues, pull requests and branches data correctly based on provided parameters\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Retrieve commits with status code 200 or 202\"}"}
+{"response": "{\n\"type\": \"none\",\n\"requirement\": \"Testing endpoints\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The system should correctly update its state to match the current flash contents\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure all tests are passing\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that Heap calls report caller's address accurately.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The merge commits should have a correct hash (5dcfb8877b68d9bb7e5cfdd7722eb4f3e5395ef3)\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that the status code is checked for 200 or 202 to handle successful responses\"}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The URLs and paths should exactly match their counterparts in Jira.\" }"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Implement pagination to collect more than 100 issues at once.\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"All fields are required\"\n}"}
+{"response": "{}"}
+{"response": "{\"requirement\": \"All fields are required\", \"type\": \"correctness\"}\n   "}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Expoe a porta que o Django usa, basicamente documenta a porta que o django ouvir\u00e1 do container\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Ensuring that sensitive data like passwords are properly encoded (e.g., POSTGRES_PASSWORD)\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The changes involve modifications to Docker files and requirements.txt.\"}"}
+{"response": "{\"requirements\": [\n  {\"type\": \"none\", \"requirement\": \"Commit modifications to Docker\"}\n]}"}
+{"response": "{\"requirements\":[{\"type\":\"performance\",\"requirement\":\"The system should respond to user inputs within 2 seconds.\"},{\"type\":\"usability\",\"requirement\":\"The application must have an intuitive and easy-to-navigate interface.\"},{\"type\":\"security\",\"requirement\":\"All sensitive data transmitted over the network should be encrypted using industry-standard encryption algorithms.\"}]}\n\n   "}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Documentation of dependencies and middleware\"\n}"}
+{"response": "{\"requirement\": \"The homepage response should clearly communicate its purpose.\", \"type\": \"usability\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure all fields of JiraIssue are serialized\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that responses for API views return appropriate status codes based on operation success/failure.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The system should accurately collect, retrieve, update and delete issues and issuetypes.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure accurate and reliable commits.\"\n}"}
+{"response": "{\"requirement\":\"Removendo dados de minera\u00e7\u00e3o\",\"type\":\"none\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Improves \\\"caller\\\" address reporting for OOM and Poison events.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The code should behave as expected and follow proper coding standards.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure each issue has a unique key within its project.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure data consistency and accuracy between JIRA and our database.\"}"}
+{"response": "{\"requirement\": \"The system should have high maintainability\", \"type\": \"maintainability\"}\n"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure that tasks are fetched correctly from Jira\" }"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Fixing some issues in Jira\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Updating requirements\"}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"No explicit non-functional requirements found.\"\n}"}
+{"response": "{\"requirement\": \"The system should have high availability to ensure minimal downtime.\", \"type\": \"correctness\"}\n"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Tasks should accurately reflect their status and dependencies\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Identify and categorize explicitly mentioned non-functional requirements\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Task should return HTTP status code 404 if task is not found.\"\n}"}
+{"response": "{\n\"type\": \"maintainability\",\n\"requirement\": \".DS_Store file should not be committed to version control\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that the copied file is correctly installed using pip\"\n}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The Dockerfile is well-commented for easy understanding and maintenance.\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"The data migration ensures that the 'repositorio' model's table is named as 'repositorios'.\"\n}"}
+{"response": "{\"requirement\": \"The system should maintain data consistency across updates\", \"type\": \"correctness\"}\n"}
+{"response": "{\"requirements\": [{\"type\": \"security\", \"requirement\": \"The database password should be properly secured.\"}, {\"type\": \"correctness\", \"requirement\": \"All tests must pass before deployment to ensure functionality\"}]}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The database service should be fully operational before the web service starts.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The tests should cover all endpoints and validate their responses\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Tasks should have their status and results checked periodically\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"A commit message should clearly describe the changes made and include relevant issue references\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixing conflicts of URLs for issues between GitHub and Jira\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Removendo arquivo inutilizado de testes\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Uses Docker secrets to store sensitive data like passwords\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"All requirements must satisfy the functional capabilities of the system.\" }"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure commits are properly formatted with meaningful messages related to JIRA tickets.\" }"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Using Docker to manage sensitive environment variables securely.\"}"}
+{"response": "{\"requirement\": \"Adding code for testing rows.\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The API request should return status codes 200 or 202 for successful requests.\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Expose port 8000 for Django server\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The Dockerfile should be easy to understand and modify for maintaining the project.\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Dockerfile explains its purpose and steps for creating Docker image.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The application should consistently connect to the database without errors.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The container should run the Django server on port 7000\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The Dockerfile and docker-compose.yaml files are documented.\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The Dockerfile and docker-compose.yml files should clearly explain their purposes.\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"The Dockerfile and docker-compose.yaml should ensure that the application runs correctly on a Docker container.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure the application connects correctly to the database.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The Django server should run on port 7000.\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Documentation of exposed port that Django uses.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The system should connect to the database correctly.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The Dockerfile defines a multi-stage build process to optimize the image size by copying only necessary files into the final image.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The Dockerfile needs to ensure that all dependencies are installed correctly and consistently across different environments\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The script defines how to create a Docker IMAGE with Python and necessary dependencies.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that the code copied to the container is running without errors\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Exposes the port that Django uses and the Redis will use\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Dockerfiles and docker-compose.yaml are provided for containerization\"}\n     "}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"KEEP THE SECRET KEY USED IN PRODUCTION SECRET!\"\n}"}
+{"response": "{\n\"type\": \"security\",\n\"requirement\": \"Keep the secret key used in production secret!\"\n}"}
+{"response": "{\"requirement\": \"SECURITY WARNING: keep the secret key used in production secret!\", \"type\": \"security\"}\n"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"KEEP THE SECRET KEY USED IN PRODUCTION SECRET\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The database password is explicitly set as '0000', which may pose a security risk due to its weakness.\"\n}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"The POSTGRES_PASSWORD should be hashed or encrypted for better security.\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"The password for the PostgreSQL user should be sufficiently complex and secure (#St@n3L@b2@24!).\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The password for the PostgreSQL user should be strong and follow best practices.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The PostgreSQL password should be hashed or encrypted to prevent unauthorized access.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"User credentials (POSTGRES_USER and POSTGRES_PASSWORD) should be securely managed.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The password for the PostgreSQL user is securely hashed and includes special characters.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Environment variables are used for sensitive data like database credentials to prevent hardcoding and enhance security.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that the web application connects to the database.\"\n}"}
+{"response": "{\"requirement\": \"The volumes used for storing data generated and utilized by containers need to persist even if containers are restarted.\", \"type\": \"maintainability\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The webapp depends on the database container to ensure correct functionality.\"\n}"}
+{"response": "{\"requirement\":\"The webapp Django should listen on port 7000 inside the container\", \"type\":\"correctness\"}\n\n   "}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The application uses volumes to maintain data persistently beyond the lifecycle of containers.\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Volumes are used to store sensitive data securely across container lifecycle.\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Password for POSTGRES_USER contains uppercase letters, numbers, and special characters\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The password for POSTGRES_USER should be strong and encrypted\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Using volumes to persist data beyond container lifecycle\"}"}
+{"response": "{ \"type\": \"performance\", \"requirement\": \"Improve connection speed to the database\"}"}
+{"response": "{\"requirement\": \"Changing some files to try and fix connection with the database\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Consertar a conex\u00e3o com o banco\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Trying to fix connection with the database\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Improving connection to the database\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Attempting to fix connection issues with the database\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Mudando alguns arquivos para tentar consertar conex\u00e3o com o banco\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Consertar conex\u00e3o com o banco\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure proper retrieval of commits data\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Retrieve commits, issues, pull requests and branches data correctly\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The endpoints should return accurate data based on the given parameters\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The scripts should retrieve and print the status codes and data for commits.\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The system should retrieve and display data accurately based on the provided parameters.\" }"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The system should retrieve data correctly without any errors.\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Test commits function should handle status codes 200 and 202 appropriately.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that the correct data is retrieved from the API endpoints for commits, issues, pull requests, and branches.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Retrieve commits data with status code 200 or 202\"\n}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The status code of the API responses should indicate success (200 or 202) for proper data retrieval.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The endpoints should return appropriate status codes (200 or 202) upon successful retrieval of data.\"\n}"}
+{"response": "{ \"type\": \"none\", \"requirement\": \"Testing issues...\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Retrieve data correctly from API endpoints.\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"The code aims to test different endpoints related to GitHub data retrieval and manipulation.\"\n}"}
+{"response": "{\"requirement\": \"Installing curl to facilitate package downloads for better performance.\", \"type\": \"performance\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Running with debug turned on is prohibited in production\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The healthcheck should verify if the Django server is responding to requests on port 8000.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The API tester should handle and test data within the specified start_date and end_date.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure database connection works correctly\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Limit maximum results per request to 100\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"\"\n}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements found\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Collects and saves issue types fetched from Jira.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Improving interaction between files\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure issues are correctly collected and stored.\"\n}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Improve performance of issue type collection tasks by using Celery for task scheduling and execution.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure accurate task status and cancellation functionality\"\n}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"The API should return clear and concise information about the task's status.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"The system must comply with security regulations\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure tasks are processed correctly and accurately.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that tasks are correctly completed based on their status\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The tasks should be retrievable with proper metadata.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Endpoint should accurately verify status of tasks\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The function should accurately report the status of each task\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The project includes detailed instructions for setup and usage in its README.md file.\"\n}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"DEBUG should be set to False for production\"}"}
+{"response": "{ \"type\": \"none\", \"requirement\": \"No explicit non-functional requirements found.\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The app should correctly handle verification of tasks from GitHub and JIRA\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that tasks are fetched and handled correctly\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"The provided description does not explicitly mention any non-functional requirements.\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The app should handle verification of tasks from both GitHub and JIRA.\"}"}
+{"response": "{\"requirement\": \"The Rust wheel for features_mining_rust package should be correctly installed.\", \"type\": \"correctness\"}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Removal of 'features' app improves maintainability by reducing complexity and dependencies.\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Remove App features to ensure correct functionality\"}"}
+{"response": "{\"requirement\": \"Removal of App features\", \"type\": \"none\"}"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"Remo\u00e7\u00e3o do App features\"}"}
+{"response": "{}"}
+{"response": "{}"}
+{"response": "{\n  \"requirement\": \"Ensure data confidentiality and integrity\",\n  \"type\": \"security\"\n}"}
+{"response": "{}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"To accurately extract and process regexes from the specified file.\" }"}
+{"response": "{ \"requirement\": \"The removal of App features\", \"type\": \"none\" }"}
+{"response": "{ \"type\": \"none\", \"requirement\": \"No explicit NFRs mentioned\" }"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The system should maintain data consistency and integrity.\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"To accurately mine and store results related to code, commits, and documentation.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The 'status' field ensures that the mining process can track if it is in progress, complete, etc.\"}"}
+{"response": "{\"requirement\": \"Creation of tables should ensure data integrity by enforcing primary keys.\", \"type\": \"correctness\"}"}
+{"response": "{\n\"type\": \"usability\",\n\"requirement\": \"The form should provide clear labels and placeholders for user input.\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure all tests are still running correctly after removing App features\" }"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The Rust code should execute successfully with no errors.\" }"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure that paths for repositories and regex files exist before proceeding with mining.\" }"}
+{"response": "{\"requirement\": \"Ensure uniqueness of 'issue_id' across all projects\", \"type\": \"correctness\"}\n"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Executa minera\u00e7\u00e3o de dados para um reposit\u00f3rio espec\u00edfico e retorna lista de task_ids com atraso entre verifica\u00e7\u00f5es\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that task status and cancellation views are correctly mapped to URLs\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"The password used for database connection should be encrypted\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Adjusting port mapping to avoid conflicts (5432 to 5433)\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure unique constraint on ('issue_id', 'project') for JiraIssue model.\"\n}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"The database password should not be exposed in plaintext.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixing connection issues to ensure correct external database access\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The code should be easy to understand and maintain.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Each commit should have unique SHA\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixing connection to external database from Docker\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure all tasks have valid IDs.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure unique SHA for GitHubCommit model.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure all fields have valid data\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixes issues related to creating the database\"}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Ensure correct installation of dependencies\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Remove features to improve maintainability\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensuring the removal of certain features does not introduce errors\"\n}"}
+{"response": "{}"}
+{"response": "{ \"type\": \"none\", \"requirement\": \"No explicit non-functional requirements mentioned.\" }"}
+{"response": "{ \"requirement\": \"Retirando parte das features\", \"type\": \"none\" }"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"The system should have an intuitive user interface\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Fix issues related to CSTONE-320 and CSTONE-401\"\n}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Efficient processing of large files\"}\n"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements were mentioned.\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The system should allow for easy removal of features\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixing bugs as indicated by JIRA issue IDs\"}"}
+{"response": "{ \"type\": \"none\", \"requirement\": \"No explicit non-functional requirements found.\" }"}
+{"response": "{}"}
+{"response": "{\"requirement\": \"CREATE SCHEMA IF NOT EXISTS aisepucrio_stnl_featuresmining;\", \"type\": \"correctness\"}"}
+{"response": "{ \"requirement\": \"The form should allow users to submit feedback.\", \"type\": \"usability\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensuring correctness by removing part of features\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure Rust code executes successfully without errors\"}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"The application should handle invalid methods appropriately with status codes and error messages.\"\n}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Use HTTPS protocol to ensure secure data transmission\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Removing some features to simplify the system\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The data must be saved correctly and efficiently.\"\n}"}
+{"response": "{\n\"type\": \"performance\",\n\"requirement\": \"The API should return the data obtained immediately without waiting for user interaction.\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP should ensure reliable connection to broker on startup\"}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Awaits task completion before returning data\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Task status should be checked accurately\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Using environment variables for database credentials to enhance security.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The application should work correctly when dependent services (db and redis) are healthy.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"All dependencies are installed and functioning correctly\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The script checks if migrations can be applied and exits with an error message if they fail.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The API should return accurate and expected data for the given tests.\"\n}"}
+{"response": "{\"requirement\": \"Wait for database readiness\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"README file should be improved and details should be corrected\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Improving README\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The API provides various endpoints for data mining, with examples using esp8266/Arduino but allowing customization of repo_name and date parameters.\"\n}"}
+{"response": "{ \"type\": \"documentation\", \"requirement\": \"README.md should be updated\" }"}
+{"response": "{\"requirement\": \"The API should automatically switch between tokens when one reaches its request limit.\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure no other database or server is already running on port 5432\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The API should have clear documentation including setup instructions and usage details.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The endpoint should accurately verify status of tasks\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The endpoint should return a 404 error if the task is not found\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure task completion status is returned\"\n}"}
+{"response": "{}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The endpoint should return the status of tasks\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Setting DEBUG to False improves security by disabling debug mode in production.\"}"}
+{"response": "{}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The app should handle verification of GitHub and JIRA tasks correctly.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The app should handle verification of tasks from GitHub and JIRA.\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The app should handle verification of tasks from both GitHub and JIRA repositories.\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The app should accurately verify task statuses from GitHub and JIRA.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The code should be easy to understand and modify\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that task IDs are present and added to the list if available.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Commits detalhados salvos no banco de dados e no JSON com sucesso.\"\n}"}
+{"response": "{\"requirement\": \"The sha field of GitHubCommit model should be unique.\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixing connection to external database in Docker\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure correct task status checking.\"}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Ensure unique constraints on 'sha' field of GitHubCommit model\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure uniqueness of email addresses for GitHubAuthor\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure task IDs are valid and match expected format.\"\n}"}
+{"response": "{\"requirement\": \"Retirando parte das features\", \"type\": \"maintainability\"}"}
+{"response": "{\"requirement\": \"Retirando parte das features\", \"type\": \"usability\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure task status check functionality works correctly\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Commits detalhados salvos no banco de dados e no JSON com sucesso.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"API should return the data obtained\"\n}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Ensure celery broker connection retry on startup\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Aguarda o t\u00e9rmino da tarefa para obter os dados minerados\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The task status should be checked accurately.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The database connection should use correct credentials obtained from environment variables\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure the service is healthy before it can be used.\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The Dockerfile and start.sh scripts are maintained to ensure the application runs correctly in a containerized environment.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Apply migrations\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The repository should contain documentation explaining how to set up and run the project.\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Fixing and improving documentation\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"README should contain detailed information and improvements.\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Improving README\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"A API oferece diversos endpoints para minera\u00e7\u00e3o de dados.\"}"}
+{"response": "{\"requirement\": \"The API should provide documentation for its functionality.\", \"type\": \"documentation\"}"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"The API must support multiple tokens to avoid GitHub API rate limits\"}\n   "}
+{"response": "{\"type\": \"usability\", \"requirement\": \"Ensure that no other database or server is already running on port 5432\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure correct connection to the database\"}"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"The API should be easily testable using provided scripts.\"}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"Explicit non-functional requirements are not provided in this description.\"}"}
+{"response": "{\n\"type\": \"documentation\",\n\"requirement\": \"# Generated by Django 5.1 on ...\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure task_id is provided immediately after API request\"\n}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"A task ID is provided immediately after the request to improve response time\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Tasks status should never be NULL\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure tasks have non-null status\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fixing the problem where task status was always NULL\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Fixing tasks that always have NULL status\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The system should respond to user inputs within two seconds.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The task status should accurately reflect the current state of the task.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Return appropriate status for tasks that do not exist\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The API should return the task ID and instructions on how to use it asynchronously.\"\n}"}
+{"response": "{}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that tasks with state 'PENDING' or 'STARTED' are revoked when deletion is requested.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Add information about the repository that was mined\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Tokens should be verified before use\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Adding column about repository information improves traceability and ease of maintenance.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Increasing memory limit per worker to improve performance\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Increasing memory limit for Celery workers to improve performance\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Adequately verify GitHub tokens after switching\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The system should be easy to update using Docker Compose\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"README.md should contain installation instructions, configuration details, and API usage information.\"\n}"}
+{"response": "{\"requirement\": \"The repository should be cloned from https://github.com/aisepucrio/stnl-dataminer-api.git\", \"type\": \"none\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The README file should contain instructions on how to generate GitHub token\"}"}
+{"response": "{\"requirement\": \"GITHUB_TOKENS and DJANGO_SUPERUSER_PASSWORD should be stored securely to prevent unauthorized access\", \"type\": \"security\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Ensure that no other PostgreSQL instances are running on port 5432\"}"}
+{"response": "{\"requirement\": \"All timestamps must be in ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ).\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The data mining process and its output should be well-documented for ease of understanding\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"After mining is complete, the data is stored.\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"API documentation using Swagger is added\"}"}
+{"response": "{\"requirement\": \"Use Django for maintainability\", \"type\": \"maintainability\"}\n       "}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The API should have Swagger documentation.\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"Add swagger\"}"}
+{"response": "{\"requirement\": \"Set default text detection for all files\", \"type\": \"maintainability\"}\n"}
+{"response": "{\"requirement\": \"Ensure consistent line endings for Python scripts (.py files) to improve maintainability.\", \"type\": \"maintainability\"}\n\n   "}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The GitHubCommitSerializer includes serialized representation of 'author' and 'committer' fields.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Implementing Generic Views for creating routes to database queries\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Implement Generic Views for creation of routes for querying the database\"\n}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The code should have Swagger documentation added\"}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"The system should have high concurrency to handle multiple tasks efficiently.\"}"}
+{"response": "{\"requirement\": \"Add swagger for API documentation\", \"type\": \"documentation\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Include swagger for API documentation\"\n}"}
+{"response": "{\"type\":\"correctness\",\"requirement\":\"Ensure line endings are consistent and correct\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"EOL style for *.sh files is LF to ensure consistency across platforms\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Adding options for filtering on database queries\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Adding options for filtering in database queries improves correctness by reducing irrelevant data\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The filters should accurately return the expected GitHub commits based on the provided parameters.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure uniqueness of GitHubPullRequest.pr_id field.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure data integrity and accuracy by validating user inputs\"}"}
+{"response": "{\"requirement\": \"Add filters to database queries\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Adding filters to queries for precision in data retrieval\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Improving data filtering options for accurate results\"\n}"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"The system should be easy to navigate and understand for users.\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Ensure that after mining is complete, the data is returned as JSON for viewing.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Extrai todas as palavras da descri\u00e7\u00e3o de uma issue do Jira, lidando com casos em que o campo \u00e9 vazio ou inexistente.\"\n}"}
+{"response": "{\"requirement\": \"Change issue identifier from issue_id to issue_key for deletion and detail views\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The lookup_field parameter should match the issue_key for correct deletion and retrieval of issues.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Raise the specific exception that occurred\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that issue_id is unique.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that removing the 'reporter' field does not affect the integrity of the data.\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Function to validate and parse date accepts both dates with time and without time.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Dates must be in 'yyyy-MM-dd' format.\"}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"The system should have intuitive and user-friendly interface.\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Ensure consistent behavior across issue, PR, and commit API responses.\" }"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Make requests to status endpoint to check task status\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Return None if there's an error accessing issues/pull requests.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that issues are fetched and saved correctly without errors\"}"}
+{"response": "{\"requirement\": \"The issuetype_description field has been added to store detailed information about the issue type.\", \"type\": \"documentation\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Removal of redundant routes and fields improves maintainability\"}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"The removal of unused routes improves code maintainability.\" }"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Ensure data integrity by validating input\"\n}"}
+{"response": "{\"requirement\": \"Remove unused code\", \"type\": \"maintainability\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Remove route to delete issues\"\n}"}
+{"response": "{\"type\": \"none\", \"requirement\": \"No explicit non-functional requirements found.\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Process all pull requests concurrently to improve efficiency\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The API should handle at least 5000 requests/hour\"\n}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"The token used for API authentication should be securely managed and stored.\"}"}
+{"response": "{\"requirement\": \"Tokens autenticados devem ter limite de 5000 requisi\u00e7\u00f5es/hora\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The system should respond with a valid 'fieldcaps' node response\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Divide the interval of dates into smaller intervals to avoid API only returning first 1000 PRs\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Fetch PRs with pagination for specified dates.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure the system handles fieldcaps node response correctly during deserialization\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure tests cover rare actions to maintain correctness\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The checksums of both \\\"write\\\" and \\\"overwrite\\\" contents are considered correct.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The script should accurately count and print the total number of PRs with and without the specified label.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure data mining results are accurate\"}"}
+{"response": "{ \"type\": \"performance\", \"requirement\": \"To fetch PRs efficiently with pagination and avoid hitting API rate limit.\" }"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Extract properties faster from source\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The 'auto-merge-without-approval' label indicates that correctness of merging without manual approval is expected.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Overwrites should not cause test failures due to checksum mismatches.\"\n}"}
+{"response": "{\"requirement\": \"Divide the interval of dates into smaller periods to improve performance.\", \"type\": \"performance\"}\n"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Minimize wait time between requests to avoid exceeding rate limits\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The extraction code should accurately read stacktrace and executable properties.\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The system should be designed to allow easy updates and modifications without affecting existing functionalities.\"}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"The migration deletes the JiraIssueType model and adds a new field 'issuetype_description' to the JiraIssue model.\" }"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Implementing new approach for obtaining features\"\n}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The code should have clear documentation for users to understand its functionality and usage.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Estrutura os dados do PR\"\n}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"Improve user interface for better usability\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure the commits are properly signed-off by dependabot[bot] <support@github.com>\"\n}"}
+{"response": "{}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Adding information about pull request number to save in database ensures accurate record keeping and traceability.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that the GitHubPullRequest number is unique.\"\n}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Salva no JSON e no banco de dados\" }"}
+{"response": "{\"requirements\":[{\"type\":\"maintainability\",\"requirement\":\"The code should have clear comments and naming conventions for better understanding and future maintenance.\"},{\"type\":\"performance\",\"requirement\":\"The system must process requests within a specified time frame to ensure efficient operation.\"},{\"type\":\"security\",\"requirement\":\"The application should implement appropriate authentication mechanisms to protect user data.\"},{\"type\":\"usability\",\"requirement\":\"The user interface should be intuitive and easy to navigate for improved user experience.\"},{\"type\":\"documentation\",\"requirement\":\"The system must have comprehensive documentation to facilitate understanding and use by other developers.\"}]}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Remove Field 'id' and add fields 'closed_at', 'merged_at'\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure data integrity when updating pull requests\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The `pr_id` field should be unique and used as primary key instead of a combination of `repository`, `number`, and `pr_id`.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Pull requests that update a dependency file\"\n}"}
+{"response": "{\"requirement\": \"Adding more detailed information about issues (assignees, author association, body, closed_at, is_pull_request, labels, locked, milestone, number, reactions, timeline_events) improves maintainability by allowing better tracking and management of issues.\", \"type\": \"maintainability\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Detailed issues are saved both in the database and as JSON.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The 'created_at', 'updated_at' and 'closed_at' fields ensure accurate tracking of issue timelines.\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"Logs are printed with flush=True to ensure immediate output and prevent blocking of execution flow.\"\n}"}
+{"response": "{}"}
+{"response": "{}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure that the URL for requests is printed to assist with debugging and issue tracking.\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure unique fields for primary keys and constraints\"\n}"}
+{"response": "{ \"type\": \"none\", \"requirement\": \"No explicit non-functional requirements found.\" }"}
+{"response": "{\"requirement\": \"Implement filters to improve data retrieval\", \"type\": \"usability\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The codebase should have clear and consistent naming conventions.\"\n}"}
+{"response": "{\"requirement\": \"Padroniza\u00e7\u00e3o do retorno entre a parte do Jira e do GitHub quando uma task \u00e9 iniciada.\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The script contains comments explaining its functionality.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Parser of json to verify data of creation\"}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The system should allow updating issues and users\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Efficiently handle large-scale GitHub repositories with potentially thousands of issues.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure the title field is of TextField type to accommodate varying lengths.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure consistency and accuracy of data types\"}"}
+{"response": "{\n\"requirement\": \"Extract only NFRs that are explicitly stated\",\n\"type\": \"correctness\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Collect data efficiently to minimize delay\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The system should have minimal downtime to ensure data consistency.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Aguardar o reset do rate limit antes de realizar novas requisi\u00e7\u00f5es para evitar atingir os limites.\"\n}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"The system should allow easy navigation and understanding of its features.\"\n}"}
+{"response": "{\n\"type\": \"usability\",\n\"requirement\": \"Improving log readability for easier debugging\"\n}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Avoid rate limit by checking 'X-RateLimit-Remaining' header and pausing requests when limit is reached.\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Efficiently handle rate limit errors by implementing retry logic and tracking rate limit status.\"\n}"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"The logs should be visually appealing and similar to those of Issues for better user experience\"}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Concurrency control to prevent exceeding API rate limits\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"The system should have minimal downtime\"}\n   "}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Add argparse to token_verifier for command-line argument support\" }"}
+{"response": "{\"type\": \"usability\", \"requirement\": \"Add argparse to token_verifier for easier command-line argument handling\"}"}
+{"response": "{\"requirement\": \"Handle rate limit errors by reattempting requests with appropriate headers.\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"README documentation should be improved\"}"}
+{"response": "{\n  \"type\": \"documentation\",\n  \"requirement\": \"The project includes documentation for installation and configuration.\"\n}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Evitando ping-pong de tokens para reduzir taxa de falhas\"}"}
+{"response": "{\"type\": \"performance\", \"requirement\": \"Otimiza coleta de dados reduzindo chamadas \u00e0 API no modo b\u00e1sico\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that all PRs are processed and saved correctly without errors\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Otimiza coleta de dados reduzindo chamadas \u00e0 API no modo b\u00e1sico\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Otimiza coleta de dados reduzindo chamadas \u00e0 API no modo b\u00e1sico\"\n}"}
+{"response": "{ \"type\": \"maintainability\", \"requirement\": \"Adds functionality to mine body of Pull Requests\" }"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The commit should accurately reflect the changes made to the pull request (PR) details.\"}"}
+{"response": "{}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Preserve existing complex data (commits and comments) when updating pull requests\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"WiFiClient should remain connected during firmware update\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Preserve existing complex data (comments and timeline events) if Issue already exists\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure WiFiClient is connected during onProgress.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure data consistency and integrity across sync operations\"\n}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"Extract metadados from GitHub API\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Metadata for repositories should accurately reflect the latest information\"\n}"}
+{"response": "{}"}
+{"response": "{\"requirement\": \"The application should obtain and display metadata of repositories\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"Obtain metadata of repositories\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure metadata is returned as a dictionary with specific keys\"\n}"}
+{"response": "{\"requirement\": \"Define where the results of tasks are stored.\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The function should accurately retrieve and count GitHub contributors.\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"The system should allow easy addition of new fields.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Extract only explicitly stated non-functional requirements\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that forks_count is consistent with actual data.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Fixing problems in metadata mining\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Raises an exception of the correct type with the correct traceback\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Fixing metadata mining issues\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The function should return None if the request is unsuccessful\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure that fields 'releases_count' and 'used_by_count' have default values of 0\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"The system should maintain high performance with minimal degradation over time.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The minerador de metadados should accurately gather and store metadata from GitHub repositories.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure accuracy of metadata retrieval\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Finalizing implementation of metadata miner to ensure functionality\"}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The primary key of the GithubPullRequest model should be a BigIntegerField.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Modifying requests to GitHub for collection to use POST method and pass parameters in body ensures data integrity and accuracy.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The API endpoints should now accept POST requests with parameters passed in the body for collecting commits, issues, pull requests, branches, and metadata.\"\n}"}
+{"response": "{\"requirement\": \"Modificando as requisi\u00e7\u00f5es de coleta do GitHub para serem POST e os par\u00e2metros serem passados no body\", \"type\": \"correctness\"}"}
+{"response": "{\n  \"type\": \"none\",\n  \"requirement\": \"Dates must be in ISO 8601 format\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The tasks are canceled correctly with a DELETE request\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Tasks should be cancelable with DELETE request\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Tasks are canceled with a DELETE request.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Tasks should be cancellable with a DELETE request\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Ensure that Git is installed to facilitate version control and collaboration.\"}"}
+{"response": "{\n\"type\": \"maintainability\",\n\"requirement\": \"Adding timestamp to data mining for better tracking and troubleshooting.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Saving directly the float timestamp\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The timestamp should be accurate\"\n}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"Endpoint for mining commits from a repository.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Saving current_timestamp directly as float\"\n}"}
+{"response": "{\n  \"type\": \"usability\",\n  \"requirement\": \"The interface should provide easy-to-use controls for selecting different types of scatter plots.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The miner should accurately record the time when each Jira issue is mined.\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Add timestamp to miner\"}"}
+{"response": "{\"type\": \"maintainability\", \"requirement\": \"Add timestamp time_mined to minerador do Jira\"}"}
+{"response": "{\"requirement\": \"Changing jira email and api token from request body to env file\", \"type\": \"security\"}"}
+{"response": "{\n  \"type\": \"security\",\n  \"requirement\": \"Moving sensitive information (jira email and jira api token) from request body to environment file (.env)\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"All fields are required: jira_domain, project_key, jira_email, jira_api_token\"\n}"}
+{"response": "{\n  \"type\": \"maintainability\",\n  \"requirement\": \"Moving jira credentials to an env file improves code maintainability by separating configuration from the main application logic.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure all issues and pull requests are associated with their respective tables\"\n}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"The model accurately represents GitHub Issues and Pull Requests with unique record_id.\"\n}"}
+{"response": "{}\n   "}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure unique record_id for GitHubIssuePullRequest instances.\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Ensure data consistency between GitHubCommit and related models\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Tasks are checked at an interval of self.interval_seconds seconds between each repository.\"\n}"}
+{"response": "{\n  \"type\": \"performance\",\n  \"requirement\": \"Improve performance by reducing API response times.\"\n}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Errors should be raised with traceback information\"}"}
+{"response": "{\"type\": \"security\", \"requirement\": \"Credentials for Postgres should not be hardcoded\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"The system should ensure correct data migration between Django migrations.\"}"}
+{"response": "{\"requirement\": \"coletando commit do git dentro do jira\", \"type\": \"correctness\"}"}
+{"response": "{\"type\": \"documentation\", \"requirement\": \"The description should contain clear and concise documentation for each field.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure the commit message accurately reflects the changes made.\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Ensure commits are correctly stored and retrieved from/to Jira issues\"}"}
+{"response": "{\"type\": \"correctness\", \"requirement\": \"Obt\u00e9m o ID num\u00e9rico da issue com base na issue key (ex: \\\"CSTONE-219\\\")\"}"}
+{"response": "{\n\"type\": \"correctness\",\n\"requirement\": \"Ensure that commits are correctly stored as JSONField\"\n}"}
+{"response": "{\"requirement\": \"Timestamp should be of type DateTimeField\", \"type\": \"correctness\"}"}
+{"response": "{}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The timestamp should be adjusted to datetime\"\n}"}
+{"response": "{ \"type\": \"correctness\", \"requirement\": \"Field 'commits' should accept null and blank values.\" }"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"Extract only explicitly stated NFRs\"\n}"}
+{"response": "{\n  \"type\": \"correctness\",\n  \"requirement\": \"The `time_mined` field should store datetime instead of float to accurately represent timestamps.\"\n}"}

@@ -1,0 +1,45 @@
+Task: Identify and Categorize Explicit Non-Functional Requirements
+
+Objective
+Analyze the provided description and extract only the explicitly mentioned non-functional requirements (NFRs), categorizing them into one of the following types:
+
+maintainability:
+Related to how easy it is to update, modify, or fix the system. Examples include modularity, code readability, and support for future changes.
+
+performance:
+Covers system speed, responsiveness, and resource efficiency. Includes requirements like "must respond within 2 seconds" or "should handle 10,000 users concurrently."
+
+security:
+Addresses protection of data and systems from unauthorized access, breaches, or vulnerabilities. Includes encryption, authentication, and access control mechanisms.
+
+usability:
+Refers to how intuitive and user-friendly the system is. Includes requirements for accessibility, simplicity, UI/UX standards, and user satisfaction.
+
+documentation:
+Related to the quality, completeness, or availability of system documentation for developers, users, or maintainers.
+
+correctness:
+Refers to the system's ability to consistently produce accurate results and behave according to specification under all defined conditions.
+
+none:
+Use this only if the requirement is clearly a non-functional requirement but doesn’t fit any of the categories above.
+
+
+
+
+What to Identify
+Non-functional requirements define the quality attributes, constraints, and operational expectations of a system beyond its functional capabilities. You must extract only NFRs that are explicitly stated in the input description—avoid assumptions or inferred requirements.
+
+Expected Output Format
+For each identified non-functional requirement, return a structured JSON object containing:
+
+"type": One of the specified categories above.
+
+"requirement": A clear and concise description of the explicitly stated requirement.
+
+
+Input Description
+Below is the description to analyze. Extract only the explicitly stated non-functional requirements and categorize them accordingly.
+
+Input:
+{PLACEHOLDER_FOR_DESCRIPTION}

@@ -1072,13 +1072,13 @@ class GitHubMiner:
                     print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
 
                     for issue in data['items']:
-                        current_timestamp = timezone.now()  # Alterado para usar timezone.now()
+                        current_timestamp = timezone.now()
                         if 'pull_request' in issue:
                             continue
 
                         issue_number = issue['number']
                         
-                        # Buscar eventos da linha do tempo
+                        # Search Events
                         timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
                         headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
                         timeline_response = requests.get(timeline_url, headers=headers)
@@ -1100,7 +1100,7 @@ class GitHubMiner:
                                 'label': event.get('label', {}).get('name') if event.get('label') else None
                             } for event in timeline_response.json()]
 
-                        # Buscar comentários apenas se for mineração complexa
+                        # Search comments only if complex mining
                         comments = []
                         if depth == 'complex':
                             comments_url = issue['comments_url']
@@ -1109,7 +1109,7 @@ class GitHubMiner:
                             
                             if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
                                 if not self.handle_rate_limit(comments_response, 'core'):
-                                    print(f"[Issues] Falha ao recuperar comentários #{issue_number} após rate limit", flush=True)
+                                    print(f"[Issues] Failed to retrieve comments #{issue_number} after rate limit", flush=True)
                                     continue
                                 comments_response = requests.get(comments_url, headers=self.headers)
                             
@@ -1124,8 +1124,8 @@ class GitHubMiner:
                                     'reactions': c.get('reactions', {})
                                 } for c in comments_response.json()]
 
-                        # Criar objeto para salvar no banco de dados
-                        processed_issue = {
+                            # Create object to save in the database
+                            processed_issue = {
                             'id': issue['id'],
                             'number': issue['number'],
                             'title': issue['title'],
@@ -1144,18 +1144,15 @@ class GitHubMiner:
                             'timeline_events': timeline_events,
                             'comments_data': comments if depth == 'complex' else [],
                             'time_mined': current_timestamp,
-                            'data_type': 'issue'  # Adiciona o tipo como 'issue'
+                            'data_type': 'issue'
                         }
 
                         if depth == 'basic':
-                            # Se for mineração básica, buscar Issue existente
                             existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
                             if existing_issue:
-                                # Preservar dados complexos se existirem
                                 processed_issue['comments_data'] = existing_issue.comments
                                 processed_issue['timeline_events'] = existing_issue.timeline_events
 
-                        # Atualizar ou criar Issue
                         GitHubIssuePullRequest.objects.update_or_create(
                             record_id=processed_issue['id'],
                             defaults={
@@ -1178,12 +1175,12 @@ class GitHubMiner:
                                 'author_association': processed_issue['author_association'],
                                 'reactions': processed_issue['reactions'],
                                 'time_mined': current_timestamp,
-                                'data_type': 'issue'  # Adiciona o tipo como 'issue'
+                                'data_type': 'issue'  
                             }
                         )
 
                         all_issues.append(processed_issue)
-                        print(f"✓ Issue #{issue_number} processada", end='\r')
+                        print(f"✓ Issue #{issue_number} processed", end='\r')
 
                     if len(data['items']) < 100:
                         has_more_pages = False
@@ -1192,17 +1189,17 @@ class GitHubMiner:
 
                     time.sleep(1)
 
-                print(f"\n✅ Período concluído: {period_issues_count} issues coletadas em {page} páginas")
+                print(f"\n✅ Period completed: {period_issues_count} issues collected in {page} pages")
 
             print("\n" + "="*50)
-            print("💾 Salvando dados em JSON...")
+            print("💾 Saving data in JSON...")
             self.save_to_json(all_issues, f"{repo_name.replace('/', '_')}_issues.json")
-            print(f"✨ Extração concluída! Total de issues coletadas: {len(all_issues)}")
+            print(f"✨ Extraction completed! Total issues collected: {len(all_issues)}")
             print("="*50 + "\n")
             return all_issues
 
         except Exception as e:
-            print(f"\n❌ Erro durante a extração: {str(e)}", flush=True)
-            raise RuntimeError(f"Falha na extração de issues: {str(e)}") from e
+            print(f"\n❌ Error during extraction: {str(e)}", flush=True)
+            raise RuntimeError(f"Issue extraction failed: {str(e)}") from e
         finally:
             self.verify_token()

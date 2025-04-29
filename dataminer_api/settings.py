@@ -94,7 +94,7 @@ DATABASES = {
     },
 }
 
-# Configurações do Jira
+# Jira Config
 JIRA_EMAIL = os.getenv("JIRA_EMAIL")
 JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN").strip('"')
 

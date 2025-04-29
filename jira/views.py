@@ -81,7 +81,7 @@ class JiraIssueCollectView(APIView):
                 end_date
             )
             
-            # Salva a task no banco de dados
+            # Save tasks on database
             Task.objects.create(
                 task_id=task.id,
                 operation='collect_jira_issues',

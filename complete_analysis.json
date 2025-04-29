@@ -1,0 +1,185 @@
+{
+    "non_functional_requirements": [
+      {
+        "type": "Security",
+        "requirement": "The function does not perform any input validation on the provided file path. This could lead to security vulnerabilities if an attacker provides a specially crafted path that accesses sensitive files or directories.",
+        "location": {
+          "line": 3,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "read_python_file"
+        }
+      },
+      {
+        "type": "Performance",
+        "requirement": "The function reads the entire contents of the file into memory. If the file is large, this could lead to performance issues or even cause the program to crash due to insufficient memory.",
+        "location": {
+          "line": 5,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "read_python_file"
+        }
+      },
+      {
+        "type": "Robustness",
+        "requirement": "The function does not handle exceptions or errors that may occur when opening the file. For example, if the file does not exist or there is insufficient permissions to access the file, the program will crash.",
+        "location": {
+          "line": 3,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "read_python_file"
+        }
+      },
+      {
+        "type": "Performance",
+        "requirement": "The code iterates through every node in the AST, which could lead to performance issues for large files.",
+        "location": {
+          "line": 14,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "get_functions_ast"
+        }
+      },
+      {
+        "type": "Security",
+        "requirement": "The code reads the content of a file based on user input (file_path), which could be a security risk if not properly validated.",
+        "location": {
+          "line": 7,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "get_functions_ast"
+        }
+      },
+      {
+        "type": "Scalability",
+        "requirement": "The code appends all function information to a list, which could lead to memory issues for files with many functions.",
+        "location": {
+          "line": 18,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "get_functions_ast"
+        }
+      },
+      {
+        "type": "Reliability",
+        "requirement": "The code assumes that 'end_lineno' exists for every node, which could raise an AttributeError if it doesn't.",
+        "location": {
+          "line": 16,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "get_functions_ast"
+        }
+      },
+      {
+        "type": "Robustness",
+        "requirement": "The function should handle cases where the input is not a valid response object. It currently does not check if 'response' attribute exists before calling hasattr(). This could raise an AttributeError.",
+        "location": {
+          "line": 3,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "serialize_response"
+        }
+      },
+      {
+        "type": "Performance",
+        "requirement": "The function could be optimized by removing the try-except block if it's not necessary. The current structure involves checking for an exception even when there might not be one.",
+        "location": {
+          "line": 2,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "serialize_response"
+        }
+      },
+      {
+        "type": "Security",
+        "requirement": "It is not secure to expose the raw error message (which might contain sensitive information) in the response. Consider logging the error instead and returning a generic error message.",
+        "location": {
+          "line": 5,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "serialize_response"
+        }
+      },
+      {
+        "type": "Scalability",
+        "requirement": "The function currently converts the response to a string even when it's already a string. This could lead to unnecessary conversions and impact performance in case of large responses.",
+        "location": {
+          "line": 4,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "serialize_response"
+        }
+      },
+      {
+        "type": "Performance",
+        "requirement": "The function `run_llm` uses the ollama.generate method which might involve significant computational resources. It is recommended to implement caching mechanisms or use rate limiting to optimize performance when handling frequent requests.",
+        "location": {
+          "line": 40,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "run_llm"
+        }
+      },
+      {
+        "type": "Performance",
+        "requirement": "The function may have performance issues if the response is large due to writing each JSON object individually. It would be more efficient to write all objects at once.",
+        "location": {
+          "line": 63,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "save_json_response"
+        }
+      },
+      {
+        "type": "Security",
+        "requirement": "The function does not check if the output file already exists. If it does, it could overwrite important data. Consider adding a check or making the function append-only.",
+        "location": {
+          "line": 63,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "save_json_response"
+        }
+      },
+      {
+        "type": "Reliability",
+        "requirement": "The function catches a generic exception. This could hide specific errors and make debugging harder. Consider catching specific exceptions.",
+        "location": {
+          "line": 63,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "save_json_response"
+        }
+      },
+      {
+        "type": "Scalability",
+        "requirement": "The function does not handle large responses well. If the response is too large, it could lead to memory issues when trying to load all objects into a list.",
+        "location": {
+          "line": 63,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "save_json_response"
+        }
+      },
+      {
+        "type": "Performance",
+        "requirement": "The function should handle large directories and files efficiently to avoid memory exhaustion or excessive processing time.",
+        "location": {
+          "line": 73,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "analyze_functions_in_directory"
+        }
+      },
+      {
+        "type": "Scalability",
+        "requirement": "The function should be able to process directories containing thousands of Python files without any restrictions.",
+        "location": {
+          "line": 73,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "analyze_functions_in_directory"
+        }
+      },
+      {
+        "type": "Security",
+        "requirement": "The function should validate and sanitize inputs to prevent potential security risks such as path traversal or code injection.",
+        "location": {
+          "line": 73,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "analyze_functions_in_directory"
+        }
+      },
+      {
+        "type": "Robustness",
+        "requirement": "The function should handle cases where files cannot be read, or an exception occurs while processing a file, ensuring the rest of the directory is processed.",
+        "location": {
+          "line": 73,
+          "file": "/Users/eduardosardenbergtavares1/Documents/PUC-Rio/StoneLab/stnl-dataminer-api/nfr.py",
+          "function_name": "analyze_functions_in_directory"
+        }
+      }
+    ]
+  }
+  
