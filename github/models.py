@@ -177,7 +177,7 @@ class GitHubIssuePullRequest(models.Model):
     is_pull_request = models.BooleanField(default=False)
     author_association = models.CharField(max_length=50, null=True, blank=True)
     reactions = models.JSONField(default=dict)
-    tipo = models.CharField(max_length=20)
+    data_type = models.CharField(max_length=20)
     time_mined = models.DateTimeField(null=True, help_text="Date and time of mining")
 
     class Meta:
@@ -188,4 +188,4 @@ class GitHubIssuePullRequest(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.tipo.capitalize()} {self.record_id} - {self.title}"
+        return f"{self.data_type.capitalize()} {self.record_id} - {self.title}"

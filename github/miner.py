@@ -911,7 +911,7 @@ class GitHubMiner:
                                 'labels': [label.get('name') for label in pr_details.get('labels', []) if label],
                                 'body': pr_details.get('body'),
                                 'time_mined': current_timestamp,
-                                'type': 'pull_request'  # Adds the type as 'pull_request'
+                                'data_type': 'pull_request'  # Adds the type as 'pull_request'
                             }
 
                             # Additional data collected only in complex mode
@@ -986,7 +986,7 @@ class GitHubMiner:
                                     'body': processed_pr.get('body'),
                                     'is_pull_request': True,
                                     'time_mined': current_timestamp,
-                                    'type': 'pull_request'  # Adds the type as 'pull_request'
+                                    'data_type': 'pull_request'  # Adds the type as 'pull_request'
                                 }
                             )
 
@@ -1144,7 +1144,7 @@ class GitHubMiner:
                             'timeline_events': timeline_events,
                             'comments_data': comments if depth == 'complex' else [],
                             'time_mined': current_timestamp,
-                            'tipo': 'issue'  # Adiciona o tipo como 'issue'
+                            'data_type': 'issue'  # Adiciona o tipo como 'issue'
                         }
 
                         if depth == 'basic':
@@ -1178,7 +1178,7 @@ class GitHubMiner:
                                 'author_association': processed_issue['author_association'],
                                 'reactions': processed_issue['reactions'],
                                 'time_mined': current_timestamp,
-                                'tipo': 'issue'  # Adiciona o tipo como 'issue'
+                                'data_type': 'issue'  # Adiciona o tipo como 'issue'
                             }
                         )
 

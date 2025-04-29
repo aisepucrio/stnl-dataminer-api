@@ -3,7 +3,7 @@ import textwrap
 import pandas as pd
 import json
 
-models = ["mistral-small:24b", "gemma3:27b", "qwq"]
+models = ["mistral-small:24b", "gemma3:27b"]
 
 def serialize_response(response: str) -> dict:
     try:

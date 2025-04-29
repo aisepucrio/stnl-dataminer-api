@@ -223,7 +223,7 @@ class CommitDetailView(generics.RetrieveAPIView):
 
 @extend_schema(tags=["GitHub"], summary="List all GitHub issues")
 class IssueListView(generics.ListAPIView):
-    queryset = GitHubIssuePullRequest.objects.filter(tipo='issue')
+    queryset = GitHubIssuePullRequest.objects.filter(data_type='issue')
     serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = GitHubIssuePullRequestFilter
@@ -232,13 +232,13 @@ class IssueListView(generics.ListAPIView):
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub issue")
 class IssueDetailView(generics.RetrieveAPIView):
-    queryset = GitHubIssuePullRequest.objects.filter(tipo='issue')
+    queryset = GitHubIssuePullRequest.objects.filter(data_type='issue')
     serializer_class = GitHubIssuePullRequestSerializer
     lookup_field = 'record_id'
 
 @extend_schema(tags=["GitHub"], summary="List all GitHub pull requests")
 class PullRequestListView(generics.ListAPIView):
-    queryset = GitHubIssuePullRequest.objects.filter(tipo='pull_request')
+    queryset = GitHubIssuePullRequest.objects.filter(data_type='pull_request')
     serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = GitHubIssuePullRequestFilter
@@ -247,7 +247,7 @@ class PullRequestListView(generics.ListAPIView):
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub pull request")
 class PullRequestDetailView(generics.RetrieveAPIView):
-    queryset = GitHubIssuePullRequest.objects.filter(tipo='pull_request')
+    queryset = GitHubIssuePullRequest.objects.filter(data_type='pull_request')
     serializer_class = GitHubIssuePullRequestSerializer
     lookup_field = 'record_id'
 
@@ -328,7 +328,7 @@ class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
                     "repo_name": {"type": "string", "description": "Repository name in format owner/repo"},
                     "start_date": {"type": "string", "format": "date-time", "description": "Start date in ISO format (optional)"},
                     "end_date": {"type": "string", "format": "date-time", "description": "End date in ISO format (optional)"},
-                    "tipo": {"type": "string", "description": "Type of data to fetch (issue or pull_request)", "default": "issue"},
+                    "data_type": {"type": "string", "description": "Type of data to fetch (issue or pull_request)", "default": "issue"},
                     "depth": {"type": "string", "description": "Depth of data to fetch (basic or full)", "default": "basic"}
                 },
                 "required": ["repo_name"]
@@ -343,7 +343,7 @@ class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
         repo_name = request.data.get('repo_name')
         start_date = request.data.get('start_date')
         end_date = request.data.get('end_date')
-        tipo = request.data.get('tipo', 'issue')
+        data_type = request.data.get('data_type', 'issue')
         depth = request.data.get('depth', 'basic')
 
         if not repo_name:
@@ -352,7 +352,7 @@ class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        task = fetch_issues_or_pull_requests.apply_async(args=[repo_name, start_date, end_date, tipo, depth])
+        task = fetch_issues_or_pull_requests.apply_async(args=[repo_name, start_date, end_date, data_type, depth])
 
         return Response({
             "task_id": task.id,
@@ -551,8 +551,8 @@ class DashboardView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        issue_filters = {'tipo': 'issue'}
-        pr_filters = {'tipo': 'pull_request'}
+        issue_filters = {'data_type': 'issue'}
+        pr_filters = {'data_type': 'pull_request'}
         commit_filters = {}
         
         if start_date:
