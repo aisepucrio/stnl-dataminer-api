@@ -766,3 +766,24 @@ You can access and explore the mined data using your favorite database client. H
 5. Save and connect.
 
 ---
+
+## Database Model
+
+The application uses a PostgreSQL database to store all mined information from GitHub and Jira. The data model was carefully designed to ensure integrity, performance, and flexibility for future analysis.
+
+Below is the entity-relationship (ER) diagram representing the main tables and relationships in the system:
+
+![Database Diagram](docs/database-diagram.png)
+
+### Main Tables
+
+- **github_commit**: Stores mined commits from GitHub repositories.
+- **github_issue_pull_request**: Stores issues and pull requests from GitHub.
+- **github_branch**: Stores repository branches.
+- **github_metadata**: Stores metadata about GitHub repositories.
+- **jira_issue**: Stores mined issues from Jira projects.
+- **task**: Manages the history and status of asynchronous mining tasks.
+
+The relationships between these tables allow you to track, for example, which commits are associated with which branches, issues, or tasks.
+
+---
