@@ -1,0 +1,31 @@
+[
+    {
+        "id": 2938799373,
+        "number": 5,
+        "title": "Reposit\u00f3rios privados n\u00e3o podem ser minerados devido \u00e0 limita\u00e7\u00e3o do PyDriller",
+        "state": "open",
+        "locked": false,
+        "assignees": [],
+        "labels": [],
+        "milestone": null,
+        "created_at": "2025-03-21T15:45:32Z",
+        "updated_at": "2025-03-21T15:45:32Z",
+        "closed_at": null,
+        "author_association": "MEMBER",
+        "body": "Atualmente, a API utiliza o PyDriller para extrair dados de commits dos reposit\u00f3rios GitHub. No entanto, o PyDriller precisa clonar o reposit\u00f3rio localmente para realizar a minera\u00e7\u00e3o e n\u00e3o suporta autentica\u00e7\u00e3o via token para acessar reposit\u00f3rios privados.\n\nIsso significa que apenas reposit\u00f3rios p\u00fablicos podem ser minerados, pois, para os privados, a tentativa de clonagem resulta em erro de permiss\u00e3o.\n\nPassos para reproduzir:\n\nFazer uma requisi\u00e7\u00e3o POST para minerar commits de um reposit\u00f3rio privado:\n\n{\n    \"repo_name\": \"meu-usuario/meu-repositorio-privado\",\n    \"start_date\": \"2023-01-01T00:00:00Z\",\n    \"end_date\": \"2023-12-31T00:00:00Z\"\n}\n\nA API retorna um erro informando que o reposit\u00f3rio n\u00e3o pode ser acessado.\nO problema ocorre porque o PyDriller n\u00e3o consegue autenticar o clone do reposit\u00f3rio.\n\nComportamento esperado:\n\n- Atualmente, a \u00fanica solu\u00e7\u00e3o \u00e9 utilizar apenas reposit\u00f3rios p\u00fablicos para a minera\u00e7\u00e3o de commits.\n- No futuro, pode ser interessante implementar uma solu\u00e7\u00e3o alternativa que permita autentica\u00e7\u00e3o para reposit\u00f3rios privados.\n\nPoss\u00edveis solu\u00e7\u00f5es:\n\n- \u2705 Explorar alternativas que permitam autentica\u00e7\u00e3o ao clonar reposit\u00f3rios privados com PyDriller.\n- \u2705 Atualizar a documenta\u00e7\u00e3o para informar que apenas reposit\u00f3rios p\u00fablicos podem ser minerados.\n\nImpacto:\n\ud83d\udd39 Usu\u00e1rios tentando minerar commits de reposit\u00f3rios privados encontrar\u00e3o erros inesperados.\n\ud83d\udd39 Pode limitar a utilidade da API para equipes que trabalham com c\u00f3digo privado.",
+        "reactions": {
+            "url": "https://api.github.com/repos/aisepucrio/stnl-dataminer-api/issues/5/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+        },
+        "is_pull_request": false,
+        "timeline_events": [],
+        "comments_data": [],
+        "time_mined": 

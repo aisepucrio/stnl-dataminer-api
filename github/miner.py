@@ -1124,8 +1124,8 @@ class GitHubMiner:
                                     'reactions': c.get('reactions', {})
                                 } for c in comments_response.json()]
 
-                            # Create object to save in the database
-                            processed_issue = {
+                        # Create object to save in the database - MOVED OUTSIDE THE CONDITIONAL BLOCK
+                        processed_issue = {
                             'id': issue['id'],
                             'number': issue['number'],
                             'title': issue['title'],
