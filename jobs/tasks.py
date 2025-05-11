@@ -25,6 +25,9 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             end_date = end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
             
         miner = GitHubMiner()
+        
+        metadata = miner.get_repository_metadata(repo_name)
+        
         commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha)
         
         self.update_state(
@@ -69,7 +72,11 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
     )
     try:
         miner = GitHubMiner()
+        
+        metadata = miner.get_repository_metadata(repo_name)
+        
         issues = miner.get_issues(repo_name, start_date, end_date, depth)
+        
         self.update_state(
             state='SUCCESS',
             meta={
@@ -116,7 +123,11 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
     )
     try:
         miner = GitHubMiner()
+        
+        metadata = miner.get_repository_metadata(repo_name)
+        
         pull_requests = miner.get_pull_requests(repo_name, start_date, end_date, depth)
+        
         self.update_state(
             state='SUCCESS',
             meta={
@@ -153,7 +164,11 @@ def fetch_branches(self, repo_name):
     )
     try:
         miner = GitHubMiner()
+        
+        metadata = miner.get_repository_metadata(repo_name)
+        
         branches = miner.get_branches(repo_name)
+        
         self.update_state(
             state='SUCCESS',
             meta={
@@ -236,7 +251,6 @@ def fetch_metadata(self, repo_name):
         miner = GitHubMiner()
         metadata = miner.get_repository_metadata(repo_name)
         
-        # Serialize the data before returning
         metadata_dict = {
             'repository': metadata.repository,
             'stars_count': metadata.stars_count,
@@ -302,7 +316,7 @@ def collect_all(self, repo_name, start_date=None, end_date=None, depth='basic', 
         if 'issues' in collect_types:
             tasks_to_run.append(fetch_issues.s(repo_name, start_date, end_date, depth))
         
-        if 'pull_requests' in collect_types:
+        if 'pull_requests' in collect_types:    
             tasks_to_run.append(fetch_pull_requests.s(repo_name, start_date, end_date, depth))
         
         if 'branches' in collect_types:
