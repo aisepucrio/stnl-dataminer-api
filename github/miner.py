@@ -288,13 +288,18 @@ class GitHubMiner:
             raise Exception(f"Error updating repo: {e}")
 
     def save_to_json(self, data, filename):
-        output_path = os.path.join(self.project_root_directory(), filename)
+        """Save data to a JSON file"""
         try:
-            with open(output_path, 'w') as outfile:
-                json.dump(data, outfile, indent=4)
-            print(f"Data successfully saved to {output_path}", flush=True)
+            def datetime_handler(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2, default=datetime_handler)
+            print(f"Data successfully saved to {filename}")
         except Exception as e:
-            print(f"Failed to save data to {output_path}: {e}", flush=True)
+            print(f"Failed to save data to {filename}: {str(e)}")
     
     def convert_to_iso8601(self, date):
         return date.isoformat()
@@ -482,6 +487,12 @@ class GitHubMiner:
         if not start_date or not end_date:
             yield (start_date, end_date)
             return
+
+        if isinstance(start_date, datetime):
+            start_date = start_date.strftime("%Y-%m-%dT%H:%M:%S")
+            
+        if isinstance(end_date, datetime):
+            end_date = end_date.strftime("%Y-%m-%dT%H:%M:%S")
 
         start = datetime.strptime(start_date.rstrip('Z'), "%Y-%m-%dT%H:%M:%S")
         end = datetime.strptime(end_date.rstrip('Z'), "%Y-%m-%dT%H:%M:%S")

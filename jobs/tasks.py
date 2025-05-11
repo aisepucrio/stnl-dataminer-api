@@ -1,10 +1,14 @@
-from celery import shared_task
+from celery import shared_task, group
 from github.miner import GitHubMiner
 from jira.miner import JiraMiner
 from django.conf import settings
+from datetime import datetime
 
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
+    """
+    Task para minerar commits de um repositório
+    """
     self.update_state(
         state='STARTED',
         meta={
@@ -13,9 +17,16 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             'commit_sha': commit_sha
         }
     )
+    
     try:
+        if isinstance(start_date, datetime):
+            start_date = start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+        if isinstance(end_date, datetime):
+            end_date = end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
         miner = GitHubMiner()
         commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha)
+        
         self.update_state(
             state='SUCCESS',
             meta={
@@ -25,12 +36,14 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
                 'data': commits
             }
         )
+        
         return {
             'operation': 'fetch_commits',
             'repository': repo_name,
             'commit_sha': commit_sha,
             'data': commits
         }
+        
     except Exception as e:
         self.update_state(
             state='FAILURE',
@@ -38,7 +51,8 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
                 'operation': 'fetch_commits',
                 'repository': repo_name,
                 'commit_sha': commit_sha,
-                'error': str(e)
+                'error': str(e),
+                'error_type': type(e).__name__
             }
         )
         raise
@@ -263,3 +277,72 @@ def fetch_metadata(self, repo_name):
             }
         )
         raise type(e)(str(e)).with_traceback(e.__traceback__)
+
+@shared_task(bind=True)
+def collect_all(self, repo_name, start_date=None, end_date=None, depth='basic', collect_types=None):
+    """
+    Task para coletar dados específicos de um repositório simultaneamente
+    """
+    self.update_state(
+        state='STARTED',
+        meta={
+            'operation': 'collect_all',
+            'repository': repo_name,
+            'depth': depth,
+            'collecting': collect_types
+        }
+    )
+    
+    try:
+        tasks_to_run = []
+        
+        if 'commits' in collect_types:
+            tasks_to_run.append(fetch_commits.s(repo_name, start_date, end_date))
+        
+        if 'issues' in collect_types:
+            tasks_to_run.append(fetch_issues.s(repo_name, start_date, end_date, depth))
+        
+        if 'pull_requests' in collect_types:
+            tasks_to_run.append(fetch_pull_requests.s(repo_name, start_date, end_date, depth))
+        
+        if 'branches' in collect_types:
+            tasks_to_run.append(fetch_branches.s(repo_name))
+        
+        if 'metadata' in collect_types:
+            tasks_to_run.append(fetch_metadata.s(repo_name))
+        
+        tasks = group(tasks_to_run)
+        
+        result = tasks.apply_async()
+        
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'operation': 'collect_all',
+                'repository': repo_name,
+                'depth': depth,
+                'group_id': result.id,
+                'collecting': collect_types
+            }
+        )
+        
+        return {
+            'operation': 'collect_all',
+            'repository': repo_name,
+            'depth': depth,
+            'group_id': result.id,
+            'collecting': collect_types
+        }
+        
+    except Exception as e:
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'operation': 'collect_all',
+                'repository': repo_name,
+                'depth': depth,
+                'error': str(e),
+                'error_type': type(e).__name__
+            }
+        )
+        raise
