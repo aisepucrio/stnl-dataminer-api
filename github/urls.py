@@ -2,6 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 
+app_name = 'github'  
+
 router = DefaultRouter()
 router.register(r'commits/collect', views.GitHubCommitViewSet, basename='commit-collect')
 router.register(r'commits/collect-by-sha', views.GitHubCommitByShaViewSet, basename='commit-collect-by-sha')

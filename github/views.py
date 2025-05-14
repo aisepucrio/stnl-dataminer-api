@@ -15,6 +15,8 @@ from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequ
 from jobs.models import Task
 from jobs.serializers import TaskSerializer
 from rest_framework import serializers
+from django.urls import reverse
+from rest_framework.test import APIClient
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -610,7 +612,10 @@ class DashboardView(APIView):
         return Response(response_data)
 
 class GitHubCollectAllSerializer(serializers.Serializer):
-    repo_name = serializers.CharField(help_text="Nome do repositório no formato owner/repo")
+    repositories = serializers.ListField(
+        child=serializers.CharField(help_text="Nome do repositório no formato owner/repo"),
+        help_text="Lista de repositórios para minerar"
+    )
     start_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data inicial para mineração (opcional)")
     end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data final para mineração (opcional)")
     depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Profundidade da mineração (basic ou complex)")
@@ -624,52 +629,118 @@ class GitHubCollectAllSerializer(serializers.Serializer):
             raise serializers.ValidationError("É necessário selecionar pelo menos um tipo de dado para minerar")
         return value
 
+    def validate_repositories(self, value):
+        if not value:
+            raise serializers.ValidationError("É necessário fornecer pelo menos um repositório para minerar")
+        return value
+
 class GitHubCollectAllViewSet(viewsets.ViewSet):
     @extend_schema(
-        summary="Minerar dados selecionados de um repositório",
+        summary="Minerar dados selecionados de múltiplos repositórios",
         tags=["GitHub"],
-        description="Endpoint para minerar dados específicos de um repositório simultaneamente",
+        description="Endpoint para minerar dados específicos de múltiplos repositórios simultaneamente",
         request=GitHubCollectAllSerializer,
         responses={
-            202: OpenApiResponse(description="Tarefa iniciada com sucesso"),
+            202: OpenApiResponse(description="Tarefas iniciadas com sucesso"),
             400: OpenApiResponse(description="Requisição inválida - parâmetros ausentes ou inválidos")
         }
     )
     def create(self, request):
-        serializer = GitHubCollectAllSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer = GitHubCollectAllSerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        repo_name = serializer.validated_data['repo_name']
-        start_date = serializer.validated_data.get('start_date')
-        end_date = serializer.validated_data.get('end_date')
-        depth = serializer.validated_data.get('depth', 'basic')
+            repositories = serializer.validated_data['repositories']
+            start_date = serializer.validated_data.get('start_date')
+            end_date = serializer.validated_data.get('end_date')
+            depth = serializer.validated_data.get('depth', 'basic')
+            collect_types = serializer.validated_data.get('collect_types')
 
-        if not any([
-            serializer.validated_data.get('collect_types')
-        ]):
-            return Response(
-                {'error': 'Selecione pelo menos um tipo de dado para minerar'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            results = []
+            client = APIClient()
 
-        task = collect_all.delay(
-            repo_name=repo_name,
-            start_date=start_date,
-            end_date=end_date,
-            depth=depth,
-            collect_types=serializer.validated_data.get('collect_types')
-        )
+            for repo_name in repositories:
+                repo_results = {
+                    'repository': repo_name,
+                    'tasks': []
+                }
 
-        Task.objects.create(
-            task_id=task.id,
-            operation='collect_all',
-            repository=repo_name,
-            status='PENDING'
-        )
+                try:
+                    if 'commits' in collect_types:
+                        response = client.post(
+                            reverse('github:commit-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'commits',
+                                'task_id': response.json().get('task_id')
+                            })
 
-        return Response({
-            'task_id': task.id,
-            'message': 'Tarefa de mineração simultânea iniciada com sucesso',
-            'status_endpoint': f'/api/jobs/tasks/{task.id}/'
-        }, status=status.HTTP_202_ACCEPTED)
+                    if 'issues' in collect_types:
+                        response = client.post(
+                            reverse('github:issue-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': depth},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'issues',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                    if 'pull_requests' in collect_types:
+                        response = client.post(
+                            reverse('github:pullrequest-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': depth},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'pull_requests',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                    if 'branches' in collect_types:
+                        response = client.post(
+                            reverse('github:branch-collect-list'),
+                            {'repo_name': repo_name},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'branches',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                    if 'metadata' in collect_types:
+                        response = client.post(
+                            reverse('github:metadata-collect-list'),
+                            {'repo_name': repo_name},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'metadata',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                except Exception as e:
+                    print(f"Erro ao processar repositório {repo_name}: {str(e)}")
+                    repo_results['error'] = str(e)
+
+                results.append(repo_results)
+
+            return Response({
+                'message': 'Tarefas de mineração iniciadas com sucesso',
+                'results': results
+            }, status=status.HTTP_202_ACCEPTED)
+
+        except Exception as e:
+            print(f"Erro na view collect-all: {str(e)}")
+            return Response({
+                'error': str(e),
+                'detail': 'Erro interno ao processar a requisição'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
