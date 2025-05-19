@@ -1,22 +1,33 @@
-from rest_framework import viewsets, generics
-from rest_framework.response import Response
-from rest_framework import status
-from jobs.tasks import fetch_commits, fetch_issues, fetch_pull_requests, fetch_branches, fetch_metadata, collect_all
-from .models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest
-from .serializers import GitHubCommitSerializer, GitHubBranchSerializer, GitHubMetadataSerializer, GitHubIssuePullRequestSerializer
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
-from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
-from rest_framework.views import APIView
-from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
-from drf_spectacular.types import OpenApiTypes
-from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
-from jobs.models import Task
-from jobs.serializers import TaskSerializer
-from rest_framework import serializers
+from django.db.models import Count
+from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
 from django.urls import reverse
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import generics, serializers, status, viewsets
+from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.response import Response
 from rest_framework.test import APIClient
+from rest_framework.views import APIView
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
+from jobs.models import Task
+from jobs.tasks import (
+    fetch_commits,
+    fetch_issues,
+    fetch_pull_requests,
+    fetch_branches,
+    fetch_metadata,
+    collect_all
+)
+from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
+from .models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest
+from .serializers import (
+    GitHubCommitSerializer,
+    GitHubBranchSerializer,
+    GitHubMetadataSerializer,
+    GitHubIssuePullRequestSerializer,
+    GraphDashboardSerializer
+)
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -744,3 +755,164 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                 'error': str(e),
                 'detail': 'Erro interno ao processar a requisição'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@extend_schema(
+    tags=["GitHub"],
+    summary="Graph Dashboard",
+    description="Provides time-series data for issues, pull requests, and commits over time. "
+                "Can be filtered by repository_id, start_date, and end_date.",
+    parameters=[
+        OpenApiParameter(
+            name="repository_id",
+            description="ID of the repository to get statistics for. If not provided, returns aggregated stats for all repositories.",
+            required=False,
+            type=int
+        ),
+        OpenApiParameter(
+            name="start_date",
+            description="Filter data from this date onwards (ISO format).",
+            required=False,
+            type=OpenApiTypes.DATETIME
+        ),
+        OpenApiParameter(
+            name="end_date",
+            description="Filter data up to this date (ISO format).",
+            required=False,
+            type=OpenApiTypes.DATETIME
+        ),
+        OpenApiParameter(
+            name="interval",
+            description="Time interval for grouping data (day, week, month). Default is 'day'.",
+            required=False,
+            type=str,
+            default="day"
+        ),
+    ],
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "repository_id": {"type": "integer", "nullable": True},
+                "repository_name": {"type": "string", "nullable": True},
+                "time_series": {
+                    "type": "object",
+                    "properties": {
+                        "labels": {"type": "array", "items": {"type": "string"}},
+                        "issues": {"type": "array", "items": {"type": "integer"}},
+                        "pull_requests": {"type": "array", "items": {"type": "integer"}},
+                        "commits": {"type": "array", "items": {"type": "integer"}}
+                    }
+                }
+            }
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "error": {"type": "string"}
+            },
+            "description": "Bad request due to invalid parameters"
+        }
+    }
+)
+class GraphDashboardView(APIView):
+    def get(self, request):
+        # Validate request parameters using serializer
+        serializer = GraphDashboardSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Extract validated data
+        validated_data = serializer.validated_data
+        repository_id = validated_data.get('repository_id')
+        start_date = validated_data.get('start_date')
+        end_date = validated_data.get('end_date')
+        interval = validated_data.get('interval', 'day')
+        
+        # Set up date truncation based on interval
+        if interval == 'day':
+            trunc_func = TruncDay
+            date_format = '%Y-%m-%d'
+        elif interval == 'week':
+            trunc_func = TruncWeek
+            date_format = 'Week %W, %Y'
+        else:  # month
+            trunc_func = TruncMonth
+            date_format = '%B %Y'
+        
+        # Base querysets - get all data from the database
+        issues_query = GitHubIssuePullRequest.objects.filter(data_type='issue')
+        prs_query = GitHubIssuePullRequest.objects.filter(data_type='pull_request')
+        commits_query = GitHubCommit.objects.all()
+        
+        # Apply filters if provided
+        if start_date:
+            issues_query = issues_query.filter(created_at__gte=start_date)
+            prs_query = prs_query.filter(created_at__gte=start_date)
+            commits_query = commits_query.filter(date__gte=start_date)
+        
+        if end_date:
+            issues_query = issues_query.filter(created_at__lte=end_date)
+            prs_query = prs_query.filter(created_at__lte=end_date)
+            commits_query = commits_query.filter(date__lte=end_date)
+        
+        repository_name = None
+        
+        # Apply repository filter if provided
+        if repository_id:
+            try:
+                metadata = GitHubMetadata.objects.get(id=repository_id)
+                repository_name = metadata.repository
+                
+                issues_query = issues_query.filter(repository=repository_name)
+                prs_query = prs_query.filter(repository=repository_name)
+                commits_query = commits_query.filter(repository=repository_name)
+            except GitHubMetadata.DoesNotExist:
+                # Just return empty data if repository doesn't exist
+                pass
+        
+        # Group data by date interval
+        issues_by_date = issues_query.annotate(
+            interval=trunc_func('created_at')
+        ).values('interval').annotate(count=Count('id')).order_by('interval')
+        
+        prs_by_date = prs_query.annotate(
+            interval=trunc_func('created_at')
+        ).values('interval').annotate(count=Count('id')).order_by('interval')
+        
+        commits_by_date = commits_query.annotate(
+            interval=trunc_func('date')
+        ).values('interval').annotate(count=Count('id')).order_by('interval')
+        
+        # Convert to dictionaries for easier lookup
+        issues_dict = {item['interval'].strftime(date_format): item['count'] for item in issues_by_date}
+        prs_dict = {item['interval'].strftime(date_format): item['count'] for item in prs_by_date}
+        commits_dict = {item['interval'].strftime(date_format): item['count'] for item in commits_by_date}
+        
+        # Get all unique dates from all three datasets
+        all_dates = set()
+        for date_dict in [issues_dict, prs_dict, commits_dict]:
+            all_dates.update(date_dict.keys())
+        
+        # Sort dates chronologically
+        date_range = sorted(list(all_dates))
+        
+        # Fill in the data for each date in the range
+        issues_data = [issues_dict.get(date_str, 0) for date_str in date_range]
+        prs_data = [prs_dict.get(date_str, 0) for date_str in date_range]
+        commits_data = [commits_dict.get(date_str, 0) for date_str in date_range]
+        
+        # Prepare response
+        response_data = {
+            "time_series": {
+                "labels": date_range,
+                "issues": issues_data,
+                "pull_requests": prs_data,
+                "commits": commits_data
+            }
+        }
+        
+        if repository_id:
+            response_data["repository_id"] = repository_id
+            response_data["repository_name"] = repository_name
+        
+        return Response(response_data)

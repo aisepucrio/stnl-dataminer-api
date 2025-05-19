@@ -26,4 +26,5 @@ urlpatterns = [
     path('branches/<str:name>/', views.BranchDetailView.as_view(), name='branch-detail'),
     path('metadata/', views.MetadataListView.as_view(), name='metadata-list'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    path('dashboard/graph/', views.GraphDashboardView.as_view(), name='graph-dashboard'),
 ]

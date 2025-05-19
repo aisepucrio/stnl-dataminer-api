@@ -110,3 +110,23 @@ class GitHubIssuePullRequestSerializer(serializers.ModelSerializer):
 
     def get_merged_at_formatted(self, obj):
         return obj.merged_at.strftime("%Y-%m-%d %H:%M:%S") if obj.merged_at else None
+
+
+class GraphDashboardSerializer(serializers.Serializer):
+    repository_id = serializers.IntegerField(required=False)
+    start_date = serializers.DateTimeField(required=False)
+    end_date = serializers.DateTimeField(required=False)
+    interval = serializers.ChoiceField(
+        choices=['day', 'week', 'month'],
+        default='day',
+        required=False
+    )
+    
+    def validate(self, data):
+        """
+        Check that start_date is before end_date if both are provided.
+        """
+        if 'start_date' in data and 'end_date' in data:
+            if data['start_date'] > data['end_date']:
+                raise serializers.ValidationError("start_date must be before end_date")
+        return data
