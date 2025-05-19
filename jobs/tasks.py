@@ -2,6 +2,7 @@ from celery import shared_task, group
 from github.miner import GitHubMiner
 from jira.miner import JiraMiner
 from django.conf import settings
+from datetime import datetime
 
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):

@@ -9,6 +9,7 @@ router.register(r'issues/collect', views.GitHubIssueViewSet, basename='issue-col
 router.register(r'pull-requests/collect', views.GitHubPullRequestViewSet, basename='pullrequest-collect')
 router.register(r'branches/collect', views.GitHubBranchViewSet, basename='branch-collect')
 router.register(r'metadata/collect', views.GitHubMetadataViewSet, basename='metadata-collect')
+router.register(r'collect-all', views.GitHubCollectAllViewSet, basename='collect-all')
 
 urlpatterns = [
     path('', include(router.urls)),
