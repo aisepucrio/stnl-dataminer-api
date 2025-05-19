@@ -2,13 +2,15 @@ import os
 import requests
 from datetime import datetime
 from requests.auth import HTTPBasicAuth
-from .models import JiraIssue
+from .models import JiraIssue, JiraProject, JiraUser, JiraComment, JiraHistory,JiraHistoryItem, JiraActivityLog, JiraChecklist, JiraSprint,JiraIssueLink, JiraCommit
+from django.db import models
 from django.utils.dateparse import parse_datetime
 from urllib.parse import quote
 import time
-import traceback
 from dotenv import load_dotenv
 from django.utils import timezone
+from jira.models import JiraIssueType
+
 
 class JiraMiner:
     def __init__(self, jira_domain):
@@ -96,7 +98,7 @@ class JiraMiner:
         encoded_jql = quote(jql_query)
 
         while True:
-            jira_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&startAt={start_at}&maxResults={max_results}"
+            jira_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&startAt={start_at}&maxResults={max_results}&expand=changelog"
             response = requests.get(jira_url, headers=self.headers, auth=self.auth)
 
             if self.handle_rate_limit(response):
@@ -110,41 +112,75 @@ class JiraMiner:
                 break
 
             for issue_data in issues:
-                current_timestamp = timezone.make_aware(datetime.fromtimestamp(time.time()))
-                description = self.extract_words_from_description(issue_data['fields'].get('description', ''))
-                issue_data = self.replace_custom_fields_with_names(issue_data, custom_fields_mapping)
-                commits = self.get_commits_for_issue(issue_data['key'])
-                comments = self.get_comments_for_issue(issue_data['key'])
-                
-                # Collecting new data
-                history = self.get_issue_history(issue_data['key'])
-                activity_log = self.get_activity_log(issue_data['key'])
-                checklist = self.get_checklist(issue_data['key'])
+                fields = issue_data["fields"]
+                issue_id = issue_data["id"]
+                issue_key = issue_data["key"]
+                current_timestamp = timezone.now()
+                description = self.extract_words_from_description(fields.get("description"))
 
-                JiraIssue.objects.update_or_create(
-                    issue_id=issue_data['id'],
+                # Ensure related objects
+                project_obj, _ = JiraProject.objects.get_or_create(
+                    id=fields['project']['id'],
                     defaults={
-                        'issue_key': issue_data['key'],
-                        'issuetype': issue_data['fields']['issuetype']['name'],
-                        'issuetype_description': issue_data['fields']['issuetype']['description'],
-                        'summary': issue_data['fields']['summary'],
-                        'description': description,
-                        'created': issue_data['fields']['created'],
-                        'updated': issue_data['fields']['updated'],
-                        'status': issue_data['fields']['status']['name'],
-                        'priority': issue_data['fields']['priority']['name'] if issue_data['fields'].get('priority') else None,
-                        'project': project_key,
-                        'creator': issue_data['fields']['creator']['displayName'],
-                        'assignee': issue_data['fields']['assignee']['displayName'] if issue_data['fields'].get('assignee') else None,
-                        'all_fields': issue_data['fields'],
-                        'time_mined': current_timestamp,
-                        'commits': commits,
-                        'comments': comments,
-                        'history': history,
-                        'activity_log': activity_log,
-                        'checklist': checklist
+                        'key': fields['project']['key'],
+                        'name': fields['project']['name'],
+                        'simplified': fields['project'].get('simplified', False),
+                        'projectTypeKey': fields['project']['projectTypeKey']
                     }
                 )
+
+
+                creator_obj = self.ensure_user(fields["creator"])
+                assignee_obj = self.ensure_user(fields.get("assignee"))
+                reporter_obj = self.ensure_user(fields.get("reporter"))
+
+                parent_issue_id = fields.get('parent', {}).get('id')
+                parent_issue_obj = None
+                if parent_issue_id:
+                    parent_issue_obj = JiraIssue.objects.filter(issue_id=parent_issue_id).first()
+
+
+                # Save main issue
+                issue_obj, _ = JiraIssue.objects.update_or_create(
+                    issue_id=issue_id,
+                    defaults={
+                        "issue_key": issue_key,
+                        "project": project_obj,
+                        "created": parse_datetime(fields["created"]),
+                        "updated": parse_datetime(fields["updated"]),
+                        "status": fields["status"]["name"],
+                        "priority": fields["priority"]["name"] if fields.get("priority") else None,
+                        "assignee": assignee_obj,
+                        "creator": creator_obj,
+                        "reporter": reporter_obj,
+                        "summary": fields["summary"],
+                        "description": description,
+                        "duedate": parse_datetime(fields["duedate"]) if fields.get("duedate") else None,
+                        "timeoriginalestimate": fields.get("timeoriginalestimate"),
+                        "timeestimate": fields.get("timeestimate"),
+                        "timespent": fields.get("timespent"),
+                        "time_mined": current_timestamp,
+                        "parent_issue": parent_issue_obj
+                    }
+                )
+
+                JiraIssueType.objects.update_or_create(
+                    issue=issue_obj,
+                    defaults={
+                        'issuetype': fields['issuetype']['name'],
+                        'issuetype_description': fields['issuetype'].get('description', ''),
+                        'hierarchyLevel': fields['issuetype'].get('hierarchyLevel', 0),
+                        'subtask': fields['issuetype'].get('subtask', False)
+                    }
+                )
+
+
+                # Sub-tabelas
+                self.save_comments(issue_key, issue_obj)
+                self.save_history(issue_key, issue_obj)
+                self.save_activity(issue_key, issue_obj)
+                self.save_checklist(issue_key, issue_obj)
+                self.save_commits(issue_key, issue_obj)
 
             total_collected += len(issues)
             start_at += max_results
@@ -507,3 +543,100 @@ class JiraMiner:
             except ValueError:
                 continue
         raise ValueError(f"Invalid date format: {date_string}. Expected formats are: 'yyyy-MM-dd' or 'yyyy-MM-dd HH:mm'.")
+    
+
+    def ensure_user(self, user_data):
+        if not user_data:
+            return None
+
+        user_obj, _ = JiraUser.objects.get_or_create(
+            accountId=user_data['accountId'],
+            defaults={
+                'displayName': user_data.get('displayName', ''),
+                'emailAddress': user_data.get('emailAddress', ''),
+                'active': user_data.get('active', True),
+                'timeZone': user_data.get('timeZone', 'UTC'),
+                'accountType': user_data.get('accountType', 'atlassian')
+            }
+        )
+        return user_obj
+
+    def save_comments(self, issue_key, issue_obj):
+        comments = self.get_comments_for_issue(issue_key)
+        for c in comments:
+            JiraComment.objects.update_or_create(
+                id=c['id'],
+                defaults={
+                    'issue': issue_obj,
+                    'author': c['author'],
+                    'body': c['body'],
+                    'created': parse_datetime(c['created']),
+                    'updated': parse_datetime(c['updated'])
+                }
+            )
+
+    def save_history(self, issue_key, issue_obj):
+        history_list = self.get_issue_history(issue_key)
+        for h in history_list:
+            history_obj, _ = JiraHistory.objects.update_or_create(
+                id=h['id'],
+                defaults={
+                    'issue': issue_obj,
+                    'author': h['author'],
+                    'created': parse_datetime(h['created'])
+                }
+            )
+            for item in h['items']:
+                JiraHistoryItem.objects.update_or_create(
+                    history=history_obj,
+                    field=item['field'],
+                    defaults={
+                        'fieldtype': item['fieldtype'],
+                        'from_value': item['from'],
+                        'to_value': item['to'],
+                        'fromString': item['fromString'],
+                        'toString': item['toString']
+                    }
+                )
+
+    def save_activity(self, issue_key, issue_obj):
+        activities = self.get_activity_log(issue_key)
+        for a in activities:
+            JiraActivityLog.objects.create(
+                issue=issue_obj,
+                to_value=a.get('to'),
+                from_value=a.get('from'),
+                author=a['author'],
+                created=parse_datetime(a['created']),
+                description=a['description'][:300]
+            )
+
+
+    def save_checklist(self, issue_key, issue_obj):
+        checklist = self.get_checklist(issue_key)
+        if checklist:
+            JiraChecklist.objects.update_or_create(
+                issue=issue_obj,
+                defaults={
+                    'checklist': checklist,
+                    'progress': f"Checklist: {sum(1 for i in checklist if i['completed'])}/{len(checklist)}",
+                    'completed': all(i['completed'] for i in checklist)
+                }
+            )
+
+    def save_commits(self, issue_key, issue_obj):
+        commits = self.get_commits_for_issue(issue_key)
+        for c in commits:
+            JiraCommit.objects.update_or_create(
+                sha=c['id'],
+                defaults={
+                    'issue': issue_obj,
+                    'author': c.get('author', ''),
+                    'author_email': c.get('authorEmail', ''),
+                    'message': c.get('message'),
+                    'repository_id': c.get('url'),
+                    'timestamp': timezone.now()  # Ideally parse from data if available
+                }
+            )
+
+    

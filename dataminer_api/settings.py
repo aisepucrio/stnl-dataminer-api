@@ -96,7 +96,7 @@ DATABASES = {
 
 # Jira Config
 JIRA_EMAIL = os.getenv("JIRA_EMAIL")
-JIRA_API_TOKEN = os.getenv("JIRA_API_TOKEN").strip('"')
+JIRA_API_TOKEN = (os.getenv("JIRA_API_TOKEN") or "").strip('"')
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
