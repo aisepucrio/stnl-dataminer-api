@@ -51,8 +51,18 @@ logger = logging.getLogger(__name__)
 class JiraIssueCollectView(APIView):
     def post(self, request, *args, **kwargs):
         try:
-            jira_domain = request.data.get('jira_domain')
-            project_key = request.data.get('project_key')
+            projects = request.data.get('projects', [])
+        
+            if not projects:
+                return Response({"error": "Nenhum projeto fornecido."}, status=400)
+
+            for project_info in projects:
+                jira_domain = project_info.get('jira_domain')
+                project_key = project_info.get('project_key')
+
+                if not jira_domain or not project_key:
+                    return Response({"error": "Each project must contain 'jira_domain' and 'project'."}, status=400)
+
             issuetypes = request.data.get('issuetypes', [])  
             start_date = request.data.get('start_date', None)
             end_date = request.data.get('end_date', None)
@@ -73,21 +83,38 @@ class JiraIssueCollectView(APIView):
                 )
 
             # Start Celery task (Removed jira_email and jira_api_token from the call)
-            task = collect_jira_issues_task.delay(
-                jira_domain,
-                project_key,
-                issuetypes if issuetypes else [],  # Ensures it's always a list
-                start_date,
-                end_date
-            )
-            
-            # Save tasks on database
-            Task.objects.create(
-                task_id=task.id,
-                operation='collect_jira_issues',
-                repository=f"{jira_domain}/{project_key}",
-                status='PENDING'
-            )
+            tasks = []
+
+            for project_info in projects:
+                jira_domain = project_info.get('jira_domain')
+                project_key = project_info.get('project_key')
+
+                if not jira_domain or not project_key:
+                    return Response(
+                        {"error": "Each project must contain 'jira_domain' and 'project'."},
+                        status=400
+                    )
+
+                task = collect_jira_issues_task.delay(
+                    jira_domain,
+                    project_key,
+                    issuetypes if issuetypes else [], 
+                    start_date,
+                    end_date
+                )
+
+                Task.objects.create(
+                    task_id=task.id,
+                    operation='collect_jira_issues',
+                    repository=f"{jira_domain}/{project_key}",
+                    status='PENDING'
+                )
+
+                tasks.append({
+                    "task_id": task.id,
+                    "repository": f"{jira_domain}/{project_key}"
+                })
+
 
             return Response(
                 {
