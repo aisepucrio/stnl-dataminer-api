@@ -1,5 +1,5 @@
 from django.db.models import Count
-from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
+from django.db.models.functions import TruncDay, TruncMonth, TruncYear
 from django.urls import reverse
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -832,12 +832,12 @@ class GraphDashboardView(APIView):
         if interval == 'day':
             trunc_func = TruncDay
             date_format = '%Y-%m-%d'
-        elif interval == 'week':
-            trunc_func = TruncWeek
-            date_format = 'Week %W, %Y'
-        else:  # month
+        elif interval == 'month':
             trunc_func = TruncMonth
-            date_format = '%B %Y'
+            date_format = '%Y-%m'
+        else:
+            trunc_func = TruncYear
+            date_format = '%Y'
         
         # Base querysets - get all data from the database
         issues_query = GitHubIssuePullRequest.objects.filter(data_type='issue')
