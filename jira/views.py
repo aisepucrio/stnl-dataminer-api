@@ -329,9 +329,9 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
                 "project_name": "Sample Project",
                 "issues_count": 120,
                 "time_mined": "2023-01-01T12:00:00Z",
-                "sprints_count": 5,    
-                "comments_count": 250, 
-                "commits_count": 80    
+                "sprints_count": 5,
+                "comments_count": 250,
+                "commits_count": 80
             },
             summary="Example with project_id"
         ),
@@ -339,8 +339,15 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
             "All Projects Example",
             value={
                 "issues_count": 500,
-                "projects_count": 5,
-                "projects": ["Project One", "Project Two", "Project Three"]
+                "projects_count": 3,
+                "projects": [
+                    {"id": "1", "name": "Project One"},
+                    {"id": "2", "name": "Project Two"},
+                    {"id": "3", "name": "Project Three"}
+                ],
+                "sprints_count": 15,
+                "comments_count": 750,
+                "commits_count": 300
             },
             summary="Example without project_name"
         ),
@@ -425,7 +432,6 @@ class JiraDashboardView(APIView):
             print(e)
             return Response({"error": "An internal server error occurred. Please try again later."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
 @extend_schema(
     tags=['Jira'],
     summary="Graph Dashboard Data",
@@ -475,7 +481,46 @@ class JiraDashboardView(APIView):
                 }
             }
         }
-    }
+    },
+    examples=[
+        OpenApiExample(
+            "Project Example",
+            value={
+                "project_id": "123",
+                "project_name": "Sample Project",
+                "time_series": {
+                    "labels": ["2023-01-01", "2023-01-02", "2023-01-03"],
+                    "issues": [5, 7, 3],
+                    "comments": [2, 4, 1],
+                    "commits": [1, 0, 2],
+                    "sprints": [0, 1, 0]
+                }
+            },
+            summary="Example with project_id"
+        ),
+        OpenApiExample(
+            "All Projects Example",
+            value={
+                "time_series": {
+                    "labels": ["2023-01-01", "2023-01-02", "2023-01-03"],
+                    "issues": [10, 12, 8],
+                    "comments": [5, 6, 3],
+                    "commits": [2, 1, 3],
+                    "sprints": [1, 0, 1]
+                }
+            },
+            summary="Example without project_id"
+        ),
+        OpenApiExample(
+            "Error Example - Invalid Date",
+            value={
+                "error": "Invalid start_date format. Please use ISO format (YYYY-MM-DDTHH:MM:SSZ)."
+            },
+            summary="Example of invalid date format error",
+            response_only=True,
+            status_codes=["400"]
+        )
+    ]
 )
 class JiraGraphDashboardView(APIView):
     def get(self, request):
