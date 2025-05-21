@@ -1,29 +1,21 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework import generics
+from django.conf import settings
+from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from rest_framework import generics, status
 from rest_framework.filters import SearchFilter, OrderingFilter
-from .models import JiraIssue
-from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
-from .filters import JiraIssueFilter
-from jobs.tasks import collect_jira_issues_task
-from django.conf import settings
-import logging
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
 from jobs.models import Task
-from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
-from drf_spectacular.types import OpenApiTypes
-from .models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit # Added JiraSprint, JiraComment, JiraCommit
-from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
-from .filters import JiraIssueFilter
 from jobs.tasks import collect_jira_issues_task
-from django.conf import settings
+from .filters import JiraIssueFilter
+from .models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit
+from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
+
 import logging
-from jobs.models import Task
-from django.utils import timezone
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
-from drf_spectacular.types import OpenApiTypes
 
 # Debug logging configuration
 logger = logging.getLogger(__name__)
