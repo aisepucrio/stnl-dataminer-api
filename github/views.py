@@ -512,12 +512,12 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                 "forks_count": 25,
                 "stars_count": 100,
                 "watchers_count": 30,
-                "time_mined": "2023-01-01T12:00:00Z"
+                "time_mined": "2024-01-01T12:00:00Z"
             },
             summary="Example with repository_id"
         ),
         OpenApiExample(
-            "All Repositories Example",
+            "All Repositories Example with Date Filters",
             value={
                 "issues_count": 500,
                 "pull_requests_count": 200,
@@ -525,10 +525,28 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                 "repositories_count": 5,
                 "repositories": [
                     {"id": 1, "repository": "owner/repo1"},
-                    {"id": 2, "repository": "owner/repo2"}
+                    {"id": 2, "repository": "owner/repo2"},
+                    {"id": 3, "repository": "owner/repo3"},
+                    {"id": 4, "repository": "owner/repo4"},
+                    {"id": 5, "repository": "owner/repo5"}
                 ]
             },
-            summary="Example without repository_id"
+            summary="Example without repository_id showing multiple repositories"
+        ),
+        OpenApiExample(
+            "Repository Example with No Activity",
+            value={
+                "repository_id": 3,
+                "repository_name": "owner/inactive-repo",
+                "issues_count": 0,
+                "pull_requests_count": 0,
+                "commits_count": 0,
+                "forks_count": 0,
+                "stars_count": 0,
+                "watchers_count": 0,
+                "time_mined": "2024-01-01T12:00:00Z"
+            },
+            summary="Example of repository with no activity"
         )
     ]
 )
@@ -812,7 +830,49 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
             },
             "description": "Bad request due to invalid parameters"
         }
-    }
+    },
+    examples=[
+        OpenApiExample(
+            "Single Repository Example",
+            value={
+                "repository_id": 1,
+                "repository_name": "owner/repo",
+                "time_series": {
+                    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                    "issues": [5, 3, 7],
+                    "pull_requests": [2, 4, 1],
+                    "commits": [10, 8, 12]
+                }
+            },
+            description="Example response for a specific repository"
+        ),
+        OpenApiExample(
+            "All Repositories Example",
+            value={
+                "time_series": {
+                    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                    "issues": [15, 12, 20],
+                    "pull_requests": [8, 10, 5],
+                    "commits": [25, 30, 28]
+                }
+            },
+            description="Example response for all repositories"
+        ),
+        OpenApiExample(
+            "Monthly Interval Example",
+            value={
+                "repository_id": 1,
+                "repository_name": "owner/repo",
+                "time_series": {
+                    "labels": ["2024-01", "2024-02", "2024-03"],
+                    "issues": [50, 45, 60],
+                    "pull_requests": [20, 25, 18],
+                    "commits": [100, 95, 110]
+                }
+            },
+            description="Example response with monthly interval"
+        )
+    ]
 )
 class GraphDashboardView(APIView):
     def get(self, request):
