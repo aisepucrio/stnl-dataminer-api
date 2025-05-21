@@ -819,7 +819,7 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
 @extend_schema(
     tags=["GitHub"],
     summary="Graph Dashboard",
-    description="Provides time-series data for issues, pull requests, and commits over time. "
+    description="Provides cumulative time-series data for issues, pull requests, and commits over time. "
                 "Can be filtered by repository_id, start_date, and end_date.",
     parameters=[
         OpenApiParameter(
@@ -830,13 +830,13 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
         ),
         OpenApiParameter(
             name="start_date",
-            description="Filter data from this date onwards (ISO format).",
+            description="Filter display window from this date onwards (ISO format).",
             required=False,
             type=OpenApiTypes.DATETIME
         ),
         OpenApiParameter(
             name="end_date",
-            description="Filter data up to this date (ISO format).",
+            description="Filter display window up to this date (ISO format).",
             required=False,
             type=OpenApiTypes.DATETIME
         ),
@@ -881,24 +881,24 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                 "repository_name": "owner/repo",
                 "time_series": {
                     "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
-                    "issues": [5, 3, 7],
-                    "pull_requests": [2, 4, 1],
-                    "commits": [10, 8, 12]
+                    "issues": [5, 8, 15],
+                    "pull_requests": [2, 6, 7],
+                    "commits": [10, 18, 30]
                 }
             },
-            description="Example response for a specific repository"
+            description="Example response for a specific repository showing cumulative counts"
         ),
         OpenApiExample(
             "All Repositories Example",
             value={
                 "time_series": {
                     "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
-                    "issues": [15, 12, 20],
-                    "pull_requests": [8, 10, 5],
-                    "commits": [25, 30, 28]
+                    "issues": [15, 27, 47],
+                    "pull_requests": [8, 18, 23],
+                    "commits": [25, 55, 83]
                 }
             },
-            description="Example response for all repositories"
+            description="Example response for all repositories showing cumulative counts"
         ),
         OpenApiExample(
             "Monthly Interval Example",
@@ -907,12 +907,12 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                 "repository_name": "owner/repo",
                 "time_series": {
                     "labels": ["2024-01", "2024-02", "2024-03"],
-                    "issues": [50, 45, 60],
-                    "pull_requests": [20, 25, 18],
-                    "commits": [100, 95, 110]
+                    "issues": [50, 95, 155],
+                    "pull_requests": [20, 45, 63],
+                    "commits": [100, 195, 305]
                 }
             },
-            description="Example response with monthly interval"
+            description="Example response with monthly interval showing cumulative counts"
         )
     ]
 )
@@ -946,20 +946,8 @@ class GraphDashboardView(APIView):
         prs_query = GitHubIssuePullRequest.objects.filter(data_type='pull_request')
         commits_query = GitHubCommit.objects.all()
         
-        # Apply filters if provided
-        if start_date:
-            issues_query = issues_query.filter(created_at__gte=start_date)
-            prs_query = prs_query.filter(created_at__gte=start_date)
-            commits_query = commits_query.filter(date__gte=start_date)
-        
-        if end_date:
-            issues_query = issues_query.filter(created_at__lte=end_date)
-            prs_query = prs_query.filter(created_at__lte=end_date)
-            commits_query = commits_query.filter(date__lte=end_date)
-        
-        repository_name = None
-        
         # Apply repository filter if provided
+        repository_name = None
         if repository_id:
             try:
                 metadata = GitHubMetadata.objects.get(id=repository_id)
@@ -969,10 +957,15 @@ class GraphDashboardView(APIView):
                 prs_query = prs_query.filter(repository=repository_name)
                 commits_query = commits_query.filter(repository=repository_name)
             except GitHubMetadata.DoesNotExist:
-                # Just return empty data if repository doesn't exist
                 pass
+
+        # Get all data up to end_date for cumulative counts
+        if end_date:
+            issues_query = issues_query.filter(created_at__lte=end_date)
+            prs_query = prs_query.filter(created_at__lte=end_date)
+            commits_query = commits_query.filter(date__lte=end_date)
         
-        # Group data by date interval
+        # Group data by date interval and calculate cumulative counts
         issues_by_date = issues_query.annotate(
             interval=trunc_func('created_at')
         ).values('interval').annotate(count=Count('id')).order_by('interval')
@@ -985,23 +978,55 @@ class GraphDashboardView(APIView):
             interval=trunc_func('date')
         ).values('interval').annotate(count=Count('id')).order_by('interval')
         
-        # Convert to dictionaries for easier lookup
-        issues_dict = {item['interval'].strftime(date_format): item['count'] for item in issues_by_date}
-        prs_dict = {item['interval'].strftime(date_format): item['count'] for item in prs_by_date}
-        commits_dict = {item['interval'].strftime(date_format): item['count'] for item in commits_by_date}
+        # Convert to dictionaries with cumulative counts
+        issues_dict = {}
+        prs_dict = {}
+        commits_dict = {}
         
-        # Get all unique dates from all three datasets
+        cumulative_issues = 0
+        cumulative_prs = 0
+        cumulative_commits = 0
+        
+        for item in issues_by_date:
+            cumulative_issues += item['count']
+            issues_dict[item['interval'].strftime(date_format)] = cumulative_issues
+            
+        for item in prs_by_date:
+            cumulative_prs += item['count']
+            prs_dict[item['interval'].strftime(date_format)] = cumulative_prs
+            
+        for item in commits_by_date:
+            cumulative_commits += item['count']
+            commits_dict[item['interval'].strftime(date_format)] = cumulative_commits
+        
+        # Get all unique dates
         all_dates = set()
         for date_dict in [issues_dict, prs_dict, commits_dict]:
             all_dates.update(date_dict.keys())
         
-        # Sort dates chronologically
+        # Filter date range if start_date is provided
         date_range = sorted(list(all_dates))
+        if start_date:
+            date_range = [d for d in date_range if d >= start_date.strftime(date_format)]
         
-        # Fill in the data for each date in the range
-        issues_data = [issues_dict.get(date_str, 0) for date_str in date_range]
-        prs_data = [prs_dict.get(date_str, 0) for date_str in date_range]
-        commits_data = [commits_dict.get(date_str, 0) for date_str in date_range]
+        # Fill in the cumulative data for each date in the range
+        # Use the last known cumulative value for dates with no new items
+        issues_data = []
+        prs_data = []
+        commits_data = []
+        
+        last_issues = 0
+        last_prs = 0
+        last_commits = 0
+        
+        for date_str in date_range:
+            last_issues = issues_dict.get(date_str, last_issues)
+            last_prs = prs_dict.get(date_str, last_prs)
+            last_commits = commits_dict.get(date_str, last_commits)
+            
+            issues_data.append(last_issues)
+            prs_data.append(last_prs)
+            commits_data.append(last_commits)
         
         # Prepare response
         response_data = {

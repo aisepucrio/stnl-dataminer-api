@@ -435,7 +435,7 @@ class JiraDashboardView(APIView):
 @extend_schema(
     tags=['Jira'],
     summary="Graph Dashboard Data",
-    description="Provides time-series data for issues, comments, commits, and sprints",
+    description="Provides cumulative time-series data for issues, comments, commits, and sprints",
     parameters=[
         OpenApiParameter(
             name='project_id',
@@ -445,13 +445,13 @@ class JiraDashboardView(APIView):
         ),
         OpenApiParameter(
             name='start_date',
-            description='Filter data from this date onwards (ISO format)',
+            description='Filter display range from this date onwards (ISO format)',
             required=False,
             type=OpenApiTypes.DATETIME
         ),
         OpenApiParameter(
             name='end_date',
-            description='Filter data up to this date (ISO format)',
+            description='Filter display range up to this date (ISO format)',
             required=False,
             type=OpenApiTypes.DATETIME
         ),
@@ -490,26 +490,26 @@ class JiraDashboardView(APIView):
                 "project_name": "Sample Project",
                 "time_series": {
                     "labels": ["2023-01-01", "2023-01-02", "2023-01-03"],
-                    "issues": [5, 7, 3],
-                    "comments": [2, 4, 1],
-                    "commits": [1, 0, 2],
-                    "sprints": [0, 1, 0]
+                    "issues": [5, 12, 15],
+                    "comments": [2, 6, 7],
+                    "commits": [1, 1, 3],
+                    "sprints": [0, 1, 1]
                 }
             },
-            summary="Example with project_id"
+            summary="Example with project_id showing cumulative counts"
         ),
         OpenApiExample(
             "All Projects Example",
             value={
                 "time_series": {
                     "labels": ["2023-01-01", "2023-01-02", "2023-01-03"],
-                    "issues": [10, 12, 8],
-                    "comments": [5, 6, 3],
-                    "commits": [2, 1, 3],
-                    "sprints": [1, 0, 1]
+                    "issues": [10, 22, 30],
+                    "comments": [5, 11, 14],
+                    "commits": [2, 3, 6],
+                    "sprints": [1, 1, 2]
                 }
             },
-            summary="Example without project_id"
+            summary="Example without project_id showing cumulative counts"
         ),
         OpenApiExample(
             "Error Example - Invalid Date",
@@ -541,70 +541,58 @@ class JiraGraphDashboardView(APIView):
                 trunc_func = TruncYear
                 date_format = '%Y'
 
-            # Base queryset filters
-            filters = {}
+            # Base queryset filters for display range
+            display_filters = {}
             if start_date:
-                filters['created__gte'] = start_date
+                display_filters['created__gte'] = start_date
             if end_date:
-                filters['created__lte'] = end_date
+                display_filters['created__lte'] = end_date
             if project_id:
-                filters['project_id'] = project_id
+                display_filters['project_id'] = project_id
 
-            # Get issues data
-            issues_data = (
-                JiraIssue.objects.filter(**filters)
-                .annotate(interval=trunc_func('created'))
-                .values('interval')
-                .annotate(count=Count('issue_id'))
-                .order_by('interval')
-            )
+            # Project filter for cumulative counts
+            project_filter = {'project_id': project_id} if project_id else {}
 
-            # Get comments data
-            comments_data = (
-                JiraComment.objects.filter(issue__in=JiraIssue.objects.filter(**filters))
-                .annotate(interval=trunc_func('created'))
-                .values('interval')
-                .annotate(count=Count('id'))
-                .order_by('interval')
-            )
+            # Get cumulative data for each date in the display range
+            issues_data = []
+            comments_data = []
+            commits_data = []
+            sprints_data = []
+            
+            base_issues = JiraIssue.objects.filter(**project_filter)
+            base_comments = JiraComment.objects.filter(issue__in=base_issues)
+            base_commits = JiraCommit.objects.filter(issue__in=base_issues)
+            base_sprints = JiraSprint.objects.filter(issue__in=base_issues)
 
-            # Get commits data
-            commits_data = (
-                JiraCommit.objects.filter(issue__in=JiraIssue.objects.filter(**filters))
-                .annotate(interval=trunc_func('timestamp'))
-                .values('interval')
-                .annotate(count=Count('sha'))
-                .order_by('interval')
-            )
+            # Get the date range for display
+            display_issues = base_issues.filter(**display_filters)
+            dates = display_issues.annotate(
+                interval=trunc_func('created')
+            ).values('interval').distinct().order_by('interval')
 
-            # Get sprints data
-            sprints_data = (
-                JiraSprint.objects.filter(issue__in=JiraIssue.objects.filter(**filters))
-                .annotate(interval=trunc_func('startDate'))
-                .values('interval')
-                .annotate(count=Count('id'))
-                .order_by('interval')
-            )
+            for date in dates:
+                current_date = date['interval']
+                
+                # Count all items up to this date
+                issues_count = base_issues.filter(created__lte=current_date).count()
+                comments_count = base_comments.filter(created__lte=current_date).count()
+                commits_count = base_commits.filter(timestamp__lte=current_date).count()
+                sprints_count = base_sprints.filter(startDate__lte=current_date).count()
 
-            # Convert to dictionaries for easier lookup
-            issues_dict = {item['interval'].strftime(date_format): item['count'] for item in issues_data}
-            comments_dict = {item['interval'].strftime(date_format): item['count'] for item in comments_data}
-            commits_dict = {item['interval'].strftime(date_format): item['count'] for item in commits_data}
-            sprints_dict = {item['interval'].strftime(date_format): item['count'] for item in sprints_data}
+                formatted_date = current_date.strftime(date_format)
+                issues_data.append({'interval': formatted_date, 'count': issues_count})
+                comments_data.append({'interval': formatted_date, 'count': comments_count})
+                commits_data.append({'interval': formatted_date, 'count': commits_count})
+                sprints_data.append({'interval': formatted_date, 'count': sprints_count})
 
-            # Get all unique dates from all four datasets
-            all_dates = set()
-            for d in [issues_dict, comments_dict, commits_dict, sprints_dict]:
-                all_dates.update(d.keys())
-            date_range = sorted(list(all_dates))
+            # Convert to response format
+            date_range = [item['interval'] for item in issues_data]
+            issues_list = [item['count'] for item in issues_data]
+            comments_list = [item['count'] for item in comments_data]
+            commits_list = [item['count'] for item in commits_data]
+            sprints_list = [item['count'] for item in sprints_data]
 
-            # Fill in the data for each date in the range
-            issues_list = [issues_dict.get(date_str, 0) for date_str in date_range]
-            comments_list = [comments_dict.get(date_str, 0) for date_str in date_range]
-            commits_list = [commits_dict.get(date_str, 0) for date_str in date_range]
-            sprints_list = [sprints_dict.get(date_str, 0) for date_str in date_range]
-
-            # Optionally, get project name
+            # Get project name if needed
             project_name = None
             if project_id:
                 try:
