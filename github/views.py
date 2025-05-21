@@ -8,6 +8,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from jobs.models import Task
@@ -28,6 +29,11 @@ from .serializers import (
     GitHubIssuePullRequestSerializer,
     GraphDashboardSerializer
 )
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -229,6 +235,7 @@ class CommitListView(generics.ListAPIView):
     filterset_class = GitHubCommitFilter
     search_fields = ['message', 'author__name']
     ordering_fields = ['date']
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub commit")
 class CommitDetailView(generics.RetrieveAPIView):
@@ -244,6 +251,7 @@ class IssueListView(generics.ListAPIView):
     filterset_class = GitHubIssuePullRequestFilter
     search_fields = ['title', 'creator']
     ordering_fields = ['created_at', 'updated_at']
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub issue")
 class IssueDetailView(generics.RetrieveAPIView):
@@ -259,6 +267,7 @@ class PullRequestListView(generics.ListAPIView):
     filterset_class = GitHubIssuePullRequestFilter
     search_fields = ['title', 'creator']
     ordering_fields = ['created_at', 'updated_at']
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub pull request")
 class PullRequestDetailView(generics.RetrieveAPIView):
@@ -272,6 +281,7 @@ class BranchListView(generics.ListAPIView):
     serializer_class = GitHubBranchSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = GitHubBranchFilter
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub branch")
 class BranchDetailView(generics.RetrieveAPIView):
@@ -330,6 +340,7 @@ class MetadataListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['repository', 'language']
     ordering_fields = ['stars_count', 'forks_count', 'created_at', 'updated_at']
+    pagination_class = StandardResultsSetPagination
 
 class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
     @extend_schema(
