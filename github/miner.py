@@ -1158,6 +1158,7 @@ class GitHubMiner:
                             'data_type': 'issue'
                         }
 
+                        existing_issue = None
                         if depth == 'basic':
                             existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
                             if existing_issue:

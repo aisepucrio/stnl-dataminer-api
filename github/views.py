@@ -649,8 +649,8 @@ class GitHubCollectAllSerializer(serializers.Serializer):
     end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data final para mineração (opcional)")
     depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Profundidade da mineração (basic ou complex)")
     collect_types = serializers.ListField(
-        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata']),
-        help_text="Lista de tipos de dados para minerar (commits, issues, pull_requests, branches, metadata)"
+        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata', 'comments']),
+        help_text="Lista de tipos de dados para minerar (commits, issues, pull_requests, branches, metadata, comments)"
     )
 
     def validate_collect_types(self, value):
@@ -662,6 +662,14 @@ class GitHubCollectAllSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("É necessário fornecer pelo menos um repositório para minerar")
         return value
+
+    def validate(self, data):
+        """
+        Validação adicional que força depth=complex quando comments está presente em collect_types
+        """
+        if 'comments' in data.get('collect_types', []):
+            data['depth'] = 'complex'
+        return data
 
 class GitHubCollectAllViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -753,6 +761,29 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                         if response.status_code == 202:
                             repo_results['tasks'].append({
                                 'type': 'metadata',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                    if 'comments' in collect_types:
+                        response = client.post(
+                            reverse('github:issue-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': 'complex'},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'issues_with_comments',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                        response = client.post(
+                            reverse('github:pullrequest-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': 'complex'},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'pull_requests_with_comments',
                                 'task_id': response.json().get('task_id')
                             })
 
