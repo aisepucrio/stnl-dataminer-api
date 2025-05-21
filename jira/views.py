@@ -14,6 +14,16 @@ from jobs.models import Task
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
+from .models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit # Added JiraSprint, JiraComment, JiraCommit
+from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
+from .filters import JiraIssueFilter
+from jobs.tasks import collect_jira_issues_task
+from django.conf import settings
+import logging
+from jobs.models import Task
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
 # Debug logging configuration
 logger = logging.getLogger(__name__)
@@ -276,9 +286,18 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
                 "projects_count": {"type": "integer", "nullable": True},
                 "projects": {
                     "type": "array", 
-                    "items": {"type": "string"},
+                    "items": {
+                        "type": "object",
+                        "properties": { 
+                            "id": {"type": "string"},
+                            "name": {"type": "string"}
+                        }
+                    },
                     "nullable": True
-                }
+                },
+                "sprints_count": {"type": "integer", "nullable": True}, # Added
+                "comments_count": {"type": "integer", "nullable": True}, # Added
+                "commits_count": {"type": "integer", "nullable": True}  # Added
             }
         },
         400: {
@@ -309,9 +328,12 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
             value={
                 "project_name": "Sample Project",
                 "issues_count": 120,
-                "time_mined": "2023-01-01T12:00:00Z"
+                "time_mined": "2023-01-01T12:00:00Z",
+                "sprints_count": 5,    
+                "comments_count": 250, 
+                "commits_count": 80    
             },
-            summary="Example with project_name"
+            summary="Example with project_id"
         ),
         OpenApiExample(
             "All Projects Example",
@@ -336,7 +358,7 @@ class JiraIssueDetailView(generics.RetrieveAPIView):
 class JiraDashboardView(APIView):
     def get(self, request):
         try:
-            project_name = request.query_params.get('project_id')
+            project_id = request.query_params.get('project_id')
             start_date = request.query_params.get('start_date')
             end_date = request.query_params.get('end_date')
 
@@ -349,38 +371,56 @@ class JiraDashboardView(APIView):
 
             issues_query = JiraIssue.objects.filter(**filters)
 
-            if project_name:
+            if project_id:
                 try:
-                    project_issues = issues_query.filter(project=project_name)
+                    project = JiraProject.objects.get(id=project_id)
+                    project_issues = issues_query.filter(project=project)
 
                     if project_issues.exists():
-                        project_name = project_issues.first().project
                         latest_time_mined = project_issues.order_by('-time_mined').first().time_mined
                     else:
                         latest_time_mined = None
 
+                    sprints_count = JiraSprint.objects.filter(issue__in=project_issues).count()
+                    comments_count = JiraComment.objects.filter(issue__in=project_issues).count()
+                    commits_count = JiraCommit.objects.filter(issue__in=project_issues).count()
+
                     response_data = {
-                        "project_name": project_name,
+                        "project_name": project.name,
                         "issues_count": project_issues.count(),
-                        "time_mined": latest_time_mined.isoformat()
+                        "time_mined": latest_time_mined.isoformat() if latest_time_mined else None,
+                        "sprints_count": sprints_count,
+                        "comments_count": comments_count,
+                        "commits_count": commits_count
                     }
-                except Exception as e:
+                except JiraProject.DoesNotExist:
                     return Response(
-                        {"error": f"Error retrieving project with ID {project_id}: {str(e)}"},
+                        {"error": f"Project with ID {project_id} not found"},
                         status=status.HTTP_404_NOT_FOUND
                     )
+                except Exception as e: # Catching generic exception for project specific data retrieval
+                    return Response(
+                        {"error": f"Error retrieving data for project ID {project_id}: {str(e)}"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             else:
-                projects = issues_query.values('project').distinct()
-                projects_list = [p['project'] for p in projects]
+                projects = JiraProject.objects.all()
+                projects_list = [{"id": p.id, "name": p.name} for p in projects]
+
+                sprints_count = JiraSprint.objects.filter(issue__in=issues_query).count()
+                comments_count = JiraComment.objects.filter(issue__in=issues_query).count()
+                commits_count = JiraCommit.objects.filter(issue__in=issues_query).count()
 
                 response_data = {
                     "issues_count": issues_query.count(),
                     "projects_count": len(projects_list),
-                    "projects": projects_list
+                    "projects": projects_list,
+                    "sprints_count": sprints_count,
+                    "comments_count": comments_count,
+                    "commits_count": commits_count
                 }
-
 
             return Response(response_data)
         except Exception as e:
             print(e)
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "An internal server error occurred. Please try again later."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
