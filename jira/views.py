@@ -424,3 +424,167 @@ class JiraDashboardView(APIView):
         except Exception as e:
             print(e)
             return Response({"error": "An internal server error occurred. Please try again later."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@extend_schema(
+    tags=['Jira'],
+    summary="Graph Dashboard Data",
+    description="Provides time-series data for issues, comments, commits, and sprints",
+    parameters=[
+        OpenApiParameter(
+            name='project_id',
+            description='ID of the project to get statistics for',
+            required=False,
+            type=str
+        ),
+        OpenApiParameter(
+            name='start_date',
+            description='Filter data from this date onwards (ISO format)',
+            required=False,
+            type=OpenApiTypes.DATETIME
+        ),
+        OpenApiParameter(
+            name='end_date',
+            description='Filter data up to this date (ISO format)',
+            required=False,
+            type=OpenApiTypes.DATETIME
+        ),
+        OpenApiParameter(
+            name='interval',
+            description='Time interval for grouping (day, month, year)',
+            required=False,
+            type=str,
+            default='day'
+        )
+    ],
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "string", "nullable": True},
+                "project_name": {"type": "string", "nullable": True},
+                "time_series": {
+                    "type": "object",
+                    "properties": {
+                        "labels": {"type": "array", "items": {"type": "string"}},
+                        "issues": {"type": "array", "items": {"type": "integer"}},
+                        "comments": {"type": "array", "items": {"type": "integer"}},
+                        "commits": {"type": "array", "items": {"type": "integer"}},
+                        "sprints": {"type": "array", "items": {"type": "integer"}}
+                    }
+                }
+            }
+        }
+    }
+)
+class JiraGraphDashboardView(APIView):
+    def get(self, request):
+        try:
+            project_id = request.query_params.get('project_id')
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+            interval = request.query_params.get('interval', 'day')
+
+            # Determine the truncation function and date format based on interval
+            if interval == 'day':
+                trunc_func = TruncDay
+                date_format = '%Y-%m-%d'
+            elif interval == 'month':
+                trunc_func = TruncMonth
+                date_format = '%Y-%m'
+            else:
+                trunc_func = TruncYear
+                date_format = '%Y'
+
+            # Base queryset filters
+            filters = {}
+            if start_date:
+                filters['created__gte'] = start_date
+            if end_date:
+                filters['created__lte'] = end_date
+            if project_id:
+                filters['project_id'] = project_id
+
+            # Get issues data
+            issues_data = (
+                JiraIssue.objects.filter(**filters)
+                .annotate(interval=trunc_func('created'))
+                .values('interval')
+                .annotate(count=Count('issue_id'))
+                .order_by('interval')
+            )
+
+            # Get comments data
+            comments_data = (
+                JiraComment.objects.filter(issue__in=JiraIssue.objects.filter(**filters))
+                .annotate(interval=trunc_func('created'))
+                .values('interval')
+                .annotate(count=Count('id'))
+                .order_by('interval')
+            )
+
+            # Get commits data
+            commits_data = (
+                JiraCommit.objects.filter(issue__in=JiraIssue.objects.filter(**filters))
+                .annotate(interval=trunc_func('timestamp'))
+                .values('interval')
+                .annotate(count=Count('sha'))
+                .order_by('interval')
+            )
+
+            # Get sprints data
+            sprints_data = (
+                JiraSprint.objects.filter(issue__in=JiraIssue.objects.filter(**filters))
+                .annotate(interval=trunc_func('startDate'))
+                .values('interval')
+                .annotate(count=Count('id'))
+                .order_by('interval')
+            )
+
+            # Convert to dictionaries for easier lookup
+            issues_dict = {item['interval'].strftime(date_format): item['count'] for item in issues_data}
+            comments_dict = {item['interval'].strftime(date_format): item['count'] for item in comments_data}
+            commits_dict = {item['interval'].strftime(date_format): item['count'] for item in commits_data}
+            sprints_dict = {item['interval'].strftime(date_format): item['count'] for item in sprints_data}
+
+            # Get all unique dates from all four datasets
+            all_dates = set()
+            for d in [issues_dict, comments_dict, commits_dict, sprints_dict]:
+                all_dates.update(d.keys())
+            date_range = sorted(list(all_dates))
+
+            # Fill in the data for each date in the range
+            issues_list = [issues_dict.get(date_str, 0) for date_str in date_range]
+            comments_list = [comments_dict.get(date_str, 0) for date_str in date_range]
+            commits_list = [commits_dict.get(date_str, 0) for date_str in date_range]
+            sprints_list = [sprints_dict.get(date_str, 0) for date_str in date_range]
+
+            # Optionally, get project name
+            project_name = None
+            if project_id:
+                try:
+                    project = JiraProject.objects.get(id=project_id)
+                    project_name = project.name
+                except JiraProject.DoesNotExist:
+                    project_name = None
+
+            response_data = {
+                "time_series": {
+                    "labels": date_range,
+                    "issues": issues_list,
+                    "comments": comments_list,
+                    "commits": commits_list,
+                    "sprints": sprints_list
+                }
+            }
+            if project_id:
+                response_data["project_id"] = project_id
+                response_data["project_name"] = project_name
+
+            return Response(response_data)
+
+        except Exception as e:
+            return Response(
+                {"error": f"An error occurred: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
