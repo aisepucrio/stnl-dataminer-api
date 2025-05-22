@@ -50,3 +50,4 @@ beautifulsoup4==4.12.2
 lxml==4.9.3
 selenium==4.15.0
 django-cors-headers==4.7.0
+djangorestframework-simplejwt==5.3.1
