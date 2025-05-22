@@ -670,6 +670,10 @@ class GitHubMiner:
                 print(f"[METADATA] Error fetching metadata: {response.status_code}", flush=True)
                 return None
 
+            if response.status_code == 401:
+                print("[METADATA] Unauthorized access. Check your GitHub tokens.", flush=True)
+                return None
+
             data = response.json()
             
             languages = self.get_repo_languages(owner, repo)
@@ -1158,6 +1162,7 @@ class GitHubMiner:
                             'data_type': 'issue'
                         }
 
+                        existing_issue = None
                         if depth == 'basic':
                             existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
                             if existing_issue:

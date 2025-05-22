@@ -1,5 +1,5 @@
 from django.db.models import Count
-from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
+from django.db.models.functions import TruncDay, TruncMonth, TruncYear
 from django.urls import reverse
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -8,6 +8,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from jobs.models import Task
@@ -28,6 +29,11 @@ from .serializers import (
     GitHubIssuePullRequestSerializer,
     GraphDashboardSerializer
 )
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
 
 class GitHubCommitViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -229,6 +235,7 @@ class CommitListView(generics.ListAPIView):
     filterset_class = GitHubCommitFilter
     search_fields = ['message', 'author__name']
     ordering_fields = ['date']
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub commit")
 class CommitDetailView(generics.RetrieveAPIView):
@@ -244,6 +251,7 @@ class IssueListView(generics.ListAPIView):
     filterset_class = GitHubIssuePullRequestFilter
     search_fields = ['title', 'creator']
     ordering_fields = ['created_at', 'updated_at']
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub issue")
 class IssueDetailView(generics.RetrieveAPIView):
@@ -259,6 +267,7 @@ class PullRequestListView(generics.ListAPIView):
     filterset_class = GitHubIssuePullRequestFilter
     search_fields = ['title', 'creator']
     ordering_fields = ['created_at', 'updated_at']
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub pull request")
 class PullRequestDetailView(generics.RetrieveAPIView):
@@ -272,6 +281,7 @@ class BranchListView(generics.ListAPIView):
     serializer_class = GitHubBranchSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = GitHubBranchFilter
+    pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub branch")
 class BranchDetailView(generics.RetrieveAPIView):
@@ -330,6 +340,7 @@ class MetadataListView(generics.ListAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     search_fields = ['repository', 'language']
     ordering_fields = ['stars_count', 'forks_count', 'created_at', 'updated_at']
+    pagination_class = StandardResultsSetPagination
 
 class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -512,12 +523,12 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                 "forks_count": 25,
                 "stars_count": 100,
                 "watchers_count": 30,
-                "time_mined": "2023-01-01T12:00:00Z"
+                "time_mined": "2024-01-01T12:00:00Z"
             },
             summary="Example with repository_id"
         ),
         OpenApiExample(
-            "All Repositories Example",
+            "All Repositories Example with Date Filters",
             value={
                 "issues_count": 500,
                 "pull_requests_count": 200,
@@ -525,10 +536,28 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                 "repositories_count": 5,
                 "repositories": [
                     {"id": 1, "repository": "owner/repo1"},
-                    {"id": 2, "repository": "owner/repo2"}
+                    {"id": 2, "repository": "owner/repo2"},
+                    {"id": 3, "repository": "owner/repo3"},
+                    {"id": 4, "repository": "owner/repo4"},
+                    {"id": 5, "repository": "owner/repo5"}
                 ]
             },
-            summary="Example without repository_id"
+            summary="Example without repository_id showing multiple repositories"
+        ),
+        OpenApiExample(
+            "Repository Example with No Activity",
+            value={
+                "repository_id": 3,
+                "repository_name": "owner/inactive-repo",
+                "issues_count": 0,
+                "pull_requests_count": 0,
+                "commits_count": 0,
+                "forks_count": 0,
+                "stars_count": 0,
+                "watchers_count": 0,
+                "time_mined": "2024-01-01T12:00:00Z"
+            },
+            summary="Example of repository with no activity"
         )
     ]
 )
@@ -631,8 +660,8 @@ class GitHubCollectAllSerializer(serializers.Serializer):
     end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data final para mineração (opcional)")
     depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Profundidade da mineração (basic ou complex)")
     collect_types = serializers.ListField(
-        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata']),
-        help_text="Lista de tipos de dados para minerar (commits, issues, pull_requests, branches, metadata)"
+        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata', 'comments']),
+        help_text="Lista de tipos de dados para minerar (commits, issues, pull_requests, branches, metadata, comments)"
     )
 
     def validate_collect_types(self, value):
@@ -644,6 +673,14 @@ class GitHubCollectAllSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("É necessário fornecer pelo menos um repositório para minerar")
         return value
+
+    def validate(self, data):
+        """
+        Validação adicional que força depth=complex quando comments está presente em collect_types
+        """
+        if 'comments' in data.get('collect_types', []):
+            data['depth'] = 'complex'
+        return data
 
 class GitHubCollectAllViewSet(viewsets.ViewSet):
     @extend_schema(
@@ -738,6 +775,29 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                                 'task_id': response.json().get('task_id')
                             })
 
+                    if 'comments' in collect_types:
+                        response = client.post(
+                            reverse('github:issue-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': 'complex'},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'issues_with_comments',
+                                'task_id': response.json().get('task_id')
+                            })
+
+                        response = client.post(
+                            reverse('github:pullrequest-collect-list'),
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': 'complex'},
+                            format='json'
+                        )
+                        if response.status_code == 202:
+                            repo_results['tasks'].append({
+                                'type': 'pull_requests_with_comments',
+                                'task_id': response.json().get('task_id')
+                            })
+
                 except Exception as e:
                     print(f"Erro ao processar repositório {repo_name}: {str(e)}")
                     repo_results['error'] = str(e)
@@ -759,7 +819,7 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
 @extend_schema(
     tags=["GitHub"],
     summary="Graph Dashboard",
-    description="Provides time-series data for issues, pull requests, and commits over time. "
+    description="Provides cumulative time-series data for issues, pull requests, and commits over time. "
                 "Can be filtered by repository_id, start_date, and end_date.",
     parameters=[
         OpenApiParameter(
@@ -770,13 +830,13 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
         ),
         OpenApiParameter(
             name="start_date",
-            description="Filter data from this date onwards (ISO format).",
+            description="Filter display window from this date onwards (ISO format).",
             required=False,
             type=OpenApiTypes.DATETIME
         ),
         OpenApiParameter(
             name="end_date",
-            description="Filter data up to this date (ISO format).",
+            description="Filter display window up to this date (ISO format).",
             required=False,
             type=OpenApiTypes.DATETIME
         ),
@@ -812,7 +872,49 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
             },
             "description": "Bad request due to invalid parameters"
         }
-    }
+    },
+    examples=[
+        OpenApiExample(
+            "Single Repository Example",
+            value={
+                "repository_id": 1,
+                "repository_name": "owner/repo",
+                "time_series": {
+                    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                    "issues": [5, 8, 15],
+                    "pull_requests": [2, 6, 7],
+                    "commits": [10, 18, 30]
+                }
+            },
+            description="Example response for a specific repository showing cumulative counts"
+        ),
+        OpenApiExample(
+            "All Repositories Example",
+            value={
+                "time_series": {
+                    "labels": ["2024-01-01", "2024-01-02", "2024-01-03"],
+                    "issues": [15, 27, 47],
+                    "pull_requests": [8, 18, 23],
+                    "commits": [25, 55, 83]
+                }
+            },
+            description="Example response for all repositories showing cumulative counts"
+        ),
+        OpenApiExample(
+            "Monthly Interval Example",
+            value={
+                "repository_id": 1,
+                "repository_name": "owner/repo",
+                "time_series": {
+                    "labels": ["2024-01", "2024-02", "2024-03"],
+                    "issues": [50, 95, 155],
+                    "pull_requests": [20, 45, 63],
+                    "commits": [100, 195, 305]
+                }
+            },
+            description="Example response with monthly interval showing cumulative counts"
+        )
+    ]
 )
 class GraphDashboardView(APIView):
     def get(self, request):
@@ -832,32 +934,20 @@ class GraphDashboardView(APIView):
         if interval == 'day':
             trunc_func = TruncDay
             date_format = '%Y-%m-%d'
-        elif interval == 'week':
-            trunc_func = TruncWeek
-            date_format = 'Week %W, %Y'
-        else:  # month
+        elif interval == 'month':
             trunc_func = TruncMonth
-            date_format = '%B %Y'
+            date_format = '%Y-%m'
+        else:
+            trunc_func = TruncYear
+            date_format = '%Y'
         
         # Base querysets - get all data from the database
         issues_query = GitHubIssuePullRequest.objects.filter(data_type='issue')
         prs_query = GitHubIssuePullRequest.objects.filter(data_type='pull_request')
         commits_query = GitHubCommit.objects.all()
         
-        # Apply filters if provided
-        if start_date:
-            issues_query = issues_query.filter(created_at__gte=start_date)
-            prs_query = prs_query.filter(created_at__gte=start_date)
-            commits_query = commits_query.filter(date__gte=start_date)
-        
-        if end_date:
-            issues_query = issues_query.filter(created_at__lte=end_date)
-            prs_query = prs_query.filter(created_at__lte=end_date)
-            commits_query = commits_query.filter(date__lte=end_date)
-        
-        repository_name = None
-        
         # Apply repository filter if provided
+        repository_name = None
         if repository_id:
             try:
                 metadata = GitHubMetadata.objects.get(id=repository_id)
@@ -867,10 +957,15 @@ class GraphDashboardView(APIView):
                 prs_query = prs_query.filter(repository=repository_name)
                 commits_query = commits_query.filter(repository=repository_name)
             except GitHubMetadata.DoesNotExist:
-                # Just return empty data if repository doesn't exist
                 pass
+
+        # Get all data up to end_date for cumulative counts
+        if end_date:
+            issues_query = issues_query.filter(created_at__lte=end_date)
+            prs_query = prs_query.filter(created_at__lte=end_date)
+            commits_query = commits_query.filter(date__lte=end_date)
         
-        # Group data by date interval
+        # Group data by date interval and calculate cumulative counts
         issues_by_date = issues_query.annotate(
             interval=trunc_func('created_at')
         ).values('interval').annotate(count=Count('id')).order_by('interval')
@@ -883,23 +978,55 @@ class GraphDashboardView(APIView):
             interval=trunc_func('date')
         ).values('interval').annotate(count=Count('id')).order_by('interval')
         
-        # Convert to dictionaries for easier lookup
-        issues_dict = {item['interval'].strftime(date_format): item['count'] for item in issues_by_date}
-        prs_dict = {item['interval'].strftime(date_format): item['count'] for item in prs_by_date}
-        commits_dict = {item['interval'].strftime(date_format): item['count'] for item in commits_by_date}
+        # Convert to dictionaries with cumulative counts
+        issues_dict = {}
+        prs_dict = {}
+        commits_dict = {}
         
-        # Get all unique dates from all three datasets
+        cumulative_issues = 0
+        cumulative_prs = 0
+        cumulative_commits = 0
+        
+        for item in issues_by_date:
+            cumulative_issues += item['count']
+            issues_dict[item['interval'].strftime(date_format)] = cumulative_issues
+            
+        for item in prs_by_date:
+            cumulative_prs += item['count']
+            prs_dict[item['interval'].strftime(date_format)] = cumulative_prs
+            
+        for item in commits_by_date:
+            cumulative_commits += item['count']
+            commits_dict[item['interval'].strftime(date_format)] = cumulative_commits
+        
+        # Get all unique dates
         all_dates = set()
         for date_dict in [issues_dict, prs_dict, commits_dict]:
             all_dates.update(date_dict.keys())
         
-        # Sort dates chronologically
+        # Filter date range if start_date is provided
         date_range = sorted(list(all_dates))
+        if start_date:
+            date_range = [d for d in date_range if d >= start_date.strftime(date_format)]
         
-        # Fill in the data for each date in the range
-        issues_data = [issues_dict.get(date_str, 0) for date_str in date_range]
-        prs_data = [prs_dict.get(date_str, 0) for date_str in date_range]
-        commits_data = [commits_dict.get(date_str, 0) for date_str in date_range]
+        # Fill in the cumulative data for each date in the range
+        # Use the last known cumulative value for dates with no new items
+        issues_data = []
+        prs_data = []
+        commits_data = []
+        
+        last_issues = 0
+        last_prs = 0
+        last_commits = 0
+        
+        for date_str in date_range:
+            last_issues = issues_dict.get(date_str, last_issues)
+            last_prs = prs_dict.get(date_str, last_prs)
+            last_commits = commits_dict.get(date_str, last_commits)
+            
+            issues_data.append(last_issues)
+            prs_data.append(last_prs)
+            commits_data.append(last_commits)
         
         # Prepare response
         response_data = {
