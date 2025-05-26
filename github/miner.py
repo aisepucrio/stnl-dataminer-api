@@ -682,10 +682,14 @@ class GitHubMiner:
             releases_count = self.get_releases_count(owner, repo)
             
             current_timestamp = timezone.now()
+
+            # Use update_or_create instead of create
             metadata, created = GitHubMetadata.objects.update_or_create(
+                # These fields are used to identify existing records
                 repository=repo_name,
+                owner=data.get('owner', {}).get('login'),
+                # These fields will be updated if the record exists, or set if it's new
                 defaults={
-                    'owner': data.get('owner', {}).get('login'),
                     'organization': data.get('organization', {}).get('login') if data.get('organization') else None,
                     'stars_count': data.get('stargazers_count', 0),
                     'watchers_count': watchers_count,
@@ -709,7 +713,8 @@ class GitHubMiner:
                 }
             )
             
-            print(f"[METADATA] Metadata {'created' if created else 'updated'} successfully", flush=True)
+            action = 'created' if created else 'updated'
+            print(f"[METADATA] Metadata {action} successfully", flush=True)
             return metadata
 
         except Exception as e:
