@@ -80,6 +80,48 @@ def fetch_users():
     response.raise_for_status()
     return response.json()
 
+def fetch_badge_():
+    FILTER = "!*Mg4PjfN9BSLHG(j"  # Filter for badges
+    url = f"{BASE_URL}/badges"
+    params = {
+        "site": SITE,
+        "order": "desc",
+        "sort": "rank",
+        "filter": FILTER
+    }
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    return response.json()
+
+def fetch_collectives():
+    FILTER = "!nNPvSNVLQY" # Filter for collectives
+    url = f"{BASE_URL}/collectives"
+    params = {
+        "site": SITE,
+        "order": "desc",
+        "sort": "name",
+        "filter": FILTER
+    }
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    return response.json()
+
+def fetch_comments():
+    FILTER = "!nNPvSNY1cp"  # Filter for comments
+    url = f"{BASE_URL}/comments"
+    params = {
+        "site": SITE,
+        "key": API_KEY,
+        "pagesize": PAGE_SIZE,
+        "access_token": ACCESS_TOKEN,
+        "order": "desc",
+        "sort": "creation",
+        "filter": FILTER
+    }
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+    return response.json()
+
 if __name__ == "__main__":
     print("Hey")
     # print("🔍 Fetching recent questions...")
