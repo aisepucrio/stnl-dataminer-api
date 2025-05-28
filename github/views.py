@@ -17,8 +17,7 @@ from jobs.tasks import (
     fetch_issues,
     fetch_pull_requests,
     fetch_branches,
-    fetch_metadata,
-    collect_all
+    fetch_metadata
 )
 from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
 from .models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest
@@ -29,6 +28,15 @@ from .serializers import (
     GitHubIssuePullRequestSerializer,
     GraphDashboardSerializer
 )
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
+from datetime import datetime
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 100

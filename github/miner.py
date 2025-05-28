@@ -342,9 +342,9 @@ class GitHubMiner:
                 repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
 
             essential_commits = []
+            current_timestamp = timezone.now()
 
             for commit in repo:
-                current_timestamp = timezone.now()
                 print(f"[COMMITS] Processing commit: {commit.hash[:7]}", flush=True)
                 # Create or get author and committer
                 author, _ = GitHubAuthor.objects.get_or_create(
@@ -448,9 +448,9 @@ class GitHubMiner:
                         }
                         mod_data['methods'].append(method_data)
 
-                commit_data['modified_files'].append(mod_data)
+                    commit_data['modified_files'].append(mod_data)
 
-            essential_commits.append(commit_data)
+                essential_commits.append(commit_data)
 
             print("\n[COMMITS] Saving data to JSON...", flush=True)
             filename = f"{repo_name.replace('/', '_')}_commit_{commit_sha}.json" if commit_sha else f"{repo_name.replace('/', '_')}_commits.json"
