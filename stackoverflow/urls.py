@@ -10,7 +10,7 @@ router.register(r'comments', views.StackCommentViewSet)
 router.register(r'tags', views.StackTagViewSet)
 router.register(r'badges', views.StackBadgeViewSet)
 router.register(r'collectives', views.StackCollectiveViewSet)
-router.register(r'tag-synonyms', views.StackTagSynonymViewSet)
+# router.register(r'tag-synonyms', views.StackTagSynonymViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

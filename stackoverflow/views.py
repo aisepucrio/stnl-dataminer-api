@@ -88,6 +88,6 @@ class StackCollectiveViewSet(viewsets.ModelViewSet):
         serializer = StackTagSerializer(tags, many=True)
         return Response(serializer.data)
 
-class StackTagSynonymViewSet(viewsets.ModelViewSet):
-    queryset = StackTagSynonym.objects.all()
-    serializer_class = StackTagSynonymSerializer 
+# class StackTagSynonymViewSet(viewsets.ModelViewSet):
+#     queryset = StackTagSynonym.objects.all()
+#     serializer_class = StackTagSynonymSerializer 
