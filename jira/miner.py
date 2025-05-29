@@ -181,6 +181,8 @@ class JiraMiner:
                 self.save_activity(issue_key, issue_obj)
                 self.save_checklist(issue_key, issue_obj)
                 self.save_commits(issue_key, issue_obj)
+                self.save_sprints(fields, issue_obj)
+
 
             total_collected += len(issues)
             start_at += max_results
@@ -190,7 +192,7 @@ class JiraMiner:
         return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
 
     def get_commits_for_issue(self, issue_key):
-        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueId={issue_key}&applicationType=git&dataType=repository"
+        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueIdOrKey={issue_key}&applicationType=git&dataType=repository"
 
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -207,6 +209,7 @@ class JiraMiner:
                         'id': commit.get('id'),
                         'message': commit.get('message'),
                         'author': commit.get('author', {}).get('name'),
+                        'author_email': commit.get('author', {}).get('emailAddress'),
                         'url': commit.get('url')
                     })
         return commits
@@ -638,5 +641,48 @@ class JiraMiner:
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
             )
+            
+    def save_sprints(self, fields, issue_obj):
+        for key in fields:
+            value = fields[key]
 
-    
+            if isinstance(value, list):
+                # ⚠️ Sprint string format (legacy)
+                if value and isinstance(value[0], str) and "name=" in value[0]:
+                    for raw in value:
+                        sprint_data = {}
+                        for part in raw.strip("[]").split(","):
+                            if "=" in part:
+                                k, v = part.strip().split("=", 1)
+                                sprint_data[k.strip()] = v.strip()
+
+                        self._save_sprint_to_db(sprint_data, issue_obj)
+
+                # ✅ New format: list of dicts (Jira Agile API)
+                elif value and isinstance(value[0], dict) and "name" in value[0]:
+                    for sprint_dict in value:
+                        self._save_sprint_to_db(sprint_dict, issue_obj)
+
+            elif isinstance(value, dict) and "name" in value:
+                # Caso venha como um único dict direto (ex: campo "sprint")
+                self._save_sprint_to_db(value, issue_obj)
+
+    def _save_sprint_to_db(self, sprint_data, issue_obj):
+        try:
+            JiraSprint.objects.update_or_create(
+                id=int(sprint_data.get("id")),
+                issue=issue_obj,
+                defaults={
+                    "name": sprint_data.get("name", ""),
+                    "goal": sprint_data.get("goal"),
+                    "state": sprint_data.get("state", ""),
+                    "boardId": int(sprint_data.get("originBoardId", 0)),
+                    "startDate": parse_datetime(sprint_data.get("startDate")) if sprint_data.get("startDate") else None,
+                    "endDate": parse_datetime(sprint_data.get("endDate")) if sprint_data.get("endDate") else None,
+                    "completeDate": parse_datetime(sprint_data.get("completeDate")) if sprint_data.get("completeDate") else None,
+                }
+            )
+            print(f"[JiraMiner] ✅ Sprint '{sprint_data.get('name')}' salva para issue {issue_obj.issue_key}", flush=True)
+        except Exception as e:
+            print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
+        

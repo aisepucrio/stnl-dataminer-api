@@ -73,9 +73,10 @@ class JiraSprint(models.Model):
     goal = models.TextField(null=True, blank=True)
     state = models.CharField(max_length=50)
     boardId = models.IntegerField()
-    startDate = models.DateTimeField()
-    endDate = models.DateTimeField()
+    startDate = models.DateTimeField(null=True, blank=True)
+    endDate = models.DateTimeField(null=True, blank=True)
     completeDate = models.DateTimeField(null=True, blank=True)
+
 
 class JiraIssueLink(models.Model):
     issue = models.ForeignKey(JiraIssue, related_name='issue_links', on_delete=models.CASCADE)
