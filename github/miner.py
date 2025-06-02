@@ -92,8 +92,14 @@ class GitHubMiner:
         self.tokens = []
         self.current_token_index = 0
         
-        if not self.load_tokens():
-            raise Exception("Failed to initialize GitHub tokens. Check your credentials.")
+        result = self.load_tokens()
+        if not result['success']:
+            raise Exception(f"Falha ao inicializar tokens do GitHub: {result['error']}")
+        
+        print(f"✅ Tokens do GitHub inicializados com sucesso:")
+        print(f"   - Total de tokens carregados: {result['tokens_loaded']}")
+        print(f"   - Tokens válidos: {result['valid_tokens']}")
+        print(f"   - Token selecionado: {result['selected_token']['index'] + 1} (com {result['selected_token']['remaining']} requisições disponíveis)")
         
         self.update_auth_header()
 
@@ -102,35 +108,93 @@ class GitHubMiner:
         try:
             url = "https://api.github.com/rate_limit"
             response = requests.get(url, headers=self.headers)
-            metrics = APIMetrics()
+            
+            if response.status_code == 401:
+                return {
+                    'valid': False,
+                    'error': 'Token inválido ou expirado',
+                    'status_code': response.status_code
+                }
+            
+            if response.status_code == 403:
+                return {
+                    'valid': False,
+                    'error': 'Token não tem permissões suficientes',
+                    'status_code': response.status_code
+                }
             
             if response.status_code != 200:
-                print(f"Error verifying token: {response.status_code}", flush=True)
-                return False
+                return {
+                    'valid': False,
+                    'error': f'Erro ao verificar token: {response.status_code}',
+                    'status_code': response.status_code
+                }
 
-            # Use the unified function to show status
-            self.check_and_log_rate_limit(response, metrics, 'core', "Token Verification")
-            return True
+            data = response.json()
+            rate = data['rate']
+            
+            return {
+                'valid': True,
+                'limit': rate['limit'],
+                'remaining': rate['remaining'],
+                'reset': rate['reset']
+            }
 
         except Exception as e:
-            print(f"Error verifying token: {e}", flush=True)
-            return False
+            return {
+                'valid': False,
+                'error': f'Erro ao verificar token: {str(e)}',
+                'status_code': None
+            }
 
     def load_tokens(self):
         """Loads GitHub tokens from .env file or environment variables"""
         load_dotenv()
         tokens_str = os.getenv("GITHUB_TOKENS")
         if not tokens_str:
-            print("No token found. Make sure GITHUB_TOKENS is set in your .env file.", flush=True)
-            return False
+            return {
+                'success': False,
+                'error': 'Nenhum token encontrado. Certifique-se que GITHUB_TOKENS está configurado no arquivo .env'
+            }
         
         self.tokens = [token.strip() for token in tokens_str.split(",") if token.strip()]
         if not self.tokens:
-            print("No valid tokens found after processing.", flush=True)
-            return False
+            return {
+                'success': False,
+                'error': 'Nenhum token válido encontrado após processamento'
+            }
         
-        print(f"{len(self.tokens)} tokens loaded.", flush=True)
-        return self.verify_token()
+        print(f"{len(self.tokens)} tokens carregados.", flush=True)
+        
+        valid_tokens = []
+        for i, token in enumerate(self.tokens):
+            self.current_token_index = i
+            self.update_auth_header()
+            result = self.verify_token()
+            
+            if result['valid']:
+                valid_tokens.append({
+                    'index': i,
+                    'limit': result['limit'],
+                    'remaining': result['remaining']
+                })
+        
+        if not valid_tokens:
+            return {
+                'success': False,
+                'error': 'Nenhum token válido encontrado após verificação'
+            }
+        
+        best_token = max(valid_tokens, key=lambda x: x['remaining'])
+        self.current_token_index = best_token['index']
+        self.update_auth_header()
+        
+        return {
+            'success': True,
+            'tokens_loaded': len(self.tokens),
+            'valid_tokens': len(valid_tokens),
+            'selected_token': best_token
+        }
 
     def update_auth_header(self):
         """Updates the Authorization header with the current token"""
@@ -267,15 +331,53 @@ class GitHubMiner:
         return os.path.expanduser("~")
 
     def clone_repo(self, repo_url, clone_path):
-        if not os.path.exists(clone_path):
-            print(f"Cloning repo: {repo_url}", flush=True)
-            # Use token for authentication
-            token = self.tokens[self.current_token_index]
-            auth_url = f'https://{token}@github.com/{repo_url.split("github.com/")[1]}'
-            Repo.clone_from(auth_url, clone_path)
-        else:
-            print(f"Repo already exists: {clone_path}", flush=True)
-            self.update_repo(clone_path)
+        max_retries = 3
+        retry_delay = 5  # segundos
+        
+        for attempt in range(max_retries):
+            try:
+                if not os.path.exists(clone_path):
+                    print(f"Cloning repo: {repo_url} (attempt {attempt + 1}/{max_retries})", flush=True)
+                    token = self.tokens[self.current_token_index]
+                    auth_url = f'https://{token}@github.com/{repo_url.split("github.com/")[1]}'
+                    
+                    git_config = [
+                        'http.postBuffer=524288000',  
+                        'http.lowSpeedLimit=1000',
+                        'http.lowSpeedTime=300',
+                        'http.sslVerify=false'  
+                    ]
+                    
+                    for config in git_config:
+                        os.system(f'git config --global {config}')
+                    
+                    Repo.clone_from(auth_url, clone_path)
+                    print(f"Repository cloned successfully: {clone_path}", flush=True)
+                    return True
+                else:
+                    print(f"Repo already exists: {clone_path}", flush=True)
+                    self.update_repo(clone_path)
+                    return True
+                
+            except GitCommandError as e:
+                print(f"Error cloning repository (attempt {attempt + 1}/{max_retries}): {str(e)}", flush=True)
+                if attempt < max_retries - 1:
+                    print(f"Waiting {retry_delay} seconds before retrying...", flush=True)
+                    time.sleep(retry_delay)
+                    retry_delay *= 2 
+                else:
+                    print("Max retries reached. Giving up.", flush=True)
+                    raise Exception(f"Failed to clone repository after {max_retries} attempts: {str(e)}")
+                
+            except Exception as e:
+                print(f"Unexpected error during clone (attempt {attempt + 1}/{max_retries}): {str(e)}", flush=True)
+                if attempt < max_retries - 1:
+                    print(f"Waiting {retry_delay} seconds before retrying...", flush=True)
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    print("Max retries reached. Giving up.", flush=True)
+                    raise Exception(f"Failed to clone repository after {max_retries} attempts: {str(e)}")
 
     def update_repo(self, repo_path):
         try:
