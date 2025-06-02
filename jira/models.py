@@ -67,15 +67,16 @@ class JiraIssueType(models.Model):
     subtask = models.BooleanField(default=False)
 
 class JiraSprint(models.Model):
-    id = models.IntegerField(primary_key=True)
-    issue = models.ForeignKey(JiraIssue, on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
-    goal = models.TextField(null=True, blank=True)
+    id = models.BigIntegerField(primary_key=True)
+    name = models.CharField(max_length=255)
+    goal = models.TextField(blank=True, null=True)
     state = models.CharField(max_length=50)
-    boardId = models.IntegerField()
+    boardId = models.BigIntegerField()
     startDate = models.DateTimeField(null=True, blank=True)
     endDate = models.DateTimeField(null=True, blank=True)
     completeDate = models.DateTimeField(null=True, blank=True)
+    issues = models.ManyToManyField('JiraIssue', related_name='sprints')
+
 
 
 class JiraIssueLink(models.Model):

@@ -81,6 +81,15 @@ class JiraMiner:
         max_results, start_at, total_collected = 100, 0, 0
         custom_fields_mapping = self.get_custom_fields_mapping()
 
+        # 🧠 Encontra o campo Sprint (ex: customfield_10020)
+        sprint_field_key = None
+        for field_id, field_name in custom_fields_mapping.items():
+            if field_name.lower() == "sprint":
+                sprint_field_key = field_id
+                break
+
+        print(f"[DEBUG] Campo Sprint mapeado como: {sprint_field_key}", flush=True)
+
         jql_query = f'project="{project_key}"'
 
         if issuetypes:
@@ -118,6 +127,11 @@ class JiraMiner:
                 current_timestamp = timezone.now()
                 description = self.extract_words_from_description(fields.get("description"))
 
+                # ✅ Injeta o campo sprint legível
+                if sprint_field_key:
+                    fields["sprint"] = fields.get(sprint_field_key)
+                    print(f"[DEBUG] Sprint data for {issue_key}: {fields.get('sprint')}", flush=True)
+
                 # Ensure related objects
                 project_obj, _ = JiraProject.objects.get_or_create(
                     id=fields['project']['id'],
@@ -129,7 +143,6 @@ class JiraMiner:
                     }
                 )
 
-
                 creator_obj = self.ensure_user(fields["creator"])
                 assignee_obj = self.ensure_user(fields.get("assignee"))
                 reporter_obj = self.ensure_user(fields.get("reporter"))
@@ -139,8 +152,6 @@ class JiraMiner:
                 if parent_issue_id:
                     parent_issue_obj = JiraIssue.objects.filter(issue_id=parent_issue_id).first()
 
-
-                # Save main issue
                 issue_obj, _ = JiraIssue.objects.update_or_create(
                     issue_id=issue_id,
                     defaults={
@@ -174,6 +185,7 @@ class JiraMiner:
                     }
                 )
 
+                print(f"[DEBUG] Campos da issue {issue_key}: {list(fields.keys())}", flush=True)
 
                 # Sub-tabelas
                 self.save_comments(issue_key, issue_obj)
@@ -182,7 +194,6 @@ class JiraMiner:
                 self.save_checklist(issue_key, issue_obj)
                 self.save_commits(issue_key, issue_obj)
                 self.save_sprints(fields, issue_obj)
-
 
             total_collected += len(issues)
             start_at += max_results
@@ -641,48 +652,31 @@ class JiraMiner:
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
             )
-            
-    def save_sprints(self, fields, issue_obj):
-        for key in fields:
-            value = fields[key]
+                
+    def save_sprints(self, fields, issue_obj):      
+        sprints_data = fields.get("sprint")
+        if not sprints_data:
+            return
 
-            if isinstance(value, list):
-                # ⚠️ Sprint string format (legacy)
-                if value and isinstance(value[0], str) and "name=" in value[0]:
-                    for raw in value:
-                        sprint_data = {}
-                        for part in raw.strip("[]").split(","):
-                            if "=" in part:
-                                k, v = part.strip().split("=", 1)
-                                sprint_data[k.strip()] = v.strip()
+        if isinstance(sprints_data, dict):  # Caso venha como dict único
+            sprints_data = [sprints_data]
 
-                        self._save_sprint_to_db(sprint_data, issue_obj)
+        for sprint in sprints_data:
+            try:
+                sprint_obj, _ = JiraSprint.objects.update_or_create(
+                    id=sprint["id"],
+                    defaults={
+                        "name": sprint["name"],
+                        "goal": sprint.get("goal", ""),
+                        "state": sprint.get("state"),
+                        "boardId": sprint.get("originBoardId", 0),
+                        "startDate": parse_datetime(sprint.get("startDate")) if sprint.get("startDate") else None,
+                        "endDate": parse_datetime(sprint.get("endDate")) if sprint.get("endDate") else None,
+                        "completeDate": parse_datetime(sprint.get("completeDate")) if sprint.get("completeDate") else None,
+                    }
+                )
+                issue_obj.sprints.add(sprint_obj)
 
-                # ✅ New format: list of dicts (Jira Agile API)
-                elif value and isinstance(value[0], dict) and "name" in value[0]:
-                    for sprint_dict in value:
-                        self._save_sprint_to_db(sprint_dict, issue_obj)
-
-            elif isinstance(value, dict) and "name" in value:
-                # Caso venha como um único dict direto (ex: campo "sprint")
-                self._save_sprint_to_db(value, issue_obj)
-
-    def _save_sprint_to_db(self, sprint_data, issue_obj):
-        try:
-            JiraSprint.objects.update_or_create(
-                id=int(sprint_data.get("id")),
-                issue=issue_obj,
-                defaults={
-                    "name": sprint_data.get("name", ""),
-                    "goal": sprint_data.get("goal"),
-                    "state": sprint_data.get("state", ""),
-                    "boardId": int(sprint_data.get("originBoardId", 0)),
-                    "startDate": parse_datetime(sprint_data.get("startDate")) if sprint_data.get("startDate") else None,
-                    "endDate": parse_datetime(sprint_data.get("endDate")) if sprint_data.get("endDate") else None,
-                    "completeDate": parse_datetime(sprint_data.get("completeDate")) if sprint_data.get("completeDate") else None,
-                }
-            )
-            print(f"[JiraMiner] ✅ Sprint '{sprint_data.get('name')}' salva para issue {issue_obj.issue_key}", flush=True)
-        except Exception as e:
-            print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
-        
+                print(f"[JiraMiner] ✅ Sprint '{sprint['name']}' associada à issue {issue_obj.issue_key}", flush=True)
+            except Exception as e:
+                print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
