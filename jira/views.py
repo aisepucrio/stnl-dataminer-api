@@ -56,7 +56,7 @@ class JiraIssueCollectView(APIView):
             projects = request.data.get('projects', [])
         
             if not projects:
-                return Response({"error": "Nenhum projeto fornecido."}, status=400)
+                return Response({"error": "No projects provided."}, status=400)
 
             for project_info in projects:
                 jira_domain = project_info.get('jira_domain')

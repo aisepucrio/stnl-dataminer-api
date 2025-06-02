@@ -682,7 +682,7 @@ class JiraMiner:
                     "completeDate": parse_datetime(sprint_data.get("completeDate")) if sprint_data.get("completeDate") else None,
                 }
             )
-            print(f"[JiraMiner] ✅ Sprint '{sprint_data.get('name')}' salva para issue {issue_obj.issue_key}", flush=True)
+            print(f"[JiraMiner] ✅ Sprint '{sprint_data.get('name')}' saved for issue {issue_obj.issue_key}", flush=True)
         except Exception as e:
-            print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
+            print(f"[JiraMiner] ⚠️ Error saving sprint for {issue_obj.issue_key}: {e}", flush=True)
         

@@ -27,7 +27,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         
         token_result = miner.verify_token()
         if not token_result['valid']:
-            error_msg = token_result.get('error', 'Erro desconhecido na validação do token')
+            error_msg = token_result.get('error', 'Unknown error in token validation')
             error_type = 'TokenValidationError'
             
             task = Task.objects.get(task_id=self.request.id)
@@ -139,7 +139,7 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
         
         token_result = miner.verify_token()
         if not token_result['valid']:
-            error_msg = token_result.get('error', 'Erro desconhecido na validação do token')
+            error_msg = token_result.get('error', 'Unknown error in token validation')
             error_type = 'TokenValidationError'
             
             task = Task.objects.get(task_id=self.request.id)
@@ -246,7 +246,7 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
         
         token_result = miner.verify_token()
         if not token_result['valid']:
-            error_msg = f"Token inválido: {token_result.get('error', 'Erro desconhecido')}"
+            error_msg = f"Invalid token: {token_result.get('error', 'Unknown error')}"
             error_type = 'TokenValidationError'
             
             self.update_state(
@@ -360,7 +360,7 @@ def fetch_branches(self, repo_name):
         
         token_result = miner.verify_token()
         if not token_result['valid']:
-            error_msg = token_result.get('error', 'Erro desconhecido na validação do token')
+            error_msg = token_result.get('error', 'Unknown error in token validation')
             error_type = 'TokenValidationError'
             
             task = Task.objects.get(task_id=self.request.id)
@@ -507,7 +507,7 @@ def fetch_metadata(self, repo_name):
         
         token_result = miner.verify_token()
         if not token_result['valid']:
-            error_msg = token_result.get('error', 'Erro desconhecido na validação do token')
+            error_msg = token_result.get('error', 'Unknown error in token validation')
             error_type = 'TokenValidationError'
             
             task = Task.objects.get(task_id=self.request.id)

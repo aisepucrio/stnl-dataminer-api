@@ -19,24 +19,24 @@ class TokenValidator:
             response = requests.get('https://api.github.com/rate_limit', headers=self.headers)
             
             if response.status_code == 401:
-                return False, "Token inválido ou expirado"
+                return False, "Invalid or expired token"
             elif response.status_code == 403:
-                return False, "Token sem permissões suficientes"
+                return False, "Token does not have sufficient permissions"
             elif response.status_code != 200:
-                return False, f"Erro na API do GitHub: {response.status_code}"
+                return False, f"GitHub API error: {response.status_code}"
             
             data = response.json()
             if 'rate' not in data:
-                return False, "Token não tem acesso à API do GitHub"
+                return False, "Token does not have access to GitHub API"
             
             return True, None
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Erro ao validar token: {str(e)}")
-            return False, f"Erro de conexão: {str(e)}"
+            logger.error(f"Error validating token: {str(e)}")
+            return False, f"Connection error: {str(e)}"
         except Exception as e:
-            logger.error(f"Erro inesperado ao validar token: {str(e)}")
-            return False, f"Erro inesperado: {str(e)}"
+            logger.error(f"Unexpected error validating token: {str(e)}")
+            return False, f"Unexpected error: {str(e)}"
 
     @staticmethod
     def create_failed_task(operation, repository, error_message):
@@ -49,6 +49,6 @@ class TokenValidator:
                 error=error_message,
                 created_at=timezone.now()
             )
-            logger.info(f"Tarefa de falha criada para {operation} em {repository}")
+            logger.info(f"Failure task created for {operation} in {repository}")
         except Exception as e:
-            logger.error(f"Erro ao criar tarefa de falha: {str(e)}") 
+            logger.error(f"Error creating failure task: {str(e)}") 

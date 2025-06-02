@@ -661,30 +661,30 @@ class DashboardView(APIView):
 
 class GitHubCollectAllSerializer(serializers.Serializer):
     repositories = serializers.ListField(
-        child=serializers.CharField(help_text="Nome do repositório no formato owner/repo"),
-        help_text="Lista de repositórios para minerar"
+        child=serializers.CharField(help_text="Repository name in format owner/repo"),
+        help_text="List of repositories to mine"
     )
-    start_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data inicial para mineração (opcional)")
-    end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data final para mineração (opcional)")
-    depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Profundidade da mineração (basic ou complex)")
+    start_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Start date for mining (optional)")
+    end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="End date for mining (optional)")
+    depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Mining depth (basic or complex)")
     collect_types = serializers.ListField(
         child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata', 'comments']),
-        help_text="Lista de tipos de dados para minerar (commits, issues, pull_requests, branches, metadata, comments)"
+        help_text="List of data types to mine (commits, issues, pull_requests, branches, metadata, comments)"
     )
 
     def validate_collect_types(self, value):
         if not value:
-            raise serializers.ValidationError("É necessário selecionar pelo menos um tipo de dado para minerar")
+            raise serializers.ValidationError("At least one data type must be selected for mining")
         return value
 
     def validate_repositories(self, value):
         if not value:
-            raise serializers.ValidationError("É necessário fornecer pelo menos um repositório para minerar")
+            raise serializers.ValidationError("At least one repository must be provided for mining")
         return value
 
     def validate(self, data):
         """
-        Validação adicional que força depth=complex quando comments está presente em collect_types
+        Additional validation that forces depth=complex when comments is present in collect_types
         """
         if 'comments' in data.get('collect_types', []):
             data['depth'] = 'complex'
@@ -692,13 +692,13 @@ class GitHubCollectAllSerializer(serializers.Serializer):
 
 class GitHubCollectAllViewSet(viewsets.ViewSet):
     @extend_schema(
-        summary="Minerar dados selecionados de múltiplos repositórios",
+        summary="Mine selected data from multiple repositories",
         tags=["GitHub"],
-        description="Endpoint para minerar dados específicos de múltiplos repositórios simultaneamente",
+        description="Endpoint to mine specific data from multiple repositories simultaneously",
         request=GitHubCollectAllSerializer,
         responses={
-            202: OpenApiResponse(description="Tarefas iniciadas com sucesso"),
-            400: OpenApiResponse(description="Requisição inválida - parâmetros ausentes ou inválidos")
+            202: OpenApiResponse(description="Tasks successfully initiated"),
+            400: OpenApiResponse(description="Bad request - missing or invalid parameters")
         }
     )
     def create(self, request):
@@ -807,21 +807,21 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                             })
 
                 except Exception as e:
-                    print(f"Erro ao processar repositório {repo_name}: {str(e)}")
+                    print(f"Error processing repository {repo_name}: {str(e)}")
                     repo_results['error'] = str(e)
 
                 results.append(repo_results)
 
             return Response({
-                'message': 'Tarefas de mineração iniciadas com sucesso',
+                'message': 'Mining tasks successfully initiated',
                 'results': results
             }, status=status.HTTP_202_ACCEPTED)
 
         except Exception as e:
-            print(f"Erro na view collect-all: {str(e)}")
+            print(f"Error in collect-all view: {str(e)}")
             return Response({
                 'error': str(e),
-                'detail': 'Erro interno ao processar a requisição'
+                'detail': 'Internal error processing request'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @extend_schema(

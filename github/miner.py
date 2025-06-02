@@ -94,12 +94,12 @@ class GitHubMiner:
         
         result = self.load_tokens()
         if not result['success']:
-            raise Exception(f"Falha ao inicializar tokens do GitHub: {result['error']}")
+            raise Exception(f"Failed to initialize GitHub tokens: {result['error']}")
         
-        print(f"✅ Tokens do GitHub inicializados com sucesso:")
-        print(f"   - Total de tokens carregados: {result['tokens_loaded']}")
-        print(f"   - Tokens válidos: {result['valid_tokens']}")
-        print(f"   - Token selecionado: {result['selected_token']['index'] + 1} (com {result['selected_token']['remaining']} requisições disponíveis)")
+        print(f"✅ GitHub tokens initialized successfully:")
+        print(f"   - Total tokens loaded: {result['tokens_loaded']}")
+        print(f"   - Valid tokens: {result['valid_tokens']}")
+        print(f"   - Selected token: {result['selected_token']['index'] + 1} (with {result['selected_token']['remaining']} requests available)")
         
         self.update_auth_header()
 
@@ -112,21 +112,21 @@ class GitHubMiner:
             if response.status_code == 401:
                 return {
                     'valid': False,
-                    'error': 'Token inválido ou expirado',
+                    'error': 'Token invalid or expired',
                     'status_code': response.status_code
                 }
             
             if response.status_code == 403:
                 return {
                     'valid': False,
-                    'error': 'Token não tem permissões suficientes',
+                    'error': 'Token does not have sufficient permissions',
                     'status_code': response.status_code
                 }
             
             if response.status_code != 200:
                 return {
                     'valid': False,
-                    'error': f'Erro ao verificar token: {response.status_code}',
+                    'error': f'Error verifying token: {response.status_code}',
                     'status_code': response.status_code
                 }
 
@@ -143,7 +143,7 @@ class GitHubMiner:
         except Exception as e:
             return {
                 'valid': False,
-                'error': f'Erro ao verificar token: {str(e)}',
+                'error': f'Error verifying token: {str(e)}',
                 'status_code': None
             }
 
@@ -154,17 +154,17 @@ class GitHubMiner:
         if not tokens_str:
             return {
                 'success': False,
-                'error': 'Nenhum token encontrado. Certifique-se que GITHUB_TOKENS está configurado no arquivo .env'
+                'error': 'No tokens found. Make sure GITHUB_TOKENS is configured in the .env file'
             }
         
         self.tokens = [token.strip() for token in tokens_str.split(",") if token.strip()]
         if not self.tokens:
             return {
                 'success': False,
-                'error': 'Nenhum token válido encontrado após processamento'
+                'error': 'No valid tokens found after processing'
             }
         
-        print(f"{len(self.tokens)} tokens carregados.", flush=True)
+        print(f"{len(self.tokens)} tokens loaded.", flush=True)
         
         valid_tokens = []
         for i, token in enumerate(self.tokens):
@@ -182,7 +182,7 @@ class GitHubMiner:
         if not valid_tokens:
             return {
                 'success': False,
-                'error': 'Nenhum token válido encontrado após verificação'
+                'error': 'No valid tokens found after verification'
             }
         
         best_token = max(valid_tokens, key=lambda x: x['remaining'])
@@ -332,7 +332,7 @@ class GitHubMiner:
 
     def clone_repo(self, repo_url, clone_path):
         max_retries = 3
-        retry_delay = 5  # segundos
+        retry_delay = 5  # seconds
         
         for attempt in range(max_retries):
             try:
@@ -408,7 +408,7 @@ class GitHubMiner:
 
     def get_commits(self, repo_name: str, start_date: str = None, end_date: str = None, clone_path: str = None, commit_sha: str = None):
         try:
-            print(f"\n[COMMITS] Starting commits extraction for {repo_name}", flush=True)
+            print(f"[COMMITS] Starting commits extraction for {repo_name}", flush=True)
 
             if commit_sha:
                 print(f"[COMMITS] Extraction mode: Specific commit (SHA: {commit_sha})", flush=True)
@@ -755,7 +755,7 @@ class GitHubMiner:
         """
         Fetches repository metadata from GitHub
         """
-        print(f"\n[METADATA] Starting metadata extraction for {repo_name}", flush=True)
+        print(f"[METADATA] Starting metadata extraction for {repo_name}", flush=True)
         
         try:
             owner, repo = repo_name.split('/')
@@ -1148,15 +1148,15 @@ class GitHubMiner:
         metrics = APIMetrics()
         
         print("\n" + "="*50)
-        print(f"🔍 INICIANDO EXTRAÇÃO DE ISSUES: {repo_name}")
-        print(f"📅 Período: {start_date or 'início'} até {end_date or 'atual'}")
-        print(f"🔎 Profundidade: {depth.upper()}")
+        print(f"🔍 STARTING ISSUE EXTRACTION: {repo_name}")
+        print(f"📅 Period: {start_date or 'start'} to {end_date or 'current'}")
+        print(f"🔎 Depth: {depth.upper()}")
         print("="*50 + "\n")
 
         try:
             for period_start, period_end in self.split_date_range(start_date, end_date):
                 print("\n" + "-"*40)
-                print(f"📊 Processando período: {period_start} até {period_end}")
+                print(f"📊 Processing period: {period_start} to {period_end}")
                 print("-"*40)
                 
                 page = 1
@@ -1181,7 +1181,7 @@ class GitHubMiner:
 
                     if response.status_code == 403 and 'rate limit' in response.text.lower():
                         if not self.handle_rate_limit(response, 'search'):
-                            print("Falha ao recuperar após rate limit", flush=True)
+                            print("Failed to recover after rate limit", flush=True)
                             break
                         response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
 
@@ -1191,7 +1191,7 @@ class GitHubMiner:
 
                     issues_in_page = len(data['items'])
                     period_issues_count += issues_in_page
-                    print(f"\n📝 Página {page}: Processando {issues_in_page} issues...")
+                    print(f"\n📝 Page {page}: Processing {issues_in_page} issues...")
 
                     for issue in data['items']:
                         current_timestamp = timezone.now()
@@ -1209,7 +1209,7 @@ class GitHubMiner:
                         timeline_events = []
                         if timeline_response.status_code == 403 and 'rate limit' in timeline_response.text.lower():
                             if not self.handle_rate_limit(timeline_response, 'core'):
-                                print(f"[Issues] Falha ao recuperar timeline #{issue_number} após rate limit", flush=True)
+                                print(f"[Issues] Failed to recover timeline #{issue_number} after rate limit", flush=True)
                                 continue
                             timeline_response = requests.get(timeline_url, headers=headers)
                         
