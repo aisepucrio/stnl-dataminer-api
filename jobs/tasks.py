@@ -3,13 +3,11 @@ from github.miner import GitHubMiner
 from jira.miner import JiraMiner
 from django.conf import settings
 from datetime import datetime
-import traceback
+from .models import Task
+from celery.exceptions import Ignore
 
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
-    """
-    Task para minerar commits de um repositório
-    """
     self.update_state(
         state='STARTED',
         meta={
@@ -27,6 +25,39 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             
         miner = GitHubMiner()
         
+        token_result = miner.verify_token()
+        if not token_result['valid']:
+            error_msg = token_result.get('error', 'Unknown error in token validation')
+            error_type = 'TokenValidationError'
+            
+            task = Task.objects.get(task_id=self.request.id)
+            task.status = 'FAILURE'
+            task.error = error_msg
+            task.error_type = error_type
+            task.token_validation_error = True
+            task.save()
+            
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'operation': 'fetch_commits',
+                    'repository': repo_name,
+                    'commit_sha': commit_sha,
+                    'error': error_msg,
+                    'error_type': error_type,
+                    'exc_type': error_type,
+                    'exc_message': error_msg
+                }
+            )
+            
+            return {
+                'status': 'FAILURE',
+                'error': error_msg,
+                'error_type': error_type,
+                'operation': 'fetch_commits',
+                'repository': repo_name
+            }
+        
         metadata = miner.get_repository_metadata(repo_name)
         
         commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha)
@@ -41,6 +72,16 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             }
         )
         
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'SUCCESS'
+        task.result = {
+            'operation': 'fetch_commits',
+            'repository': repo_name,
+            'commit_sha': commit_sha,
+            'data': commits
+        }
+        task.save()
+        
         return {
             'operation': 'fetch_commits',
             'repository': repo_name,
@@ -49,17 +90,36 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         }
         
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
         self.update_state(
             state='FAILURE',
             meta={
                 'operation': 'fetch_commits',
                 'repository': repo_name,
                 'commit_sha': commit_sha,
-                'error': str(e),
-                'error_type': type(e).__name__
+                'error': error_msg,
+                'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg
             }
         )
-        raise
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'FAILURE'
+        task.error = error_msg
+        task.error_type = error_type
+        task.token_validation_error = error_type == 'TokenValidationError'
+        task.save()
+        
+        return {
+            'status': 'FAILURE',
+            'error': error_msg,
+            'error_type': error_type,
+            'operation': 'fetch_commits',
+            'repository': repo_name
+        }
 
 @shared_task(bind=True)
 def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic'):
@@ -68,52 +128,111 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
         meta={
             'operation': 'fetch_issues',
             'repository': repo_name,
+            'start_date': start_date,
+            'end_date': end_date,
             'depth': depth
         }
     )
+
     try:
         miner = GitHubMiner()
         
-        metadata = miner.get_repository_metadata(repo_name)
-        
+        token_result = miner.verify_token()
+        if not token_result['valid']:
+            error_msg = token_result.get('error', 'Unknown error in token validation')
+            error_type = 'TokenValidationError'
+            
+            task = Task.objects.get(task_id=self.request.id)
+            task.status = 'FAILURE'
+            task.error = error_msg
+            task.error_type = error_type
+            task.token_validation_error = True
+            task.save()
+            
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'operation': 'fetch_issues',
+                    'repository': repo_name,
+                    'error': error_msg,
+                    'error_type': error_type,
+                    'token_validation_error': True
+                }
+            )
+            
+            return {
+                'status': 'FAILURE',
+                'error': error_msg,
+                'error_type': error_type,
+                'operation': 'fetch_issues',
+                'repository': repo_name,
+                'token_validation_error': True
+            }
+
         issues = miner.get_issues(repo_name, start_date, end_date, depth)
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'SUCCESS'
+        task.result = {
+            'count': len(issues),
+            'repository': repo_name,
+            'start_date': start_date,
+            'end_date': end_date,
+            'depth': depth
+        }
+        task.save()
         
         self.update_state(
             state='SUCCESS',
             meta={
                 'operation': 'fetch_issues',
                 'repository': repo_name,
-                'depth': depth,
-                'data': issues
+                'count': len(issues),
+                'start_date': start_date,
+                'end_date': end_date,
+                'depth': depth
             }
         )
+        
         return {
-            'operation': 'fetch_issues',
+            'status': 'SUCCESS',
+            'count': len(issues),
             'repository': repo_name,
-            'depth': depth,
-            'data': issues
+            'start_date': start_date,
+            'end_date': end_date,
+            'depth': depth
         }
+
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
         self.update_state(
             state='FAILURE',
             meta={
                 'operation': 'fetch_issues',
                 'repository': repo_name,
-                'error': str(e),
-                'error_type': type(e).__name__
+                'error': error_msg,
+                'error_type': error_type
             }
         )
-        raise type(e)(str(e)).with_traceback(e.__traceback__)
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'FAILURE'
+        task.error = error_msg
+        task.error_type = error_type
+        task.save()
+        
+        return {
+            'status': 'FAILURE',
+            'error': error_msg,
+            'error_type': error_type,
+            'operation': 'fetch_issues',
+            'repository': repo_name
+        }
 
 @shared_task(bind=True)
 def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic'):
-    """
-    self - first argument automatically passed by Celery due to bind=True
-    repo_name - repository name
-    start_date - start date (optional)
-    end_date - end date (optional)
-    depth - mining depth (optional, default='basic')
-    """
     self.update_state(
         state='STARTED',
         meta={
@@ -125,34 +244,107 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
     try:
         miner = GitHubMiner()
         
+        token_result = miner.verify_token()
+        if not token_result['valid']:
+            error_msg = f"Invalid token: {token_result.get('error', 'Unknown error')}"
+            error_type = 'TokenValidationError'
+            
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'status': 'FAILURE',
+                    'error': error_msg,
+                    'error_type': error_type,
+                    'operation': 'fetch_pull_requests',
+                    'repository': repo_name,
+                    'token_validation_error': True
+                }
+            )
+            
+            task = Task.objects.get(task_id=self.request.id)
+            task.status = 'FAILURE'
+            task.error = error_msg
+            task.error_type = error_type
+            task.token_validation_error = True
+            task.save()
+            
+            return {
+                'status': 'FAILURE',
+                'error': error_msg,
+                'error_type': error_type,
+                'operation': 'fetch_pull_requests',
+                'repository': repo_name
+            }
+        
         metadata = miner.get_repository_metadata(repo_name)
         
         pull_requests = miner.get_pull_requests(repo_name, start_date, end_date, depth)
         
+        def convert_datetime(obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, dict):
+                return {k: convert_datetime(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_datetime(item) for item in obj]
+            return obj
+
+        prs_serializable = convert_datetime(pull_requests)
+        
         self.update_state(
             state='SUCCESS',
             meta={
+                'status': 'SUCCESS',
                 'operation': 'fetch_pull_requests',
                 'repository': repo_name,
-                'depth': depth,
-                'data': pull_requests
+                'data': prs_serializable
             }
         )
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'SUCCESS'
+        task.result = {
+            'status': 'SUCCESS',
+            'operation': 'fetch_pull_requests',
+            'repository': repo_name,
+            'data': prs_serializable
+        }
+        task.save()
+        
         return {
-            'status': 'success',
-            'data': pull_requests
+            'status': 'SUCCESS',
+            'operation': 'fetch_pull_requests',
+            'repository': repo_name,
+            'data': prs_serializable
         }
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
         self.update_state(
             state='FAILURE',
             meta={
+                'status': 'FAILURE',
+                'error': error_msg,
+                'error_type': error_type,
                 'operation': 'fetch_pull_requests',
-                'repository': repo_name,
-                'error': str(e),
-                'error_type': type(e).__name__
+                'repository': repo_name
             }
         )
-        raise type(e)(str(e)).with_traceback(e.__traceback__)
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'FAILURE'
+        task.error = error_msg
+        task.error_type = error_type
+        task.save()
+        
+        return {
+            'status': 'FAILURE',
+            'error': error_msg,
+            'error_type': error_type,
+            'operation': 'fetch_pull_requests',
+            'repository': repo_name
+        }
 
 @shared_task(bind=True)
 def fetch_branches(self, repo_name):
@@ -166,6 +358,38 @@ def fetch_branches(self, repo_name):
     try:
         miner = GitHubMiner()
         
+        token_result = miner.verify_token()
+        if not token_result['valid']:
+            error_msg = token_result.get('error', 'Unknown error in token validation')
+            error_type = 'TokenValidationError'
+            
+            task = Task.objects.get(task_id=self.request.id)
+            task.status = 'FAILURE'
+            task.error = error_msg
+            task.error_type = error_type
+            task.token_validation_error = True
+            task.save()
+            
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'operation': 'fetch_branches',
+                    'repository': repo_name,
+                    'error': error_msg,
+                    'error_type': error_type,
+                    'exc_type': error_type,
+                    'exc_message': error_msg
+                }
+            )
+            
+            return {
+                'status': 'FAILURE',
+                'error': error_msg,
+                'error_type': error_type,
+                'operation': 'fetch_branches',
+                'repository': repo_name
+            }
+        
         metadata = miner.get_repository_metadata(repo_name)
         
         branches = miner.get_branches(repo_name)
@@ -178,21 +402,51 @@ def fetch_branches(self, repo_name):
                 'data': branches
             }
         )
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'SUCCESS'
+        task.result = {
+            'operation': 'fetch_branches',
+            'repository': repo_name,
+            'data': branches
+        }
+        task.save()
+        
         return {
             'operation': 'fetch_branches',
             'repository': repo_name,
             'data': branches
         }
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
         self.update_state(
             state='FAILURE',
             meta={
                 'operation': 'fetch_branches',
                 'repository': repo_name,
-                'error': str(e)
+                'error': error_msg,
+                'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg
             }
         )
-        raise
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'FAILURE'
+        task.error = error_msg
+        task.error_type = error_type
+        task.token_validation_error = error_type == 'TokenValidationError'
+        task.save()
+        
+        return {
+            'status': 'FAILURE',
+            'error': error_msg,
+            'error_type': error_type,
+            'operation': 'fetch_branches',
+            'repository': repo_name
+        }
 
 @shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None):
@@ -250,6 +504,39 @@ def fetch_metadata(self, repo_name):
     )
     try:
         miner = GitHubMiner()
+        
+        token_result = miner.verify_token()
+        if not token_result['valid']:
+            error_msg = token_result.get('error', 'Unknown error in token validation')
+            error_type = 'TokenValidationError'
+            
+            task = Task.objects.get(task_id=self.request.id)
+            task.status = 'FAILURE'
+            task.error = error_msg
+            task.error_type = error_type
+            task.token_validation_error = True
+            task.save()
+            
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'operation': 'fetch_metadata',
+                    'repository': repo_name,
+                    'error': error_msg,
+                    'error_type': error_type,
+                    'exc_type': error_type,
+                    'exc_message': error_msg
+                }
+            )
+            
+            return {
+                'status': 'FAILURE',
+                'error': error_msg,
+                'error_type': error_type,
+                'operation': 'fetch_metadata',
+                'repository': repo_name
+            }
+            
         metadata = miner.get_repository_metadata(repo_name)
         
         metadata_dict = {
@@ -279,16 +566,41 @@ def fetch_metadata(self, repo_name):
                 'result': metadata_dict
             }
         )
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'SUCCESS'
+        task.result = metadata_dict
+        task.save()
+        
         return metadata_dict
         
     except Exception as e:
+        error_msg = str(e)
+        error_type = type(e).__name__
+        
         self.update_state(
             state='FAILURE',
             meta={
                 'operation': 'fetch_metadata',
                 'repository': repo_name,
-                'error': str(e),
-                'error_type': type(e).__name__
+                'error': error_msg,
+                'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg
             }
         )
-        raise type(e)(str(e)).with_traceback(e.__traceback__)
+        
+        task = Task.objects.get(task_id=self.request.id)
+        task.status = 'FAILURE'
+        task.error = error_msg
+        task.error_type = error_type
+        task.token_validation_error = error_type == 'TokenValidationError'
+        task.save()
+        
+        return {
+            'status': 'FAILURE',
+            'error': error_msg,
+            'error_type': error_type,
+            'operation': 'fetch_metadata',
+            'repository': repo_name
+        }
