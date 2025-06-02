@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'jira',
     'jobs',
     'django_filters',
+    'stackoverflow',
 ]
 
 MIDDLEWARE = [
