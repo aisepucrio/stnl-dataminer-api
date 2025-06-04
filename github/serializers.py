@@ -130,3 +130,31 @@ class GraphDashboardSerializer(serializers.Serializer):
             if data['start_date'] > data['end_date']:
                 raise serializers.ValidationError("start_date must be before end_date")
         return data
+
+class GitHubCollectAllSerializer(serializers.Serializer):
+    repositories = serializers.ListField(
+        child=serializers.CharField(help_text="Repository name in format owner/repo"),
+        help_text="List of repositories to mine"
+    )
+    start_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Start date for mining (optional)")
+    end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="End date for mining (optional)")
+    depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Mining depth (basic or complex)")
+    collect_types = serializers.ListField(
+        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata', 'comments']),
+        help_text="List of data types to mine (commits, issues, pull_requests, branches, metadata, comments)"
+    )
+
+    def validate_collect_types(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one data type must be selected for mining")
+        return value
+
+    def validate_repositories(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one repository must be provided for mining")
+        return value
+
+    def validate(self, data):
+        if 'comments' in data.get('collect_types', []):
+            data['depth'] = 'complex'
+        return data
