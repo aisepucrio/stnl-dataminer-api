@@ -16,6 +16,10 @@ if [ $? -ne 0 ]; then
 fi
 echo "Migrations applied successfully."
 
+echo "Collecting static files..."
+python manage.py collectstatic --no-input
+echo "Static files collected successfully."
+
 # Criar superusuário
 echo "Checking for superuser..."
 python manage.py shell -c "
