@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from jobs.models import Task
-from jobs.tasks import collect_jira_issues_task
+from .tasks import fetch_issues, fetch_metadata
 from .filters import JiraIssueFilter
 from .models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit
 from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
@@ -97,17 +97,16 @@ class JiraIssueCollectView(APIView):
                         status=400
                     )
 
-                task = collect_jira_issues_task.delay(
-                    jira_domain,
+                task = fetch_issues.delay(
                     project_key,
-                    issuetypes if issuetypes else [], 
                     start_date,
-                    end_date
+                    end_date,
+                    depth='basic'
                 )
 
                 Task.objects.create(
                     task_id=task.id,
-                    operation='collect_jira_issues',
+                    operation='fetch_issues',
                     repository=f"{jira_domain}/{project_key}",
                     status='PENDING'
                 )

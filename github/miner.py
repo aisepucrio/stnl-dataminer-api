@@ -1083,14 +1083,15 @@ class GitHubMiner:
                             # Inside the get_pull_requests method
                             if depth == 'basic':
                                 # If it's basic mining, check for existing PR
-                                existing_pr = GitHubPullRequest.objects.filter(pr_id=processed_pr['id']).first()
+                                existing_pr = GitHubIssuePullRequest.objects.filter(record_id=processed_pr['id']).first()
                                 if existing_pr:
                                     # Preserve complex data if it exists
                                     processed_pr['commits'] = existing_pr.commits
                                     processed_pr['comments'] = existing_pr.comments
+                                    processed_pr['timeline_events'] = existing_pr.timeline_events
 
                             # Update or create PR
-                            GitHubIssuePullRequest.objects.update_or_create(
+                            pr_obj, created = GitHubIssuePullRequest.objects.update_or_create(
                                 record_id=processed_pr['id'],
                                 defaults={
                                     'repository': repo_name,
@@ -1111,9 +1112,11 @@ class GitHubMiner:
                                     'data_type': 'pull_request'  # Adds the type as 'pull_request'
                                 }
                             )
+                            
+                            action = 'created' if created else 'updated'
+                            log_debug(pr_number, f"PR {action} successfully")
 
                             all_prs.append(processed_pr)
-                            log_debug(pr_number, "Processing and saving completed successfully")
                             flush_debug_logs()
 
                         except Exception as e:

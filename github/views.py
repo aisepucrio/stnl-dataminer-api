@@ -12,7 +12,7 @@ from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from jobs.models import Task
-from jobs.tasks import (
+from .tasks import (
     fetch_commits,
     fetch_issues,
     fetch_pull_requests,
