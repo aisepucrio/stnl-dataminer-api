@@ -29,6 +29,7 @@ from .serializers import (
     GraphDashboardSerializer,
     GitHubCollectAllSerializer
 )
+from .utils import DateTimeHandler
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -74,6 +75,19 @@ class GitHubCommitViewSet(viewsets.ViewSet):
         if not repo_name:
             return Response(
                 {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -127,6 +141,19 @@ class GitHubIssueViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
         
         # Save the task in the database
@@ -174,6 +201,19 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
         if not repo_name:
             return Response(
                 {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -585,24 +625,18 @@ class DashboardView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        if start_date or end_date:
-            try:
-                if start_date:
-                    start_datetime = timezone.datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                
-                if end_date:
-                    end_datetime = timezone.datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                
-                if start_date and end_date and start_datetime > end_datetime:
-                    return Response(
-                        {"error": "start_date must be before end_date"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            except ValueError:
-                return Response(
-                    {"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         issue_filters = {'data_type': 'issue'}
         pr_filters = {'data_type': 'pull_request'}
@@ -640,7 +674,7 @@ class DashboardView(APIView):
                     "forks_count": metadata.forks_count,
                     "stars_count": metadata.stars_count,
                     "watchers_count": metadata.watchers_count,
-                    "time_mined": metadata.time_mined
+                    "time_mined": DateTimeHandler.format_date(metadata.time_mined)
                 }
             except GitHubMetadata.DoesNotExist:
                 return Response(
