@@ -16,13 +16,17 @@ if [ $? -ne 0 ]; then
 fi
 echo "Migrations applied successfully."
 
+echo "Collecting static files..."
+python manage.py collectstatic --no-input
+echo "Static files collected successfully."
+
 # Criar superusuário
 echo "Checking for superuser..."
 python manage.py shell -c "
 from django.contrib.auth import get_user_model;
 User = get_user_model();
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@admin.com', 'adminpassword')
+if not User.objects.filter(username='${DJANGO_SUPERUSER_USERNAME}').exists():
+    User.objects.create_superuser('${DJANGO_SUPERUSER_USERNAME}', 'admin@admin.com', '${DJANGO_SUPERUSER_PASSWORD}')
 " && echo "Superuser created successfully." || echo "Superuser already exists or failed to create."
 
 # Iniciar o servidor
