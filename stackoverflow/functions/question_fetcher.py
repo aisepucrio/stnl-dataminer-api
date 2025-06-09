@@ -2,6 +2,7 @@ import requests
 from datetime import datetime
 import time
 import logging
+from stackoverflow.models import StackQuestion, StackUser # Import StackQuestion and StackUser models
 
 logger = logging.getLogger(__name__)
 
@@ -67,18 +68,92 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             
             # Process questions
             for item in data.get('items', []):
+                owner_data = item.get('owner', {})
+                owner_id = owner_data.get('user_id')
+                
+                stack_user = None
+                if owner_id:
+                    try:
+                        stack_user, created = StackUser.objects.get_or_create(
+                            user_id=owner_id,
+                            defaults={
+                                'display_name': owner_data.get('display_name'),
+                                'reputation': owner_data.get('reputation', 0),
+                                'profile_image': owner_data.get('profile_image'),
+                                'user_type': owner_data.get('user_type'),
+                                'is_employee': owner_data.get('is_employee', False),
+                                'creation_date': datetime.fromtimestamp(owner_data['creation_date']) if 'creation_date' in owner_data else None,
+                                'last_access_date': datetime.fromtimestamp(owner_data['last_access_date']) if 'last_access_date' in owner_data else None,
+                                'last_modified_date': datetime.fromtimestamp(owner_data['last_modified_date']) if 'last_modified_date' in owner_data else None,
+                                'link': owner_data.get('link'),
+                                'accept_rate': owner_data.get('accept_rate'),
+                                'about_me': owner_data.get('about_me'),
+                                'location': owner_data.get('location'),
+                                'website_url': owner_data.get('website_url'),
+                                'account_id': owner_data.get('account_id'),
+                                'badge_counts': owner_data.get('badge_counts'),
+                                'collectives': owner_data.get('collectives'),
+                                'view_count': owner_data.get('view_count', 0),
+                                'down_vote_count': owner_data.get('down_vote_count', 0),
+                                'up_vote_count': owner_data.get('up_vote_count', 0),
+                                'answer_count': owner_data.get('answer_count', 0),
+                                'question_count': owner_data.get('question_count', 0),
+                                'reputation_change_year': owner_data.get('reputation_change_year', 0),
+                                'reputation_change_quarter': owner_data.get('reputation_change_quarter', 0),
+                                'reputation_change_month': owner_data.get('reputation_change_month', 0),
+                                'reputation_change_week': owner_data.get('reputation_change_week', 0),
+                                'reputation_change_day': owner_data.get('reputation_change_day', 0),
+                            }
+                        )
+                        if not created:
+                            # Update existing user fields if necessary (optional, but good practice)
+                            stack_user.display_name = owner_data.get('display_name', stack_user.display_name)
+                            stack_user.reputation = owner_data.get('reputation', stack_user.reputation)
+                            stack_user.profile_image = owner_data.get('profile_image', stack_user.profile_image)
+                            stack_user.user_type = owner_data.get('user_type', stack_user.user_type)
+                            stack_user.is_employee = owner_data.get('is_employee', stack_user.is_employee)
+                            if 'creation_date' in owner_data: stack_user.creation_date = datetime.fromtimestamp(owner_data['creation_date'])
+                            if 'last_access_date' in owner_data: stack_user.last_access_date = datetime.fromtimestamp(owner_data['last_access_date'])
+                            if 'last_modified_date' in owner_data: stack_user.last_modified_date = datetime.fromtimestamp(owner_data['last_modified_date'])
+                            stack_user.link = owner_data.get('link', stack_user.link)
+                            stack_user.accept_rate = owner_data.get('accept_rate', stack_user.accept_rate)
+                            stack_user.about_me = owner_data.get('about_me', stack_user.about_me)
+                            stack_user.location = owner_data.get('location', stack_user.location)
+                            stack_user.website_url = owner_data.get('website_url', stack_user.website_url)
+                            stack_user.account_id = owner_data.get('account_id', stack_user.account_id)
+                            stack_user.badge_counts = owner_data.get('badge_counts', stack_user.badge_counts)
+                            stack_user.collectives = owner_data.get('collectives', stack_user.collectives)
+                            stack_user.view_count = owner_data.get('view_count', stack_user.view_count)
+                            stack_user.down_vote_count = owner_data.get('down_vote_count', stack_user.down_vote_count)
+                            stack_user.up_vote_count = owner_data.get('up_vote_count', stack_user.up_vote_count)
+                            stack_user.answer_count = owner_data.get('answer_count', stack_user.answer_count)
+                            stack_user.question_count = owner_data.get('question_count', stack_user.question_count)
+                            stack_user.reputation_change_year = owner_data.get('reputation_change_year', stack_user.reputation_change_year)
+                            stack_user.reputation_change_quarter = owner_data.get('reputation_change_quarter', stack_user.reputation_change_quarter)
+                            stack_user.reputation_change_month = owner_data.get('reputation_change_month', stack_user.reputation_change_month)
+                            stack_user.reputation_change_week = owner_data.get('reputation_change_week', stack_user.reputation_change_week)
+                            stack_user.reputation_change_day = owner_data.get('reputation_change_day', stack_user.reputation_change_day)
+                            stack_user.save()
+                    except Exception as e:
+                        logger.error(f"Error processing StackUser with ID {owner_id}: {e}")
+                
                 question = {
                     'question_id': item['question_id'],
                     'title': item['title'],
                     'body': item['body'],
-                    'creation_date': datetime.fromtimestamp(item['creation_date']).isoformat(),
+                    'creation_date': datetime.fromtimestamp(item['creation_date']).isoformat() if 'creation_date' in item else None,
                     'score': item['score'],
                     'view_count': item['view_count'],
                     'answer_count': item['answer_count'],
                     # 'tags': item['tags'],
                     'is_answered': item['is_answered'],
                     # 'accepted_answer_id': item.get('accepted_answer_id'),  # Commented out to avoid error
-                    'owner': item['owner'].get('user_id') if 'owner' in item else None
+                    'owner': stack_user,  # Assign the StackUser object
+                    'share_link': item.get('share_link'),
+                    'body_markdown': item.get('body_markdown'),
+                    'link': item.get('link'),
+                    'favorite_count': item.get('favorite_count', 0),
+                    'time_mined': datetime.now().isoformat(),
                 }
                 questions.append(question)
             

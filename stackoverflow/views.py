@@ -278,16 +278,24 @@ class StackOverflowViewSet(viewsets.ViewSet):
             try:
                 with transaction.atomic():
                     for question_data in questions:
-                        # Remove tags from question_data to avoid direct assignment
+                        # Extract owner and tags to handle them separately
+                        owner_instance = question_data.pop('owner', None)
                         tags = question_data.pop('tags', [])
+
                         # Create or update the question
                         question, created = StackQuestion.objects.update_or_create(
                             question_id=question_data['question_id'],
                             defaults=question_data
                         )
+                        
+                        # Assign owner if it exists
+                        if owner_instance:
+                            question.owner = owner_instance
+                            question.save()
+
                         # Set tags using the set() method
-                        # tag_instances = [StackTag.objects.get_or_create(name=tag)[0] for tag in tags]
-                        # question.tags.set(tag_instances)
+                        tag_instances = [StackTag.objects.get_or_create(name=tag)[0] for tag in tags]
+                        question.tags.set(tag_instances)
             except Exception as e:
                 return Response({
                     'error': f'Database error: {str(e)}'
