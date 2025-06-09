@@ -4,12 +4,13 @@ from jobs.models import Task
 from datetime import datetime
 
 @shared_task(bind=True)
-def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic'):
+def fetch_issues(self, project_key, jira_domain, start_date=None, end_date=None, depth='basic'):
     self.update_state(
         state='STARTED',
         meta={
             'operation': 'fetch_issues',
             'project': project_key,
+            'jira_domain': jira_domain,
             'start_date': start_date,
             'end_date': end_date,
             'depth': depth,
@@ -18,7 +19,7 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
         }
     )
     try:
-        miner = JiraMiner()
+        miner = JiraMiner(jira_domain)
         
         token_result = miner.verify_token()
         if not token_result['valid']:
@@ -127,18 +128,19 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
         }
 
 @shared_task(bind=True)
-def fetch_metadata(self, project_key):
+def fetch_metadata(self, project_key, jira_domain):
     self.update_state(
         state='STARTED',
         meta={
             'operation': 'fetch_metadata',
             'project': project_key,
+            'jira_domain': jira_domain,
             'exc_type': None,
             'exc_message': None
         }
     )
     try:
-        miner = JiraMiner()
+        miner = JiraMiner(jira_domain)
         
         token_result = miner.verify_token()
         if not token_result['valid']:

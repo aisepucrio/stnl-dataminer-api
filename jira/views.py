@@ -99,6 +99,7 @@ class JiraIssueCollectView(APIView):
 
                 task = fetch_issues.delay(
                     project_key,
+                    jira_domain,
                     start_date,
                     end_date,
                     depth='basic'
