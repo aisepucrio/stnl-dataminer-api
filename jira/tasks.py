@@ -57,12 +57,12 @@ def fetch_issues(self, project_key, jira_domain, start_date=None, end_date=None,
                 'token_validation_error': True
             }
 
-        issues = miner.get_issues(project_key, start_date, end_date, depth)
+        issues = miner.collect_jira_issues(project_key, [], start_date, end_date)
         
         task = Task.objects.get(task_id=self.request.id)
         task.status = 'SUCCESS'
         task.result = {
-            'count': len(issues),
+            'count': issues.get('total_issues', 0),
             'project': project_key,
             'start_date': start_date,
             'end_date': end_date,
@@ -75,7 +75,7 @@ def fetch_issues(self, project_key, jira_domain, start_date=None, end_date=None,
             meta={
                 'operation': 'fetch_issues',
                 'project': project_key,
-                'count': len(issues),
+                'count': issues.get('total_issues', 0),
                 'start_date': start_date,
                 'end_date': end_date,
                 'depth': depth,
@@ -86,7 +86,7 @@ def fetch_issues(self, project_key, jira_domain, start_date=None, end_date=None,
         
         return {
             'status': 'SUCCESS',
-            'count': len(issues),
+            'count': issues.get('total_issues', 0),
             'project': project_key,
             'start_date': start_date,
             'end_date': end_date,
