@@ -83,9 +83,9 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                                 'profile_image': owner_data.get('profile_image'),
                                 'user_type': owner_data.get('user_type'),
                                 'is_employee': owner_data.get('is_employee', False),
-                                'creation_date': datetime.fromtimestamp(owner_data['creation_date']) if 'creation_date' in owner_data else None,
-                                'last_access_date': datetime.fromtimestamp(owner_data['last_access_date']) if 'last_access_date' in owner_data else None,
-                                'last_modified_date': datetime.fromtimestamp(owner_data['last_modified_date']) if 'last_modified_date' in owner_data else None,
+                                'creation_date': owner_data.get('creation_date'),
+                                'last_access_date': owner_data.get('last_access_date'),
+                                'last_modified_date': owner_data.get('last_modified_date'),
                                 'link': owner_data.get('link'),
                                 'accept_rate': owner_data.get('accept_rate'),
                                 'about_me': owner_data.get('about_me'),
@@ -113,9 +113,9 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                             stack_user.profile_image = owner_data.get('profile_image', stack_user.profile_image)
                             stack_user.user_type = owner_data.get('user_type', stack_user.user_type)
                             stack_user.is_employee = owner_data.get('is_employee', stack_user.is_employee)
-                            if 'creation_date' in owner_data: stack_user.creation_date = datetime.fromtimestamp(owner_data['creation_date'])
-                            if 'last_access_date' in owner_data: stack_user.last_access_date = datetime.fromtimestamp(owner_data['last_access_date'])
-                            if 'last_modified_date' in owner_data: stack_user.last_modified_date = datetime.fromtimestamp(owner_data['last_modified_date'])
+                            stack_user.creation_date = owner_data.get('creation_date', stack_user.creation_date)
+                            stack_user.last_access_date = owner_data.get('last_access_date', stack_user.last_access_date)
+                            stack_user.last_modified_date = owner_data.get('last_modified_date', stack_user.last_modified_date)
                             stack_user.link = owner_data.get('link', stack_user.link)
                             stack_user.accept_rate = owner_data.get('accept_rate', stack_user.accept_rate)
                             stack_user.about_me = owner_data.get('about_me', stack_user.about_me)
@@ -142,7 +142,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     'question_id': item['question_id'],
                     'title': item.get('title'),
                     'body': item.get('body'),
-                    'creation_date': datetime.fromtimestamp(item['creation_date']).isoformat() if 'creation_date' in item else None,
+                    'creation_date': item.get('creation_date'),
                     'score': item.get('score', 0),
                     'view_count': item.get('view_count', 0),
                     'answer_count': item.get('answer_count', 0),
@@ -158,8 +158,8 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     'link': item.get('link'),
                     'favorite_count': item.get('favorite_count', 0),
                     'content_license': item.get('content_license', None),
-                    'last_activity_date': datetime.fromtimestamp(item['last_activity_date']).isoformat() if 'last_activity_date' in item else None,
-                    'time_mined': datetime.now().isoformat(),
+                    'last_activity_date': item.get('last_activity_date'),
+                    'time_mined': int(time.time()),
                 }
                 questions.append(question)
             

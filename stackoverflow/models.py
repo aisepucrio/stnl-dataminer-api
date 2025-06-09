@@ -8,9 +8,9 @@ class StackUser(models.Model):
     profile_image = models.URLField(null=True)
     user_type = models.CharField(max_length=50, null=True)
     is_employee = models.BooleanField(default=False)
-    creation_date = models.DateTimeField(null=True)
-    last_access_date = models.DateTimeField(null=True)
-    last_modified_date = models.DateTimeField(null=True)
+    creation_date = models.BigIntegerField(null=True)
+    last_access_date = models.BigIntegerField(null=True)
+    last_modified_date = models.BigIntegerField(null=True)
     link = models.URLField(null=True)
     accept_rate = models.IntegerField(null=True)
     about_me = models.TextField(null=True)
@@ -44,16 +44,16 @@ class StackQuestion(models.Model):
     up_vote_count = models.IntegerField(default=0)
     down_vote_count = models.IntegerField(default=0)
     is_answered = models.BooleanField(default=False)
-    creation_date = models.DateTimeField(null=True)
+    creation_date = models.BigIntegerField(null=True)
     content_license = models.CharField(max_length=50, null=True)
-    last_activity_date = models.DateTimeField(null=True)
+    last_activity_date = models.BigIntegerField(null=True)
     owner = models.ForeignKey(StackUser, on_delete=models.SET_NULL, null=True, related_name='questions')
     share_link = models.URLField(null=True)
     body_markdown = models.TextField(null=True)
     link = models.URLField(null=True)
     favorite_count = models.IntegerField(default=0)
     accepted_answer_id = models.BigIntegerField(null=True)
-    time_mined = models.DateTimeField(default=timezone.now, null=True)
+    time_mined = models.BigIntegerField(default=int(timezone.now().timestamp()), null=True)
     tags = models.ManyToManyField('StackTag', through='StackQuestionTag')
 
     class Meta:
@@ -68,15 +68,15 @@ class StackAnswer(models.Model):
     up_vote_count = models.IntegerField(default=0)
     down_vote_count = models.IntegerField(default=0)
     is_accepted = models.BooleanField(default=False)
-    creation_date = models.DateTimeField()
+    creation_date = models.BigIntegerField()
     content_license = models.CharField(max_length=50, null=True)
-    last_activity_date = models.DateTimeField()
+    last_activity_date = models.BigIntegerField()
     owner = models.ForeignKey(StackUser, on_delete=models.SET_NULL, null=True, related_name='answers')
     share_link = models.URLField()
     body_markdown = models.TextField()
     link = models.URLField()
     title = models.TextField()
-    time_mined = models.DateTimeField(default=timezone.now)
+    time_mined = models.BigIntegerField(default=int(timezone.now().timestamp()))
 
     class Meta:
         db_table = 'stack_answer'
@@ -87,13 +87,13 @@ class StackComment(models.Model):
     post_id = models.BigIntegerField()
     body = models.TextField()
     score = models.IntegerField(default=0)
-    creation_date = models.DateTimeField()
+    creation_date = models.BigIntegerField()
     content_license = models.CharField(max_length=50)
     edited = models.BooleanField(default=False)
     owner = models.ForeignKey(StackUser, on_delete=models.SET_NULL, null=True, related_name='comments')
     body_markdown = models.TextField()
     link = models.URLField()
-    time_mined = models.DateTimeField(default=timezone.now)
+    time_mined = models.BigIntegerField(default=int(timezone.now().timestamp()))
 
     class Meta:
         db_table = 'stack_comment'
@@ -104,8 +104,8 @@ class StackTag(models.Model):
     is_moderator_only = models.BooleanField(default=False)
     is_required = models.BooleanField(default=False)
     count = models.IntegerField(default=0)
-    last_activity_date = models.DateTimeField(null=True)
-    last_sync = models.DateTimeField(default=timezone.now)
+    last_activity_date = models.BigIntegerField(null=True)
+    last_sync = models.BigIntegerField(default=int(timezone.now().timestamp()))
     questions = models.ManyToManyField('StackQuestion', through='StackQuestionTag')
 
     class Meta:
@@ -146,7 +146,7 @@ class StackCollective(models.Model):
     description = models.TextField()
     link = models.URLField()
     slug = models.CharField(max_length=255)
-    last_sync = models.DateTimeField(default=timezone.now)
+    last_sync = models.BigIntegerField(default=int(timezone.now().timestamp()))
     tags = models.ManyToManyField(StackTag, through='StackCollectiveTag')
     users = models.ManyToManyField(StackUser, through='StackCollectiveUser')
 
