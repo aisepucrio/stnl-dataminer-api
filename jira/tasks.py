@@ -37,6 +37,8 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
                     'project': project_key,
                     'error': error_msg,
                     'error_type': error_type,
+                    'exc_type': error_type,
+                    'exc_message': error_msg,
                     'token_validation_error': True
                 }
             )
@@ -45,6 +47,8 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
                 'status': 'FAILURE',
                 'error': error_msg,
                 'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg,
                 'operation': 'fetch_issues',
                 'project': project_key,
                 'token_validation_error': True
@@ -143,6 +147,8 @@ def fetch_metadata(self, project_key):
                     'project': project_key,
                     'error': error_msg,
                     'error_type': error_type,
+                    'exc_type': error_type,
+                    'exc_message': error_msg,
                     'token_validation_error': True
                 }
             )
@@ -151,6 +157,8 @@ def fetch_metadata(self, project_key):
                 'status': 'FAILURE',
                 'error': error_msg,
                 'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg,
                 'operation': 'fetch_metadata',
                 'project': project_key,
                 'token_validation_error': True
