@@ -94,6 +94,8 @@ class StackComment(models.Model):
     body_markdown = models.TextField()
     link = models.URLField()
     time_mined = models.BigIntegerField(default=int(timezone.now().timestamp()))
+    question = models.ForeignKey(StackQuestion, on_delete=models.CASCADE, null=True, related_name='comments')
+    answer = models.ForeignKey(StackAnswer, on_delete=models.CASCADE, null=True, related_name='comments')
 
     class Meta:
         db_table = 'stack_comment'
