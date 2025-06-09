@@ -68,6 +68,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             
             # Process questions
             for item in data.get('items', []):
+                print(item)
                 owner_data = item.get('owner', {})
                 owner_id = owner_data.get('user_id')
                 
@@ -139,20 +140,25 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                 
                 question = {
                     'question_id': item['question_id'],
-                    'title': item['title'],
-                    'body': item['body'],
+                    'title': item.get('title'),
+                    'body': item.get('body'),
                     'creation_date': datetime.fromtimestamp(item['creation_date']).isoformat() if 'creation_date' in item else None,
-                    'score': item['score'],
-                    'view_count': item['view_count'],
-                    'answer_count': item['answer_count'],
-                    # 'tags': item['tags'],
-                    'is_answered': item['is_answered'],
-                    # 'accepted_answer_id': item.get('accepted_answer_id'),  # Commented out to avoid error
+                    'score': item.get('score', 0),
+                    'view_count': item.get('view_count', 0),
+                    'answer_count': item.get('answer_count', 0),
+                    'comment_count': item.get('comment_count', 0),
+                    'up_vote_count': item.get('up_vote_count', 0),
+                    'down_vote_count': item.get('down_vote_count', 0),
+                    'tags': item.get('tags', []),
+                    'is_answered': item.get('is_answered', False),
+                    'accepted_answer_id': item.get('accepted_answer_id'),
                     'owner': stack_user,  # Assign the StackUser object
                     'share_link': item.get('share_link'),
                     'body_markdown': item.get('body_markdown'),
                     'link': item.get('link'),
                     'favorite_count': item.get('favorite_count', 0),
+                    'content_license': item.get('content_license', None),
+                    'last_activity_date': datetime.fromtimestamp(item['last_activity_date']).isoformat() if 'last_activity_date' in item else None,
                     'time_mined': datetime.now().isoformat(),
                 }
                 questions.append(question)

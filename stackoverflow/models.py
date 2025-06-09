@@ -52,6 +52,7 @@ class StackQuestion(models.Model):
     body_markdown = models.TextField(null=True)
     link = models.URLField(null=True)
     favorite_count = models.IntegerField(default=0)
+    accepted_answer_id = models.BigIntegerField(null=True)
     time_mined = models.DateTimeField(default=timezone.now, null=True)
     tags = models.ManyToManyField('StackTag', through='StackQuestionTag')
 
@@ -103,9 +104,9 @@ class StackTag(models.Model):
     is_moderator_only = models.BooleanField(default=False)
     is_required = models.BooleanField(default=False)
     count = models.IntegerField(default=0)
-    last_activity_date = models.DateTimeField()
+    last_activity_date = models.DateTimeField(null=True)
     last_sync = models.DateTimeField(default=timezone.now)
-    questions = models.ManyToManyField(StackQuestion, through='StackQuestionTag')
+    questions = models.ManyToManyField('StackQuestion', through='StackQuestionTag')
 
     class Meta:
         db_table = 'stack_tag'
