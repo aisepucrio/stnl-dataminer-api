@@ -3,6 +3,15 @@ from .miner import GitHubMiner
 from jobs.models import Task
 from datetime import datetime
 
+def format_date_for_json(date_value):
+    if date_value is None:
+        return None
+    if isinstance(date_value, str):
+        return date_value
+    if hasattr(date_value, 'isoformat'):
+        return date_value.isoformat()
+    return str(date_value)
+
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
     self.update_state(
@@ -10,6 +19,8 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         meta={
             'operation': 'fetch_commits',
             'repository': repo_name,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'commit_sha': commit_sha
         }
     )
@@ -66,6 +77,8 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
                 'operation': 'fetch_commits',
                 'repository': repo_name,
                 'commit_sha': commit_sha,
+                'start_date': format_date_for_json(start_date),
+                'end_date': format_date_for_json(end_date),
                 'data': commits
             }
         )
@@ -76,6 +89,8 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             'operation': 'fetch_commits',
             'repository': repo_name,
             'commit_sha': commit_sha,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'data': commits
         }
         task.save()
@@ -84,6 +99,8 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             'operation': 'fetch_commits',
             'repository': repo_name,
             'commit_sha': commit_sha,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'data': commits
         }
         
@@ -109,7 +126,6 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         task.status = 'FAILURE'
         task.error = error_msg
         task.error_type = error_type
-        task.token_validation_error = error_type == 'TokenValidationError'
         task.save()
         
         return {
@@ -127,8 +143,8 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
         meta={
             'operation': 'fetch_issues',
             'repository': repo_name,
-            'start_date': start_date,
-            'end_date': end_date,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'depth': depth
         }
     )
@@ -177,8 +193,8 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
         task.result = {
             'count': len(issues),
             'repository': repo_name,
-            'start_date': start_date,
-            'end_date': end_date,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'depth': depth
         }
         task.save()
@@ -189,8 +205,8 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
                 'operation': 'fetch_issues',
                 'repository': repo_name,
                 'count': len(issues),
-                'start_date': start_date,
-                'end_date': end_date,
+                'start_date': format_date_for_json(start_date),
+                'end_date': format_date_for_json(end_date),
                 'depth': depth
             }
         )
@@ -199,8 +215,8 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
             'status': 'SUCCESS',
             'count': len(issues),
             'repository': repo_name,
-            'start_date': start_date,
-            'end_date': end_date,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'depth': depth
         }
 
@@ -242,6 +258,8 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
         meta={
             'operation': 'fetch_pull_requests',
             'repository': repo_name,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'depth': depth
         }
     )
@@ -289,8 +307,8 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
         task.result = {
             'count': len(pull_requests),
             'repository': repo_name,
-            'start_date': start_date,
-            'end_date': end_date,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'depth': depth
         }
         task.save()
@@ -301,8 +319,8 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
                 'operation': 'fetch_pull_requests',
                 'repository': repo_name,
                 'count': len(pull_requests),
-                'start_date': start_date,
-                'end_date': end_date,
+                'start_date': format_date_for_json(start_date),
+                'end_date': format_date_for_json(end_date),
                 'depth': depth
             }
         )
@@ -311,8 +329,8 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
             'status': 'SUCCESS',
             'count': len(pull_requests),
             'repository': repo_name,
-            'start_date': start_date,
-            'end_date': end_date,
+            'start_date': format_date_for_json(start_date),
+            'end_date': format_date_for_json(end_date),
             'depth': depth
         }
 
@@ -497,15 +515,6 @@ def fetch_metadata(self, repo_name):
 
         metadata = miner.get_repository_metadata(repo_name)
         
-        def format_date(date_value):
-            if date_value is None:
-                return None
-            if isinstance(date_value, str):
-                return date_value
-            if hasattr(date_value, 'isoformat'):
-                return date_value.isoformat()
-            return str(date_value)
-        
         metadata_dict = {
             'repository': metadata.repository,
             'owner': metadata.owner,
@@ -522,13 +531,13 @@ def fetch_metadata(self, repo_name):
             'languages': metadata.languages,
             'readme': metadata.readme,
             'labels_count': metadata.labels_count,
-            'created_at': format_date(metadata.created_at),
-            'updated_at': format_date(metadata.updated_at),
+            'created_at': format_date_for_json(metadata.created_at),
+            'updated_at': format_date_for_json(metadata.updated_at),
             'is_archived': metadata.is_archived,
             'is_template': metadata.is_template,
             'used_by_count': metadata.used_by_count,
             'releases_count': metadata.releases_count,
-            'time_mined': format_date(metadata.time_mined)
+            'time_mined': format_date_for_json(metadata.time_mined)
         }
         
         task = Task.objects.get(task_id=self.request.id)
