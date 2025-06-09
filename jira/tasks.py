@@ -12,7 +12,9 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
             'project': project_key,
             'start_date': start_date,
             'end_date': end_date,
-            'depth': depth
+            'depth': depth,
+            'exc_type': None,
+            'exc_message': None
         }
     )
     try:
@@ -75,7 +77,9 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
                 'count': len(issues),
                 'start_date': start_date,
                 'end_date': end_date,
-                'depth': depth
+                'depth': depth,
+                'exc_type': None,
+                'exc_message': None
             }
         )
         
@@ -85,7 +89,9 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
             'project': project_key,
             'start_date': start_date,
             'end_date': end_date,
-            'depth': depth
+            'depth': depth,
+            'exc_type': None,
+            'exc_message': None
         }
 
     except Exception as e:
@@ -98,7 +104,9 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
                 'operation': 'fetch_issues',
                 'project': project_key,
                 'error': error_msg,
-                'error_type': error_type
+                'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg
             }
         )
         
@@ -112,6 +120,8 @@ def fetch_issues(self, project_key, start_date=None, end_date=None, depth='basic
             'status': 'FAILURE',
             'error': error_msg,
             'error_type': error_type,
+            'exc_type': error_type,
+            'exc_message': error_msg,
             'operation': 'fetch_issues',
             'project': project_key
         }
@@ -122,7 +132,9 @@ def fetch_metadata(self, project_key):
         state='STARTED',
         meta={
             'operation': 'fetch_metadata',
-            'project': project_key
+            'project': project_key,
+            'exc_type': None,
+            'exc_message': None
         }
     )
     try:
@@ -179,14 +191,18 @@ def fetch_metadata(self, project_key):
             meta={
                 'operation': 'fetch_metadata',
                 'project': project_key,
-                'metadata': metadata
+                'metadata': metadata,
+                'exc_type': None,
+                'exc_message': None
             }
         )
         
         return {
             'status': 'SUCCESS',
             'project': project_key,
-            'metadata': metadata
+            'metadata': metadata,
+            'exc_type': None,
+            'exc_message': None
         }
 
     except Exception as e:
@@ -199,7 +215,9 @@ def fetch_metadata(self, project_key):
                 'operation': 'fetch_metadata',
                 'project': project_key,
                 'error': error_msg,
-                'error_type': error_type
+                'error_type': error_type,
+                'exc_type': error_type,
+                'exc_message': error_msg
             }
         )
         
@@ -213,6 +231,8 @@ def fetch_metadata(self, project_key):
             'status': 'FAILURE',
             'error': error_msg,
             'error_type': error_type,
+            'exc_type': error_type,
+            'exc_message': error_msg,
             'operation': 'fetch_metadata',
             'project': project_key
         } 
