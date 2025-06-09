@@ -92,7 +92,7 @@ def create_answer(answer_data, question, owner):
             'body_markdown': answer_data.get('body_markdown'),
             'link': answer_data.get('link'),
             'title': answer_data.get('title'),
-            'time_mined': datetime.now(),
+            'time_mined': int(time.time()),
         }
     )
     return answer
@@ -221,10 +221,10 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                                 comment_data = comment.get('owner', {})
                                 comment_id = comment_data.get('user_id')
                                 create_or_update_user(comment_id, comment_data)
-            tag_objs = []
-            for tag_name in question_tags:
-                tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
-                tag_objs.append(tag_obj)
+                tag_objs = []
+                for tag_name in question_tags:
+                    tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
+                    tag_objs.append(tag_obj)
 
             # Finally assign them all at once
             stack_question.tags.set(tag_objs)

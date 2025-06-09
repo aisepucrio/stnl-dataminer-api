@@ -31,23 +31,6 @@ def fetch_questions():
     response.raise_for_status()
     return response.json()
 
-
-def fetch_answers():
-    FILTER = "!)Rm-Ag_ZixQvpDE.3s.paOrN"
-    url = f"{BASE_URL}/answers"
-    params = {
-        "site": SITE,
-        "key": API_KEY,
-        "pagesize": PAGE_SIZE,
-        "access_token": ACCESS_TOKEN,
-        "order": "desc",
-        "sort": "creation",
-        "filter": FILTER
-    }
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    return response.json()
-
 def fetch_tags():
     FILTER = "!6WPIommryG6wE"
     url = f"{BASE_URL}/tags"
