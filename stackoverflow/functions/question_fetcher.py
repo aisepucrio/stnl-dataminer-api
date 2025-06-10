@@ -210,7 +210,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                 # Creating user from answers and comments
                 if item.get('is_answered'):
                     for answer in item.get('answers', []):
-                        # 1️⃣ extract the owner so you can upsert the StackUser:
+                        # extract the owner so you can upsert the StackUser:
                         owner_data = answer.get('owner', {})
                         owner_id   = owner_data.get('user_id')
                         stack_user = create_or_update_user(owner_id, owner_data)
@@ -225,6 +225,35 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                 for tag_name in question_tags:
                     tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
                     tag_objs.append(tag_obj)
+
+            # Finally assign them all at once
+            stack_question.tags.set(tag_objs)
+            question_tags = question.pop('tags', [])  
+
+            stack_question, created = StackQuestion.objects.get_or_create(
+                question_id=question['question_id'],
+                defaults=question
+            )
+            questions.append(question)
+
+            # Creating user from answers and comments
+            if item.get('is_answered'):
+                for answer in item.get('answers', []):
+                    # 1️⃣ extract the owner so you can upsert the StackUser:
+                    owner_data = answer.get('owner', {})
+                    owner_id   = owner_data.get('user_id')
+                    stack_user = create_or_update_user(owner_id, owner_data)
+                    create_answer(answer, stack_question, stack_user)
+                    comments = answer.get('comments', [])
+                    if comments:
+                        for comment in comments:
+                            comment_data = comment.get('owner', {})
+                            comment_id = comment_data.get('user_id')
+                            create_or_update_user(comment_id, comment_data)
+            tag_objs = []
+            for tag_name in question_tags:
+                tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
+                tag_objs.append(tag_obj)
 
             # Finally assign them all at once
             stack_question.tags.set(tag_objs)
