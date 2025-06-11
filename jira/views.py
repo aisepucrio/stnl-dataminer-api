@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from jobs.models import Task
-from .tasks import fetch_issues, fetch_metadata
+from jira.tasks import collect_jira_issues_task
 from .filters import JiraIssueFilter
 from .models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit
 from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
@@ -56,7 +56,7 @@ class JiraIssueCollectView(APIView):
             projects = request.data.get('projects', [])
         
             if not projects:
-                return Response({"error": "No projects provided."}, status=400)
+                return Response({"error": "Nenhum projeto fornecido."}, status=400)
 
             for project_info in projects:
                 jira_domain = project_info.get('jira_domain')
@@ -97,17 +97,17 @@ class JiraIssueCollectView(APIView):
                         status=400
                     )
 
-                task = fetch_issues.delay(
-                    project_key,
+                task = collect_jira_issues_task.delay(
                     jira_domain,
+                    project_key,
+                    issuetypes if issuetypes else [], 
                     start_date,
-                    end_date,
-                    depth='basic'
+                    end_date
                 )
 
                 Task.objects.create(
                     task_id=task.id,
-                    operation='fetch_issues',
+                    operation='collect_jira_issues',
                     repository=f"{jira_domain}/{project_key}",
                     status='PENDING'
                 )
