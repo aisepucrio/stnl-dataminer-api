@@ -77,8 +77,6 @@ class JiraSprint(models.Model):
     completeDate = models.DateTimeField(null=True, blank=True)
     issues = models.ManyToManyField('JiraIssue', related_name='sprints')
 
-
-
 class JiraIssueLink(models.Model):
     issue = models.ForeignKey(JiraIssue, related_name='issue_links', on_delete=models.CASCADE)
     linked_issue = models.ForeignKey(JiraIssue, related_name='linked_to', on_delete=models.CASCADE)

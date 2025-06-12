@@ -403,7 +403,7 @@ class JiraDashboardView(APIView):
                     )
             else:
                 projects = JiraProject.objects.all()
-                projects_list = [{"id": p.id, "name": p.name} for p in projects]
+                projects_list = [{"id": p.id, "name": f"{p.name} ({p.key})"} for p in projects]
 
                 sprints_count = JiraSprint.objects.filter(issues__in=issues_query).count()
                 comments_count = JiraComment.objects.filter(issue__in=issues_query).count()
