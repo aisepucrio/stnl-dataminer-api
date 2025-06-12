@@ -159,3 +159,30 @@ class GitHubCollectAllSerializer(serializers.Serializer):
         if 'comments' in data.get('collect_types', []):
             data['depth'] = 'complex'
         return data
+
+class ExportDataSerializer(serializers.Serializer):
+    table = serializers.ChoiceField(
+        choices=[
+            'githubcommit',
+            'githubissue',
+            'githubpullrequest',
+            'githubbranch',
+            'githubmetadata',
+            'githubissuepullrequest'
+        ],
+        help_text="Table name to export"
+    )
+    ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="List of IDs to export (optional)"
+    )
+    format = serializers.ChoiceField(
+        choices=['csv', 'json'],
+        default='json',
+        help_text="Output format (csv or json)"
+    )
+    output_path = serializers.CharField(
+        required=False,
+        help_text="Path where to save the file (optional). If not provided, file will be downloaded to browser's default download location"
+    )
