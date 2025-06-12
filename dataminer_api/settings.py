@@ -142,6 +142,8 @@ MEDIA_ROOT_NAME = 'media'
 MEDIA_ROOT = os.path.join(BASE_DIR, MEDIA_ROOT_NAME)
 MEDIA_URL = f'/{MEDIA_ROOT_NAME}/'
 
+EXPORT_DIRECTORY = os.path.join(BASE_DIR, 'exports')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

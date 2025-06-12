@@ -27,16 +27,19 @@ from .serializers import (
     GitHubMetadataSerializer,
     GitHubIssuePullRequestSerializer,
     GraphDashboardSerializer,
-    GitHubCollectAllSerializer
+    GitHubCollectAllSerializer,
+    ExportDataSerializer
 )
 from .utils import DateTimeHandler
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from datetime import datetime
 import json
 import logging
+import csv
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -1055,3 +1058,121 @@ class GraphDashboardView(APIView):
             response_data["repository_name"] = repository_name
         
         return Response(response_data)
+
+class ExportDataView(APIView):
+    @extend_schema(
+        summary="Export GitHub data",
+        tags=["GitHub"],
+        request=ExportDataSerializer,
+        responses={
+            200: OpenApiResponse(description="Exported data file"),
+            400: OpenApiResponse(description="Invalid parameters"),
+            404: OpenApiResponse(description="Table not found"),
+            500: OpenApiResponse(description="Server error")
+        }
+    )
+    def post(self, request):
+        serializer = ExportDataSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        table = serializer.validated_data['table']
+        ids = serializer.validated_data.get('ids', [])
+        format_type = serializer.validated_data['format']
+        output_path = serializer.validated_data.get('output_path')
+
+        model_mapping = {
+            'githubcommit': GitHubCommit,
+            'githubbranch': GitHubBranch,
+            'githubmetadata': GitHubMetadata,
+            'githubissuepullrequest': GitHubIssuePullRequest
+        }
+
+        if table not in model_mapping:
+            return Response(
+                {"error": f"Table '{table}' not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        model = model_mapping[table]
+        queryset = model.objects.all()
+
+        if ids:
+            queryset = queryset.filter(id__in=ids)
+
+        data = []
+        for obj in queryset:
+            obj_dict = {}
+            for field in obj._meta.fields:
+                value = getattr(obj, field.name)
+                if hasattr(value, 'id'):
+                    obj_dict[field.name] = value.id
+                else:
+                    obj_dict[field.name] = value
+            data.append(obj_dict)
+
+        if not data:
+            return Response(
+                {"error": "No data found to export"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        filename = f"{table}_export.{format_type}"
+        
+        if output_path:
+            try:
+                if not output_path.endswith(f'.{format_type}'):
+                    output_path = f"{output_path}.{format_type}"
+
+                if not os.path.isabs(output_path):
+                    output_path = os.path.join(settings.EXPORT_DIRECTORY, os.path.basename(output_path))
+                else:
+                    try:
+                        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                    except Exception as e:
+                        output_path = os.path.join(settings.EXPORT_DIRECTORY, os.path.basename(output_path))
+                
+                os.makedirs(settings.EXPORT_DIRECTORY, exist_ok=True)
+                
+                if format_type == 'csv':
+                    with open(output_path, 'w', newline='', encoding='utf-8') as f:
+                        writer = csv.DictWriter(f, fieldnames=data[0].keys())
+                        writer.writeheader()
+                        writer.writerows(data)
+                else: 
+                    with open(output_path, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, default=str, indent=2)
+                
+                return Response({
+                    "message": "File saved successfully",
+                    "path": output_path,
+                    "absolute_path": os.path.abspath(output_path)
+                })
+                
+            except Exception as e:
+                return Response(
+                    {
+                        "error": f"Error saving file: {str(e)}",
+                        "hint": "Make sure to provide a complete file path including the filename",
+                        "attempted_path": output_path,
+                        "absolute_path": os.path.abspath(output_path) if output_path else None
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            if format_type == 'csv':
+                response = HttpResponse(content_type='text/csv')
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                
+                writer = csv.DictWriter(response, fieldnames=data[0].keys())
+                writer.writeheader()
+                writer.writerows(data)
+                
+                return response
+            else: 
+                response = HttpResponse(
+                    json.dumps(data, default=str, indent=2),
+                    content_type='application/json'
+                )
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response

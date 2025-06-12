@@ -27,4 +27,5 @@ urlpatterns = [
     path('metadata/', views.MetadataListView.as_view(), name='metadata-list'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('dashboard/graph/', views.GraphDashboardView.as_view(), name='graph-dashboard'),
+    path('export/', views.ExportDataView.as_view(), name='export-data'),
 ]
