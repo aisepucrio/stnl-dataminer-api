@@ -10,9 +10,14 @@ import time
 from dotenv import load_dotenv
 from django.utils import timezone
 from jira.models import JiraIssueType
+from django.core.exceptions import PermissionDenied
 
 
 class JiraMiner:
+    class NoValidJiraTokenError(Exception):
+        """Token inválido ou todos os tokens expiraram."""
+        pass
+
     def __init__(self, jira_domain):
         load_dotenv()
         self.jira_domain = jira_domain.strip()
@@ -56,7 +61,8 @@ class JiraMiner:
 
             self.switch_token()
 
-        raise Exception("❌ No valid Jira token found.")
+        raise self.NoValidJiraTokenError("❌ No valid Jira token found.")
+
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
@@ -130,7 +136,7 @@ class JiraMiner:
                 # ✅ Injeta o campo sprint legível
                 if sprint_field_key:
                     fields["sprint"] = fields.get(sprint_field_key)
-                    print(f"[DEBUG] Sprint data for {issue_key}: {fields.get('sprint')}", flush=True)
+
 
                 # Ensure related objects
                 project_obj, _ = JiraProject.objects.get_or_create(
@@ -185,7 +191,23 @@ class JiraMiner:
                     }
                 )
 
-                print(f"[DEBUG] Campos da issue {issue_key}: {list(fields.keys())}", flush=True)
+                created_date = parse_datetime(fields["created"]).strftime('%d/%m/%Y')
+
+                # Verifica nome da sprint (pode ser uma ou várias)
+                sprints_data = fields.get("sprint")
+                sprint_names = ""
+
+                if sprints_data:
+                    if isinstance(sprints_data, dict):  # caso venha como dict
+                        sprint_names = sprints_data.get("name", "")
+                    elif isinstance(sprints_data, list):  # lista de dicts
+                        sprint_names = ", ".join(s.get("name", "") for s in sprints_data if isinstance(s, dict))
+
+                sprint_info = f" | Sprint: {sprint_names}" if sprint_names.strip() else ""
+
+                print(f"[JiraMiner] 🛠️ Minerado: {issue_key}, criada em {created_date}{sprint_info}", flush=True)
+
+
 
                 # Sub-tabelas
                 self.save_comments(issue_key, issue_obj)
@@ -677,6 +699,8 @@ class JiraMiner:
                 )
                 issue_obj.sprints.add(sprint_obj)
 
-                print(f"[JiraMiner] ✅ Sprint '{sprint['name']}' associada à issue {issue_obj.issue_key}", flush=True)
+
             except Exception as e:
                 print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
+
+

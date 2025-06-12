@@ -8,7 +8,6 @@ from rest_framework import generics, status
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
 from jobs.models import Task
 from jira.tasks import collect_jira_issues_task
 from .filters import JiraIssueFilter
