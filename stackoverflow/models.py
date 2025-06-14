@@ -29,6 +29,7 @@ class StackUser(models.Model):
     reputation_change_month = models.IntegerField(default=0)
     reputation_change_week = models.IntegerField(default=0)
     reputation_change_day = models.IntegerField(default=0)
+    time_mined = models.BigIntegerField(null=True)
 
     class Meta:
         db_table = 'stack_user'

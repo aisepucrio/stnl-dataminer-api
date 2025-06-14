@@ -3,12 +3,14 @@ from datetime import datetime
 import time
 import logging
 from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag # Import StackQuestion and StackUser models
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 def create_or_update_user(user_id, user_data):
     stack_user = None
     try:
+        current_time = int(timezone.now().timestamp())
         stack_user, created = StackUser.objects.get_or_create(
         user_id=user_id,
         defaults={
@@ -38,6 +40,7 @@ def create_or_update_user(user_id, user_data):
             'reputation_change_month': user_data.get('reputation_change_month', 0),
             'reputation_change_week': user_data.get('reputation_change_week', 0),
             'reputation_change_day': user_data.get('reputation_change_day', 0),
+            'time_mined': None  # Set to null to indicate incomplete data
         }
         )
         if not created:
@@ -68,6 +71,7 @@ def create_or_update_user(user_id, user_data):
             stack_user.reputation_change_month = user_data.get('reputation_change_month', stack_user.reputation_change_month)
             stack_user.reputation_change_week = user_data.get('reputation_change_week', stack_user.reputation_change_week)
             stack_user.reputation_change_day = user_data.get('reputation_change_day', stack_user.reputation_change_day)
+            stack_user.time_mined = None  # Set to null to indicate incomplete data
             stack_user.save()
     except Exception as e:
         logger.error(f"Error processing StackUser with ID {user_data}: {e}")
