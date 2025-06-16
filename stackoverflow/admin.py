@@ -57,9 +57,9 @@ class StackBadgeAdmin(admin.ModelAdmin):
 
 @admin.register(StackCollective)
 class StackCollectiveAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'slug', 'last_sync')
+    list_display = ('slug', 'name', 'last_sync')
     search_fields = ('name', 'description')
-    readonly_fields = ('id', 'last_sync')
+    readonly_fields = ('slug', 'last_sync')
 
 # Register the through models
 admin.site.register(StackQuestionTag)

@@ -247,35 +247,74 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
 
     return all_collectives_data
 
-def link_users_to_collectives(users: list):
+def link_users_to_collectives(users: list, fallback_collectives_data: list = None):
     """
     For each user in the list, create StackCollectiveUser links
     based on their current user.collectives field.
+
+    If a collective slug is not found in the DB, it will be created using the
+    fallback_collectives_data (as returned from fetch_collectives_data).
     """
     from stackoverflow.models import StackCollective, StackCollectiveUser
 
-    link_pairs = []
+    # Convert fallback_collectives_data (list) to dict {slug: collective_dict}
+    if fallback_collectives_data and isinstance(fallback_collectives_data, list):
+        fallback_collectives_data = {
+            c["slug"]: c for c in fallback_collectives_data if "slug" in c
+        }
+
+    link_triples = []  # (user, slug, role)
+    slugs = set()
+
+    # Extract (user, slug, role) triples
     for user in users:
         for col in user.collectives or []:
-            slug = col.get("slug")
+            collective_obj = col.get("collective", {})
+            slug = collective_obj.get("slug")
+            role = col.get("role")
             if slug:
-                link_pairs.append((user, slug))
+                link_triples.append((user, slug, role))
+                slugs.add(slug)
 
-    if not link_pairs:
+    if not link_triples:
         return
 
-    # Fetch all relevant collectives in one query
-    slugs = {slug for _, slug in link_pairs}
+    # Fetch all relevant collectives from DB
     slug_to_collective = {
         c.slug: c for c in StackCollective.objects.filter(slug__in=slugs)
     }
 
     created_count = 0
-    for user, slug in link_pairs:
+    for user, slug, role in link_triples:
         collective = slug_to_collective.get(slug)
+
+        # If not found, try to create from fallback data
+        if not collective and fallback_collectives_data:
+            fallback = fallback_collectives_data.get(slug)
+            if fallback:
+                collective, _ = StackCollective.objects.get_or_create(
+                    slug=slug,
+                    defaults={
+                        "name": fallback.get("name"),
+                        "description": fallback.get("description", ""),
+                        "link": fallback.get("link"),
+                        "last_sync": int(timezone.now().timestamp())
+                    }
+                )
+                slug_to_collective[slug] = collective  # Cache it
+                logger.info(f"Created missing StackCollective: {slug}")
+            else:
+                logger.warning(f"Slug '{slug}' not found in fallback_collectives_data")
+
         if not collective:
+            logger.warning(f"Could not link user {user.user_id} to missing slug '{slug}'")
             continue
-        _, created = StackCollectiveUser.objects.get_or_create(user=user, collective=collective)
+
+        _, created = StackCollectiveUser.objects.get_or_create(
+            user=user,
+            collective=collective,
+            defaults={"role": role or "unknown"}  # fallback role
+        )
         if created:
             created_count += 1
 
@@ -407,7 +446,8 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
         collectives = user_data.get('collectives', [])
         user.collectives = collectives
         for col in collectives:
-            slug = col.get("slug")
+            slug = col.get("collective", {}).get("slug")
+            print("SLUGGGGGGGG:", slug)
             if slug:
                 unique_slugs.add(slug)
         
@@ -492,7 +532,7 @@ def main():
     # Fetch a test slice of users
     # users = list(StackUser.objects.all()[7:20])
     users = list()
-    user_2988 = StackUser.objects.filter(user_id=2988).first()
+    user_2988 = StackUser.objects.filter(user_id=107301).first()
     if user_2988:
         users.append(user_2988)
     if not users:
@@ -514,7 +554,7 @@ def main():
         logger.info(f"Fetching collective data for {len(unique_slugs)} unique slugs")
         collectives = fetch_collectives_data(list(unique_slugs), api_key, access_token)
         logger.info(f"Fetched {len(collectives)} collectives")
-        link_users_to_collectives(users)
+        link_users_to_collectives(users, collectives)
     else:
         logger.info("No collectives found to fetch")
 

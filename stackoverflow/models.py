@@ -144,11 +144,10 @@ class StackUserBadge(models.Model):
         unique_together = ('user', 'badge')
 
 class StackCollective(models.Model):
-    id = models.CharField(max_length=255, primary_key=True)
+    slug = models.CharField(max_length=255, primary_key=True)
     name = models.CharField(max_length=255)
     description = models.TextField()
     link = models.URLField()
-    slug = models.CharField(max_length=255)
     last_sync = models.BigIntegerField(default=int(timezone.now().timestamp()))
     tags = models.ManyToManyField(StackTag, through='StackCollectiveTag')
     users = models.ManyToManyField(StackUser, through='StackCollectiveUser')
@@ -157,7 +156,7 @@ class StackCollective(models.Model):
         db_table = 'stack_collective'
 
 class StackCollectiveTag(models.Model):
-    collective = models.ForeignKey(StackCollective, on_delete=models.CASCADE)
+    collective = models.ForeignKey(StackCollective, on_delete=models.CASCADE, to_field='slug', db_column='collective_slug')
     tag = models.ForeignKey(StackTag, on_delete=models.CASCADE)
 
     class Meta:
@@ -165,7 +164,7 @@ class StackCollectiveTag(models.Model):
         unique_together = ('collective', 'tag')
 
 class StackCollectiveUser(models.Model):
-    collective = models.ForeignKey(StackCollective, on_delete=models.CASCADE)
+    collective = models.ForeignKey(StackCollective, on_delete=models.CASCADE, to_field='slug', db_column='collective_slug')
     user = models.ForeignKey(StackUser, on_delete=models.CASCADE)
     role = models.CharField(max_length=50)
 
