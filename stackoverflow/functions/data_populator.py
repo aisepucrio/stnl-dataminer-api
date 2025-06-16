@@ -349,7 +349,8 @@ def sync_collective_tags(collectives_data: list):
     tag_objs = {
         tag.name: tag for tag in StackTag.objects.filter(name__in=tag_names)
     }
-    missing_tags = tag_names - tag_objs.keys()
+    existing_tag_names = set(tag_objs.keys())
+    missing_tags = tag_names - existing_tag_names
     for tag_name in missing_tags:
         tag_obj = StackTag.objects.create(name=tag_name)
         tag_objs[tag_name] = tag_obj
@@ -509,7 +510,6 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
         user.collectives = collectives
         for col in collectives:
             slug = col.get("collective", {}).get("slug")
-            print("SLUGGGGGGGG:", slug)
             if slug:
                 unique_slugs.add(slug)
         
@@ -571,53 +571,72 @@ def populate_missing_data(api_key: str, access_token: str):
     total_batches = (total_users + batch_size - 1) // batch_size
     logger.info(f"Will process {total_batches} batches of up to {batch_size} users each")
     
+    all_unique_slugs = set()
+    total_badges_updated = 0
+    
     for i in range(0, total_users, batch_size):
         batch = users_to_update[i:i + batch_size]
-        logger.info(f"Processing batch {i//batch_size + 1} of {total_batches} ({len(batch)} users)")
-        update_users_data(list(batch), api_key, access_token)
-
-def main():
-    """
-    Main function to test badge, user, and collective fetching and population.
-    Run this manually to test the badge + collective pipeline.
-    """
-    from django.conf import settings
-
-    # Load credentials from env or settings
-    api_key = os.getenv("STACK_API_KEY") or settings.STACK_API_KEY
-    access_token = os.getenv("STACK_ACCESS_TOKEN") or settings.STACK_ACCESS_TOKEN
-
-    if not api_key or not access_token:
-        logger.error("API key or access token not provided.")
-        return
-
-    # Fetch a test slice of users
-    users = list(StackUser.objects.all()[:100])
-    # users = list()
-    # user_2988 = StackUser.objects.filter(user_id=107301).first()
-    # if user_2988:
-    #     users.append(user_2988)
-    if not users:
-        logger.warning("No users found in the database.")
-        return
-
-    logger.info(f"Updating data for {len(users)} users")
-    unique_slugs = update_users_data(users, api_key, access_token)
-
-    logger.info(f"Fetching badges for {len(users)} users")
-    badge_updated = update_badges_data(users, api_key, access_token)
-
-    if badge_updated:
-        logger.info("Badge data successfully updated.")
-    else:
-        logger.info("No badge updates were made.")
-
-    if unique_slugs:
-        logger.info(f"Fetching collective data for {len(unique_slugs)} unique slugs")
-        collectives = fetch_collectives_data(list(unique_slugs), api_key, access_token)
+        batch_users = list(batch)
+        logger.info(f"Processing batch {i//batch_size + 1} of {total_batches} ({len(batch_users)} users)")
+        
+        # Update user data and collect slugs
+        batch_slugs = update_users_data(batch_users, api_key, access_token)
+        if batch_slugs:
+            all_unique_slugs.update(batch_slugs)
+        
+        # Update badges for this batch
+        logger.info(f"Updating badges for batch {i//batch_size + 1}")
+        if update_badges_data(batch_users, api_key, access_token):
+            total_badges_updated += 1
+    
+    # After all users are processed, handle collectives
+    if all_unique_slugs:
+        logger.info(f"Fetching collective data for {len(all_unique_slugs)} unique slugs")
+        collectives = fetch_collectives_data(list(all_unique_slugs), api_key, access_token)
         logger.info(f"Fetched {len(collectives)} collectives")
-        link_users_to_collectives(users, collectives)
+        
+        # Link all users to their collectives
+        logger.info("Linking users to collectives")
+        link_users_to_collectives(users_to_update, collectives)
+        
+        # Sync collective tags
+        logger.info("Syncing collective tags")
         sync_collective_tags(collectives)
     else:
         logger.info("No collectives found to fetch")
+    
+    logger.info(f"Data population completed. Updated {total_users} users, {total_badges_updated} badge batches, and {len(all_unique_slugs)} collectives.")
+
+def main():
+    """
+    Main function to populate missing data for all users that need updating.
+    This function handles the complete pipeline of:
+    1. Updating user data
+    2. Fetching and updating badges
+    3. Fetching and updating collectives
+    4. Linking users to collectives
+    5. Syncing collective tags
+    """
+    from django.conf import settings
+    import sys
+
+    try:
+        # Load credentials from env or settings
+        api_key = os.getenv("STACK_API_KEY") or settings.STACK_API_KEY
+        access_token = os.getenv("STACK_ACCESS_TOKEN") or settings.STACK_ACCESS_TOKEN
+
+        if not api_key or not access_token:
+            logger.error("API key or access token not provided.")
+            sys.exit(1)
+
+        logger.info("Starting data population process...")
+        populate_missing_data(api_key, access_token)
+        logger.info("Data population completed successfully.")
+
+    except Exception as e:
+        logger.error(f"An error occurred during data population: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 

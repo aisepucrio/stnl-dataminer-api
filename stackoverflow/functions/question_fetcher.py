@@ -157,7 +157,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             response.raise_for_status()
             
             data = response.json()
-            logger.info(f"API Response Data: {data}")
+            # logger.info(f"API Response Data: {data}")
             
             if 'error_id' in data:
                 raise Exception(f"API Error: {data.get('error_message', 'Unknown error')}")

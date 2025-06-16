@@ -8,6 +8,9 @@ from .models import StackAnswer, StackQuestion, StackTag
 from .serializers import StackAnswerSerializer
 from .miner import StackOverflowMiner
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiParameter
+from .functions.data_populator import populate_missing_data
+import os
+from dotenv import load_dotenv
 
 @extend_schema_view(
     collect_answers=extend_schema(
@@ -139,6 +142,34 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExam
                 "type": "object",
                 "properties": {
                     "error": {"type": "string"}
+                }
+            },
+            500: {
+                "type": "object",
+                "properties": {
+                    "error": {"type": "string"}
+                }
+            }
+        },
+        tags=["StackOverflow"]
+    ),
+    re_populate_data=extend_schema(
+        summary="Re-populate Stack Overflow User Data",
+        description="""
+        Re-populate user data including badges, collectives, and other user-related information.
+        
+        Notes:
+        - Updates users that have never been mined or were mined more than a week ago
+        - Processes users in batches of 100
+        - Updates badges, collectives, and user information
+        - The API will automatically handle rate limiting
+        """,
+        responses={
+            200: {
+                "type": "object",
+                "properties": {
+                    "message": {"type": "string"},
+                    "status": {"type": "string"}
                 }
             },
             500: {
@@ -301,11 +332,51 @@ class StackOverflowViewSet(viewsets.ViewSet):
                     'error': f'Database error: {str(e)}'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # Prepare response
+            # Load credentials and populate missing data
+            load_dotenv()
+            api_key = os.getenv("STACK_API_KEY")
+            access_token = os.getenv("STACK_ACCESS_TOKEN")
+            
+            if not api_key or not access_token:
+                return Response({
+                    'error': 'STACK_API_KEY and STACK_ACCESS_TOKEN must be set in .env file'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Populate missing data for users
+            populate_missing_data(api_key, access_token)
+
             return Response({
-                'message': 'Successfully collected questions',
-                'total_questions': len(questions),
-                'questions': questions
+                'message': 'Successfully collected questions and populated user data',
+                'total_questions': len(questions)
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'error': f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def re_populate_data(self, request):
+        """
+        Re-populate user data including badges, collectives, and other user-related information.
+        """
+        try:
+            # Load credentials
+            load_dotenv()
+            api_key = os.getenv("STACK_API_KEY")
+            access_token = os.getenv("STACK_ACCESS_TOKEN")
+            
+            if not api_key or not access_token:
+                return Response({
+                    'error': 'STACK_API_KEY and STACK_ACCESS_TOKEN must be set in .env file'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Populate missing data
+            populate_missing_data(api_key, access_token)
+
+            return Response({
+                'message': 'Successfully re-populated user data',
+                'status': 'completed'
             }, status=status.HTTP_200_OK)
 
         except Exception as e:

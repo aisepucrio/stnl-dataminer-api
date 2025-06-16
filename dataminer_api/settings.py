@@ -203,8 +203,8 @@ CELERY_MAX_MEMORY_PER_CHILD = 1024*1024*2
 # Defines the number of concurrent worker processes
 CELERY_CONCURRENCY = 4
 
-STACK_EXCHANGE_API_KEY = os.getenv("STACK_API_KEY")
-STACK_EXCHANGE_ACCESS_TOKEN = os.getenv("STACK_ACCESS_TOKEN")
+STACK_API_KEY = os.getenv("STACK_API_KEY")
+STACK_ACCESS_TOKEN = os.getenv("STACK_ACCESS_TOKEN")
 
 # Logging configuration
 LOGGING = {
