@@ -297,7 +297,7 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                     defaults={
                         "name": fallback.get("name"),
                         "description": fallback.get("description", ""),
-                        "link": fallback.get("link"),
+                        "link": fallback.get("link") or "",
                         "last_sync": int(timezone.now().timestamp())
                     }
                 )
@@ -310,16 +310,78 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
             logger.warning(f"Could not link user {user.user_id} to missing slug '{slug}'")
             continue
 
-        _, created = StackCollectiveUser.objects.get_or_create(
+        obj, created = StackCollectiveUser.objects.get_or_create(
             user=user,
             collective=collective,
-            defaults={"role": role or "unknown"}  # fallback role
+            defaults={"role": role or "unknown"}
         )
+
+        # If it already exists, update role if it's changed
+        if not created and obj.role != (role or "unknown"):
+            obj.role = role or "unknown"
+            obj.save(update_fields=["role"])
+
         if created:
             created_count += 1
 
     logger.info(f"Created {created_count} StackCollectiveUser links for {len(users)} users.")
 
+def sync_collective_tags(collectives_data: list):
+    from stackoverflow.models import StackTag, StackCollective, StackCollectiveTag
+
+    if not collectives_data:
+        logger.warning("No collective data provided to sync_collective_tags")
+        return
+
+    # Gather all tag names and collective slugs
+    tag_names = set()
+    slug_to_tags = {}
+
+    for col in collectives_data:
+        slug = col.get("slug")
+        tags = col.get("tags", [])
+        if not slug or not tags:
+            continue
+        slug_to_tags[slug] = tags
+        tag_names.update(tags)
+
+    # Fetch/create StackTag objects
+    tag_objs = {
+        tag.name: tag for tag in StackTag.objects.filter(name__in=tag_names)
+    }
+    missing_tags = tag_names - tag_objs.keys()
+    for tag_name in missing_tags:
+        tag_obj = StackTag.objects.create(name=tag_name)
+        tag_objs[tag_name] = tag_obj
+        logger.info(f"Created missing StackTag: {tag_name}")
+
+    # Fetch collectives
+    collectives = {
+        c.slug: c for c in StackCollective.objects.filter(slug__in=slug_to_tags.keys())
+    }
+
+    # Create missing StackCollectiveTag links
+    created_count = 0
+    for slug, tag_list in slug_to_tags.items():
+        collective = collectives.get(slug)
+        if not collective:
+            logger.warning(f"Collective '{slug}' not found in DB. Skipping tag link.")
+            continue
+
+        for tag_name in tag_list:
+            tag = tag_objs.get(tag_name)
+            if not tag:
+                logger.warning(f"Tag '{tag_name}' not found. Skipping.")
+                continue
+
+            _, created = StackCollectiveTag.objects.get_or_create(
+                collective=collective,
+                tag=tag
+            )
+            if created:
+                created_count += 1
+
+    logger.info(f"Created {created_count} StackCollectiveTag relationships.")
 
 
 def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
@@ -555,6 +617,7 @@ def main():
         collectives = fetch_collectives_data(list(unique_slugs), api_key, access_token)
         logger.info(f"Fetched {len(collectives)} collectives")
         link_users_to_collectives(users, collectives)
+        sync_collective_tags(collectives)
     else:
         logger.info("No collectives found to fetch")
 
