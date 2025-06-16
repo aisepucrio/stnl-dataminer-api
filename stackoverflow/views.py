@@ -4,8 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import transaction
 from datetime import datetime
-from .models import StackAnswer, StackQuestion, StackTag
-from .serializers import StackAnswerSerializer
+from .models import StackQuestion, StackTag
 from .miner import StackOverflowMiner
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiParameter
 from .functions.data_populator import populate_missing_data
@@ -185,80 +184,9 @@ from dotenv import load_dotenv
 class StackOverflowViewSet(viewsets.ViewSet):
     """
     ViewSet for collecting Stack Overflow data.
-    Provides endpoints for collecting answers and questions.
+    Provides endpoints for collecting questions and populating db with all necessary data.
     """
     
-    @action(detail=False, methods=['post'])
-    def collect_answers(self, request):
-        """
-        Collect all answers from Stack Overflow within a date range
-        
-        Parameters:
-        - site: The site to fetch from (default: stackoverflow)
-        - start_date: Start date in ISO format (YYYY-MM-DD)
-        - end_date: End date in ISO format (YYYY-MM-DD)
-        """
-        try:
-            # Get and validate parameters
-            site = request.data.get('site', 'stackoverflow')
-            start_date = request.data.get('start_date')
-            end_date = request.data.get('end_date')
-
-            # Validate dates
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d')
-                end = datetime.strptime(end_date, '%Y-%m-%d')
-            except ValueError:
-                return Response({
-                    'error': 'Invalid date format. Use YYYY-MM-DD'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            # Validate date range
-            if end < start:
-                return Response({
-                    'error': 'End date must be after start date'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            # Initialize miner and get answers
-            miner = StackOverflowMiner()
-            try:
-                answers = miner.get_answers(
-                    site=site,
-                    start_date=start_date,
-                    end_date=end_date
-                )
-            except Exception as e:
-                if 'rate limit' in str(e).lower():
-                    return Response({
-                        'error': 'Stack Overflow API rate limit exceeded. Please try again later.'
-                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-                raise
-
-            # Save answers to database in a transaction
-            try:
-                with transaction.atomic():
-                    for answer_data in answers:
-                        StackAnswer.objects.update_or_create(
-                            answer_id=answer_data['answer_id'],
-                            defaults=answer_data
-                        )
-            except Exception as e:
-                return Response({
-                    'error': f'Database error: {str(e)}'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            # Prepare response
-            return Response({
-                'message': 'Successfully collected answers',
-                'total_answers': len(answers),
-                'answers': answers
-            }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response({
-                'error': f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     @action(detail=False, methods=['post'])
     def collect_questions(self, request):
         """
@@ -333,20 +261,20 @@ class StackOverflowViewSet(viewsets.ViewSet):
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             # Load credentials and populate missing data
-            load_dotenv()
-            api_key = os.getenv("STACK_API_KEY")
-            access_token = os.getenv("STACK_ACCESS_TOKEN")
+            # load_dotenv()
+            # api_key = os.getenv("STACK_API_KEY")
+            # access_token = os.getenv("STACK_ACCESS_TOKEN")
             
-            if not api_key or not access_token:
-                return Response({
-                    'error': 'STACK_API_KEY and STACK_ACCESS_TOKEN must be set in .env file'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # if not api_key or not access_token:
+            #     return Response({
+            #         'error': 'STACK_API_KEY and STACK_ACCESS_TOKEN must be set in .env file'
+            #     }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # Populate missing data for users
-            populate_missing_data(api_key, access_token)
+            # # Populate missing data for users
+            # populate_missing_data(api_key, access_token)
 
             return Response({
-                'message': 'Successfully collected questions and populated user data',
+                'message': 'Successfully collected questions',
                 'total_questions': len(questions)
             }, status=status.HTTP_200_OK)
 
