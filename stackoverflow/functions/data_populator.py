@@ -559,8 +559,8 @@ def populate_missing_data(api_key: str, access_token: str):
         access_token (str): Stack Exchange access token
     """
     # Get users that need updating
-    users_to_update = get_users_to_update()
-    total_users = users_to_update.count()
+    users_to_update = list(get_users_to_update())
+    total_users = len(users_to_update)
     logger.info(f"Found {total_users} users that need updating")
     
     if total_users == 0:
@@ -573,11 +573,14 @@ def populate_missing_data(api_key: str, access_token: str):
     
     all_unique_slugs = set()
     total_badges_updated = 0
+    processed_user_ids = set()
     
     for i in range(0, total_users, batch_size):
         batch = users_to_update[i:i + batch_size]
         batch_users = list(batch)
+        batch_user_ids = [user.user_id for user in batch_users]
         logger.info(f"Processing batch {i//batch_size + 1} of {total_batches} ({len(batch_users)} users)")
+        logger.info(f"Batch user IDs: {batch_user_ids}")
         
         # Update user data and collect slugs
         batch_slugs = update_users_data(batch_users, api_key, access_token)
@@ -588,6 +591,10 @@ def populate_missing_data(api_key: str, access_token: str):
         logger.info(f"Updating badges for batch {i//batch_size + 1}")
         if update_badges_data(batch_users, api_key, access_token):
             total_badges_updated += 1
+            
+        # Track processed users
+        processed_user_ids.update(batch_user_ids)
+        logger.info(f"Total users processed so far: {len(processed_user_ids)}")
     
     # After all users are processed, handle collectives
     if all_unique_slugs:
@@ -605,7 +612,13 @@ def populate_missing_data(api_key: str, access_token: str):
     else:
         logger.info("No collectives found to fetch")
     
-    logger.info(f"Data population completed. Updated {total_users} users, {total_badges_updated} badge batches, and {len(all_unique_slugs)} collectives.")
+    # Verify all users were processed
+    if len(processed_user_ids) != total_users:
+        logger.warning(f"Not all users were processed! Expected {total_users}, got {len(processed_user_ids)}")
+        missing_users = set(u.user_id for u in users_to_update) - processed_user_ids
+        logger.warning(f"Missing user IDs: {missing_users}")
+    
+    logger.info(f"Data population completed. Updated {len(processed_user_ids)} users, {total_badges_updated} badge batches, and {len(all_unique_slugs)} collectives.")
 
 def main():
     """
