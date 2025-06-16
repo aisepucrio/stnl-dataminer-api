@@ -2,7 +2,7 @@ import requests
 from datetime import datetime
 import time
 import logging
-from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag # Import StackQuestion and StackUser models
+from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment# Import StackQuestion and StackUser models
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,30 @@ def create_answer(answer_data, question, owner):
     )
     return answer
 
+def create_comment(comment_data, parent, owner):
+    # figure out which FK to set
+    question_obj = parent if isinstance(parent, StackQuestion) else None
+    answer_obj   = parent if isinstance(parent, StackAnswer)  else None
+
+    comment, _ = StackComment.objects.get_or_create(
+        comment_id=comment_data.get('comment_id'),
+        defaults={
+            'post_type':       comment_data.get('post_type'),
+            'post_id':         comment_data.get('post_id'),
+            'body':            comment_data.get('body'),
+            'score':           comment_data.get('score', 0),
+            'creation_date':   comment_data.get('creation_date'),
+            'content_license': comment_data.get('content_license'),
+            'edited':          comment_data.get('edited', False),
+            'owner':           owner,
+            'body_markdown':   comment_data.get('body_markdown'),
+            'link':            comment_data.get('link'),
+            'time_mined':      int(time.time()),
+            'question':        question_obj,
+            'answer':          answer_obj,
+        }
+    )
+    return comment
 
 def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100):
     """
@@ -170,14 +194,6 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                 # Creating user
                 if owner_id:
                     stack_user = create_or_update_user(owner_id, owner_data)
-                
-                # Creating user from comments
-                comments = item.get('comments', [])
-                if (comments):
-                    for comment in comments:
-                        comment_data = comment.get('owner', {})
-                        comment_id = comment_data.get('user_id')
-                        create_or_update_user(comment_id, comment_data)
 
                 question = {
                     'question_id': item['question_id'],
@@ -211,6 +227,15 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                 )
                 questions.append(question)
 
+                # Creating user from comments
+                comments = item.get('comments', [])
+                if (comments):
+                    for comment in comments:
+                        comment_data = comment.get('owner', {})
+                        comment_id = comment_data.get('user_id')
+                        stack_user = create_or_update_user(comment_id, comment_data)
+                        create_comment(comment, stack_question, stack_user)
+
                 # Creating user from answers and comments
                 if item.get('is_answered'):
                     for answer in item.get('answers', []):
@@ -218,13 +243,14 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                         owner_data = answer.get('owner', {})
                         owner_id   = owner_data.get('user_id')
                         stack_user = create_or_update_user(owner_id, owner_data)
-                        create_answer(answer, stack_question, stack_user)
+                        stack_answer = create_answer(answer, stack_question, stack_user)
                         comments = answer.get('comments', [])
                         if comments:
                             for comment in comments:
                                 comment_data = comment.get('owner', {})
                                 comment_id = comment_data.get('user_id')
-                                create_or_update_user(comment_id, comment_data)
+                                stack_user = create_or_update_user(comment_id, comment_data)
+                                create_comment(comment, stack_answer, stack_user)
                 tag_objs = []
                 for tag_name in question_tags:
                     tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
