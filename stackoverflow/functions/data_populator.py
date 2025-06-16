@@ -592,11 +592,11 @@ def main():
         return
 
     # Fetch a test slice of users
-    # users = list(StackUser.objects.all()[7:20])
-    users = list()
-    user_2988 = StackUser.objects.filter(user_id=107301).first()
-    if user_2988:
-        users.append(user_2988)
+    users = list(StackUser.objects.all()[:100])
+    # users = list()
+    # user_2988 = StackUser.objects.filter(user_id=107301).first()
+    # if user_2988:
+    #     users.append(user_2988)
     if not users:
         logger.warning("No users found in the database.")
         return

@@ -137,7 +137,6 @@ class StackBadge(models.Model):
 class StackUserBadge(models.Model):
     user = models.ForeignKey(StackUser, on_delete=models.CASCADE)
     badge = models.ForeignKey(StackBadge, on_delete=models.CASCADE)
-    award_count = models.IntegerField(default=1)
 
     class Meta:
         db_table = 'stack_user_badge'
