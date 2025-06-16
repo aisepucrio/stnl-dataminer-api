@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stackoverflow', '0016_stackuser_time_mined_alter_stackanswer_time_mined_and_more'),
+        ('stackoverflow', '0005_alter_stackanswer_time_mined_and_more'),
     ]
 
     operations = [
