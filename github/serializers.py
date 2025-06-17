@@ -178,11 +178,7 @@ class ExportDataSerializer(serializers.Serializer):
         help_text="List of IDs to export (optional)"
     )
     format = serializers.ChoiceField(
-        choices=['csv', 'json'],
+        choices=['json'],
         default='json',
-        help_text="Output format (csv or json)"
-    )
-    output_path = serializers.CharField(
-        required=False,
-        help_text="Path where to save the file (optional). If not provided, file will be downloaded to browser's default download location"
+        help_text="Output format (only JSON is supported)"
     )

@@ -1079,7 +1079,6 @@ class ExportDataView(APIView):
         table = serializer.validated_data['table']
         ids = serializer.validated_data.get('ids', [])
         format_type = serializer.validated_data['format']
-        output_path = serializer.validated_data.get('output_path')
 
         model_mapping = {
             'githubcommit': GitHubCommit,
@@ -1117,62 +1116,20 @@ class ExportDataView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        filename = f"{table}_export.{format_type}"
-        
-        if output_path:
-            try:
-                if not output_path.endswith(f'.{format_type}'):
-                    output_path = f"{output_path}.{format_type}"
+        filename = f"{table}_export.json"
 
-                if not os.path.isabs(output_path):
-                    output_path = os.path.join(settings.EXPORT_DIRECTORY, os.path.basename(output_path))
-                else:
-                    try:
-                        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    except Exception as e:
-                        output_path = os.path.join(settings.EXPORT_DIRECTORY, os.path.basename(output_path))
-                
-                os.makedirs(settings.EXPORT_DIRECTORY, exist_ok=True)
-                
-                if format_type == 'csv':
-                    with open(output_path, 'w', newline='', encoding='utf-8') as f:
-                        writer = csv.DictWriter(f, fieldnames=data[0].keys())
-                        writer.writeheader()
-                        writer.writerows(data)
-                else: 
-                    with open(output_path, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, default=str, indent=2)
-                
-                return Response({
-                    "message": "File saved successfully",
-                    "path": output_path,
-                    "absolute_path": os.path.abspath(output_path)
-                })
-                
-            except Exception as e:
-                return Response(
-                    {
-                        "error": f"Error saving file: {str(e)}",
-                        "hint": "Make sure to provide a complete file path including the filename",
-                        "attempted_path": output_path,
-                        "absolute_path": os.path.abspath(output_path) if output_path else None
-                    },
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        else:
-            if format_type == 'csv':
-                response = HttpResponse(content_type='text/csv')
-                response['Content-Disposition'] = f'attachment; filename="{filename}"'
-                
-                writer = csv.DictWriter(response, fieldnames=data[0].keys())
-                writer.writeheader()
-                writer.writerows(data)
-                
-                return response
-            else: 
-                response = HttpResponse(
-                    json.dumps(data, default=str, indent=2),
-                    content_type='application/json'
-                )
-                response['Content-Disposition'] = f'attachment; filename="{filename}"'
-                return response
+        try:
+            response = HttpResponse(
+                json.dumps(data, default=str, indent=2),
+                content_type='application/json'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+
+            return response
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error exporting data: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
