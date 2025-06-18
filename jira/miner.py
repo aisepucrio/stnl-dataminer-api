@@ -11,17 +11,20 @@ from dotenv import load_dotenv
 from django.utils import timezone
 from jira.models import JiraIssueType
 from django.core.exceptions import PermissionDenied
+from jobs.models import Task 
 
 
 class JiraMiner:
     class NoValidJiraTokenError(Exception):
-        """Token inválido ou todos os tokens expiraram."""
+        """Invalid token or all tokens have expired."""
         pass
 
-    def __init__(self, jira_domain):
+    def __init__(self, jira_domain, task_obj=None):
         load_dotenv()
         self.jira_domain = jira_domain.strip()
-        print(f"DEBUG received domain in JiraMiner: '{self.jira_domain}'", flush=True)
+        self.task_obj = task_obj 
+        self.log_progress(f"DEBUG received domain in JiraMiner: '{self.jira_domain}'")
+
 
         # Loading tokens
         self.tokens = [token.strip() for token in os.getenv("JIRA_API_TOKEN", "").split(",") if token.strip()]
@@ -34,6 +37,17 @@ class JiraMiner:
         self.headers = {"Accept": "application/json"}
         self.update_auth()
         self.verify_token()
+
+    def log_progress(self, message):
+        print(message, flush=True)
+        if self.task_obj:
+            self.task_obj.operation = message
+            self.task_obj.save(update_fields=["operation"])
+            print(f"[DEBUG] Salvo em Task.operation: {self.task_obj.operation}", flush=True)
+            from jobs.models import Task
+            refreshed = Task.objects.get(pk=self.task_obj.pk)
+            print(f"[DEBUG] Valor no banco após save: {refreshed.operation}", flush=True)
+
         
     def update_auth(self):
         self.auth = HTTPBasicAuth(self.jira_email, self.tokens[self.current_token_index])
@@ -44,7 +58,8 @@ class JiraMiner:
     def switch_token(self):
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
         self.update_auth()
-        print(f"[JiraMiner] 🔁 Switching to token {self.current_token_index + 1}/{len(self.tokens)}", flush=True)
+        self.log_progress(f"Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
+
 
     def verify_token(self):
         for _ in range(len(self.tokens)):
@@ -52,12 +67,16 @@ class JiraMiner:
                 url = f"https://{self.jira_domain}/rest/api/3/myself"
                 response = requests.get(url, headers=self.headers, auth=self.auth)
                 if response.status_code == 200:
-                    print(f"[JiraMiner] ✅ Token {self.current_token_index + 1} is valid", flush=True)
+                    self.log_progress(f"Token {self.current_token_index + 1} is valid")
                     return
                 else:
-                    print(f"[JiraMiner] ⚠️ Token {self.current_token_index + 1} is invalid: {response.status_code}", flush=True)
+                    self.log_progress(f"Token {self.current_token_index + 1} is invalid: {response.status_code}")
+
+                    
+                    
             except Exception as e:
-                print(f"[JiraMiner] ❌ Error verifying token {self.current_token_index + 1}: {e}", flush=True)
+                self.log_progress(f"Problem verifying {self.current_token_index + 1}: {e}")
+
 
             self.switch_token()
 
@@ -66,18 +85,21 @@ class JiraMiner:
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
-            print("[JiraMiner] 🚫 Rate limit reached. Trying next token...", flush=True)
+            self.log_progress("Rate limit reached. Trying next token...")
+
             original_index = self.current_token_index
 
             for _ in range(len(self.tokens)):
                 self.switch_token()
                 retry = requests.get(response.request.url, headers=self.headers, auth=self.auth)
                 if retry.status_code != 429:
-                    print("[JiraMiner] ✅ New token worked!", flush=True)
+                    self.log_progress("New Token worked after rate limit.")
+
                     return True
 
             # If no token worked, wait for 60 seconds
-            print("[JiraMiner] 🕒 All tokens hit the limit. Waiting for 60 seconds...", flush=True)
+            self.log_progress("All tokens failed after rate limit. Waiting for 60 seconds before retrying...")
+
             time.sleep(60)
             return True
 
@@ -86,15 +108,18 @@ class JiraMiner:
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         max_results, start_at, total_collected = 100, 0, 0
         custom_fields_mapping = self.get_custom_fields_mapping()
+        self.log_progress(f"Colecting project issues {project_key}...")
 
-        # 🧠 Encontra o campo Sprint (ex: customfield_10020)
+        # Find the Sprint field (e.g., customfield_10020)
         sprint_field_key = None
         for field_id, field_name in custom_fields_mapping.items():
             if field_name.lower() == "sprint":
                 sprint_field_key = field_id
                 break
 
-        print(f"[DEBUG] Campo Sprint mapeado como: {sprint_field_key}", flush=True)
+
+        self.log_progress(f"Token {self.current_token_index + 1} is valid")
+
 
         jql_query = f'project="{project_key}"'
 
@@ -133,7 +158,7 @@ class JiraMiner:
                 current_timestamp = timezone.now()
                 description = self.extract_words_from_description(fields.get("description"))
 
-                # ✅ Injeta o campo sprint legível
+                # Injects the sprint field readable
                 if sprint_field_key:
                     fields["sprint"] = fields.get(sprint_field_key)
 
@@ -193,23 +218,24 @@ class JiraMiner:
 
                 created_date = parse_datetime(fields["created"]).strftime('%d/%m/%Y')
 
-                # Verifica nome da sprint (pode ser uma ou várias)
+                # # Verify sprint names(can be a single dict or a list of dicts)
                 sprints_data = fields.get("sprint")
                 sprint_names = ""
 
                 if sprints_data:
-                    if isinstance(sprints_data, dict):  # caso venha como dict
+                    if isinstance(sprints_data, dict):  # in case it comes as a single dict
                         sprint_names = sprints_data.get("name", "")
-                    elif isinstance(sprints_data, list):  # lista de dicts
+                    elif isinstance(sprints_data, list):  # list of dicts
                         sprint_names = ", ".join(s.get("name", "") for s in sprints_data if isinstance(s, dict))
 
                 sprint_info = f" | Sprint: {sprint_names}" if sprint_names.strip() else ""
 
-                print(f"[JiraMiner] 🛠️ Minerado: {issue_key}, criada em {created_date}{sprint_info}", flush=True)
+                self.log_progress(f" Mined: {issue_key}, created in {created_date}{sprint_info}")
 
 
 
-                # Sub-tabelas
+
+                # Sub-tables
                 self.save_comments(issue_key, issue_obj)
                 self.save_history(issue_key, issue_obj)
                 self.save_activity(issue_key, issue_obj)
@@ -265,7 +291,8 @@ class JiraMiner:
             return self.get_comments_for_issue(issue_key)
             
         if response.status_code != 200:
-            print(f"[JiraMiner] ⚠️ Error collecting comments for issue {issue_key}: {response.status_code}", flush=True)
+            self.log_progress(f" Problem collecting comments for {issue_key}: {response.status_code}")
+
             return []
             
         comments_data = response.json()
@@ -301,7 +328,8 @@ class JiraMiner:
             return self.get_issue_history(issue_key)
             
         if response.status_code != 200:
-            print(f"[JiraMiner] ⚠️ Error collecting history for issue {issue_key}: {response.status_code}", flush=True)
+            self.log_progress(f"Problem collecting history for {issue_key}: {response.status_code}")
+
             return []
             
         history_data = response.json()
@@ -349,7 +377,8 @@ class JiraMiner:
             return self.get_activity_log(issue_key)
             
         if response.status_code != 200:
-            print(f"[JiraMiner] ⚠️ Error collecting activity log for issue {issue_key}: {response.status_code}", flush=True)
+            self.log_progress(f"Problem collecting activity log for {issue_key}: {response.status_code}")
+
             return []
             
         history_data = response.json()
@@ -437,7 +466,8 @@ class JiraMiner:
             return self.get_checklist(issue_key)
             
         if response.status_code != 200:
-            print(f"[JiraMiner] ⚠️ Error collecting checklist for issue {issue_key}: {response.status_code}", flush=True)
+            self.log_progress(f"Problem collecting checklist for {issue_key}: {response.status_code}")
+
             return []
             
         issue_data = response.json()
@@ -680,7 +710,7 @@ class JiraMiner:
         if not sprints_data:
             return
 
-        if isinstance(sprints_data, dict):  # Caso venha como dict único
+        if isinstance(sprints_data, dict):  # If it comes as a single dict
             sprints_data = [sprints_data]
 
         for sprint in sprints_data:
@@ -701,6 +731,7 @@ class JiraMiner:
 
 
             except Exception as e:
-                print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
+                self.log_progress(f"Problem on saving sprint for {issue_obj.issue_key}: {e}")
+
 
 

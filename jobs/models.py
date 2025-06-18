@@ -3,7 +3,7 @@ from django.utils import timezone
 
 class Task(models.Model):
     task_id = models.CharField(max_length=255, unique=True)
-    operation = models.CharField(max_length=100)
+    operation = models.TextField()
     repository = models.CharField(max_length=255)
     created_at = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=50, default='PENDING')
