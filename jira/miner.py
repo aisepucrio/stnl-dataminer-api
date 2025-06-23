@@ -1,18 +1,28 @@
 import os
-import requests
-from datetime import datetime
-from requests.auth import HTTPBasicAuth
-from .models import JiraIssue, JiraProject, JiraUser, JiraComment, JiraHistory,JiraHistoryItem, JiraActivityLog, JiraChecklist, JiraSprint,JiraIssueLink, JiraCommit
-from django.db import models
-from django.utils.dateparse import parse_datetime
-from urllib.parse import quote
 import time
-from dotenv import load_dotenv
-from django.utils import timezone
-from jira.models import JiraIssueType
-from django.core.exceptions import PermissionDenied
-from jobs.models import Task 
+from datetime import datetime
+from urllib.parse import quote
 
+import requests
+from dotenv import load_dotenv
+from requests.auth import HTTPBasicAuth
+
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
+from .models import (
+    JiraIssue,
+    JiraProject,
+    JiraUser,
+    JiraComment,
+    JiraHistory,
+    JiraHistoryItem,
+    JiraActivityLog,
+    JiraChecklist,
+    JiraSprint,
+    JiraCommit,
+    JiraIssueType
+)
 
 class JiraMiner:
     class NoValidJiraTokenError(Exception):
