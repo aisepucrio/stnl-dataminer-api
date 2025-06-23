@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from jira.models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit
+from jira.models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit, JiraUser
 
 logger = logging.getLogger(__name__)
 
@@ -149,9 +149,10 @@ class JiraDashboardView(APIView):
                     else:
                         latest_time_mined = None
 
-                    sprints_count = JiraSprint.objects.filter(issues__in=project_issues).count()
-                    comments_count = JiraComment.objects.filter(issue__in=project_issues).count()
-                    commits_count = JiraCommit.objects.filter(issue__in=project_issues).count()
+                    sprints_count = JiraSprint.objects.filter(issues__in=project_issues).distinct().count()
+                    comments_count = JiraComment.objects.filter(issue__in=project_issues).distinct().count()
+                    commits_count = JiraCommit.objects.filter(issue__in=project_issues).distinct().count()
+                    users_count = JiraUser.objects.filter().distinct().count()
 
                     response_data = {
                         "project_name": project.name,
@@ -159,7 +160,8 @@ class JiraDashboardView(APIView):
                         "time_mined": latest_time_mined.isoformat() if latest_time_mined else None,
                         "sprints_count": sprints_count,
                         "comments_count": comments_count,
-                        "commits_count": commits_count
+                        "commits_count": commits_count,
+                        "users_count": users_count
                     }
                 except JiraProject.DoesNotExist:
                     return Response(
@@ -175,9 +177,10 @@ class JiraDashboardView(APIView):
                 projects = JiraProject.objects.all()
                 projects_list = [{"id": p.id, "name": f"{p.name} ({p.key})"} for p in projects]
 
-                sprints_count = JiraSprint.objects.filter(issues__in=issues_query).count()
-                comments_count = JiraComment.objects.filter(issue__in=issues_query).count()
-                commits_count = JiraCommit.objects.filter(issue__in=issues_query).count()
+                sprints_count = JiraSprint.objects.filter(issues__in=issues_query).distinct().count()
+                comments_count = JiraComment.objects.filter(issue__in=issues_query).distinct().count()
+                commits_count = JiraCommit.objects.filter(issue__in=issues_query).distinct().count()
+                users_count = JiraUser.objects.filter().distinct().count()
 
                 response_data = {
                     "issues_count": issues_query.count(),
@@ -185,7 +188,8 @@ class JiraDashboardView(APIView):
                     "projects": projects_list,
                     "sprints_count": sprints_count,
                     "comments_count": comments_count,
-                    "commits_count": commits_count
+                    "commits_count": commits_count,
+                    "users_count": users_count
                 }
 
             return Response(response_data)
