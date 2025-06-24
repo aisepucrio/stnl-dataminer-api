@@ -219,10 +219,6 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             
             # Process questions
             for item in data.get('items', []):
-                # ADD THIS PRINT STATEMENT
-                print(f"=== Processing question {item['question_id']} ===")
-                print(f"Tags from API: {item.get('tags', [])}")
-                
                 # Extract owner data and create/update user
                 owner_data = item.get('owner', {})
                 owner_id = owner_data.get('user_id')
@@ -304,7 +300,6 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                                 create_comment(comment, stack_answer, comment_owner)
 
                 # Process tags - ADD MORE PRINT STATEMENTS
-                print(f"About to process {len(question_tags)} tags for question {question['question_id']}")
                 tag_objs = []
                 for tag_name in question_tags:
                     print(f"Processing tag: {tag_name}")
@@ -313,21 +308,13 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     print(f"Tag '{tag_name}' {'created' if created else 'already exists'}")
 
                 # Assign tags to the question
-                print(f"Assigning {len(tag_objs)} tags to question {question['question_id']}")
                 try:
                     stack_question.tags.set(tag_objs)
-                    print(f"SUCCESS: Assigned tags to question {question['question_id']}")
                 except Exception as e:
                     print(f"ERROR: Failed to assign tags to question {question['question_id']}: {e}")
                     raise
-
-                # ADD THIS: Check if the relationship was actually saved
-                print(f"Verifying tag assignment for question {question['question_id']}")
-                actual_tags = list(stack_question.tags.all())
-                print(f"Actual tags in database: {[tag.name for tag in actual_tags]}")
             
             logger.info(f"Processed {len(data.get('items', []))} questions")
-            print(f"=== Finished processing batch of questions ===")
             
             # has_more = data.get('has_more', False)
             # if has_more:
