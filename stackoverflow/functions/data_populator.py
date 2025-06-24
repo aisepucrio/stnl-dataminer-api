@@ -1,4 +1,4 @@
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 import requests
 import time
 import logging
@@ -126,35 +126,29 @@ def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
         badge_link = item.get("link")
         badge_description = item.get("description")
         user_id = item.get("user", {}).get("user_id")
-
         badge_id = item.get("badge_id")
         if badge_id is None:
             continue  # Defensive programming
-
         try:
-            badge_obj, _ = StackBadge.objects.get_or_create(
-                badge_id=badge_id,
-                defaults={
-                    "name": badge_name,
-                    "badge_type": badge_type,
-                    "rank": badge_rank,
-                    "link": badge_link,
-                    "description": badge_description or "",
-                }
-            )
+            with transaction.atomic():
+                badge_obj, _ = StackBadge.objects.get_or_create(
+                    badge_id=badge_id,
+                    defaults={
+                        "name": badge_name,
+                        "badge_type": badge_type,
+                        "rank": badge_rank,
+                        "link": badge_link,
+                        "description": badge_description or "",
+                    }
+                )
+                user = next((u for u in users if u.user_id == user_id), None)
+                if user:
+                    _, created = StackUserBadge.objects.get_or_create(user=user, badge=badge_obj)
+                    if created:
+                        created_count += 1
         except IntegrityError as e:
-            logger.error(f"Integrity error while inserting badge {badge_id}: {e}")
+            logger.error(f"Integrity error while inserting badge {badge_id} or linking user {user_id}: {e}")
             continue
-
-
-        user = next((u for u in users if u.user_id == user_id), None)
-        if user:
-            try:
-                _, created = StackUserBadge.objects.get_or_create(user=user, badge=badge_obj)
-                if created:
-                    created_count += 1
-            except IntegrityError as e:
-                logger.error(f"Integrity error while linking user {user} to badge {badge_obj}: {e}")
 
 
     logger.info(f"Created {created_count} new StackUserBadge entries")
@@ -344,22 +338,21 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
             continue
 
         try:
-            obj, created = StackCollectiveUser.objects.get_or_create(
-                user=user,
-                collective=collective,
-                defaults={"role": role or "unknown"}
-            )
+            with transaction.atomic():
+                obj, created = StackCollectiveUser.objects.get_or_create(
+                    user=user,
+                    collective=collective,
+                    defaults={"role": role or "unknown"}
+                )
+                # If it already exists, update role if it's changed
+                if not created and obj.role != (role or "unknown"):
+                    obj.role = role or "unknown"
+                    obj.save(update_fields=["role"])
+                if created:
+                    created_count += 1
         except IntegrityError as e:
             logger.error(f"Integrity error while linking user {user} to collective {collective.slug}: {e}")
 
-
-        # If it already exists, update role if it's changed
-        if not created and obj.role != (role or "unknown"):
-            obj.role = role or "unknown"
-            obj.save(update_fields=["role"])
-
-        if created:
-            created_count += 1
 
     logger.info(f"Created {created_count} StackCollectiveUser links for {len(users)} users.")
 
@@ -413,12 +406,13 @@ def sync_collective_tags(collectives_data: list):
                 continue
 
             try:
-                _, created = StackCollectiveTag.objects.get_or_create(
-                    collective=collective,
-                    tag=tag
-                )
-                if created:
-                    created_count += 1
+                with transaction.atomic():
+                    _, created = StackCollectiveTag.objects.get_or_create(
+                        collective=collective,
+                        tag=tag
+                    )
+                    if created:
+                        created_count += 1
             except IntegrityError as e:
                 logger.error(f"Integrity error while linking tag '{tag}' to collective '{collective.slug}': {e}")
 
