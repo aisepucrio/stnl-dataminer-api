@@ -1,15 +1,26 @@
+from django.db import IntegrityError
 import requests
 import time
 import logging
 import os
+import sys
 from django.utils import timezone
 from django.db.models import Q
 from stackoverflow.models import (
     StackUser, StackBadge, StackCollective, StackUserBadge,
     StackCollectiveUser, StackCollectiveTag, StackTag
 )
+from stackoverflow.functions.safe_api_call import safe_api_call
 
 logger = logging.getLogger(__name__)
+
+def check_required_config() -> None:
+    required_env_vars = ["API_KEY", "ACCESS_TOKEN"]
+
+    missing = [var for var in required_env_vars if not os.getenv(var)]
+    if missing:
+        logger.critical(f"Missing required environment variables: {', '.join(missing)}")
+        sys.exit(1)  # Clean exit with error code
 
 def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
     """
@@ -42,10 +53,11 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
         }
 
         try:
-            response = requests.get(base_url, params=params)
-            response.raise_for_status()
-            data = response.json()
-
+            data = safe_api_call(base_url, params=params)
+            if not data:
+                    logger.warning("No data returned or API error occurred.")
+                    return []
+            
             items = data.get("items", [])
             all_badges.extend(items)
 
@@ -119,22 +131,31 @@ def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
         if badge_id is None:
             continue  # Defensive programming
 
-        badge_obj, _ = StackBadge.objects.get_or_create(
-            badge_id=badge_id,
-            defaults={
-                "name": badge_name,
-                "badge_type": badge_type,
-                "rank": badge_rank,
-                "link": badge_link,
-                "description": badge_description or "",
-            }
-        )
+        try:
+            badge_obj, _ = StackBadge.objects.get_or_create(
+                badge_id=badge_id,
+                defaults={
+                    "name": badge_name,
+                    "badge_type": badge_type,
+                    "rank": badge_rank,
+                    "link": badge_link,
+                    "description": badge_description or "",
+                }
+            )
+        except IntegrityError as e:
+            logger.error(f"Integrity error while inserting badge {badge_id}: {e}")
+            continue
+
 
         user = next((u for u in users if u.user_id == user_id), None)
         if user:
-            _, created = StackUserBadge.objects.get_or_create(user=user, badge=badge_obj)
-            if created:
-                created_count += 1
+            try:
+                _, created = StackUserBadge.objects.get_or_create(user=user, badge=badge_obj)
+                if created:
+                    created_count += 1
+            except IntegrityError as e:
+                logger.error(f"Integrity error while linking user {user} to badge {badge_obj}: {e}")
+
 
     logger.info(f"Created {created_count} new StackUserBadge entries")
     return created_count > 0
@@ -146,6 +167,7 @@ def get_users_to_update():
     Returns:
         QuerySet: Users that need updating
     """
+    check_required_config()
     current_time = int(timezone.now().timestamp())
     week_in_seconds = 7 * 24 * 60 * 60  # 7 days in seconds
     
@@ -193,25 +215,33 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
             base_url = f"https://api.stackexchange.com/2.3/collectives/{slugs_string}"
 
             try:
-                response = requests.get(base_url, params=params)
-                response.raise_for_status()
-                data = response.json()
-
+                data = safe_api_call(base_url, params=params)
+                if not data:
+                    logger.warning("No data returned or API error occurred.")
+                    return []
+                
                 items = data.get('items', [])
 
                 if items:
                     all_collectives_data.extend(items)
                     logger.info(f"Fetched {len(items)} collectives from page {page}")
+                    
                     for c in items:
-                        StackCollective.objects.get_or_create(
-                            slug=c.get("slug"),
-                            defaults={
-                                "name": c.get("name"),
-                                "description": c.get("description", ""),
-                                "link": c.get("link"),
-                                "last_sync": int(timezone.now().timestamp())
-                            }
-                        )
+                        try:
+                            collective_obj, _ = StackCollective.objects.get_or_create(
+                                slug=c.get("slug"),
+                                defaults={
+                                    "name": c.get("name"),
+                                    "description": c.get("description"),
+                                    "link": c.get("link"),
+                                    "last_sync": int(timezone.now().timestamp())
+                                }
+                            )
+                        except IntegrityError as e:
+                            logger.error(f"Integrity error while inserting collective {c.get('slug')}: {e}")
+                            continue
+
+
 
                         #TODO: StackCollectiveTag for all tags in tags field. 
                 else:
@@ -288,21 +318,24 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
     for user, slug, role in link_triples:
         collective = slug_to_collective.get(slug)
 
-        # If not found, try to create from fallback data
+       # If not found, try to create from fallback data
         if not collective and fallback_collectives_data:
             fallback = fallback_collectives_data.get(slug)
             if fallback:
-                collective, _ = StackCollective.objects.get_or_create(
-                    slug=slug,
-                    defaults={
-                        "name": fallback.get("name"),
-                        "description": fallback.get("description", ""),
-                        "link": fallback.get("link") or "",
-                        "last_sync": int(timezone.now().timestamp())
-                    }
-                )
-                slug_to_collective[slug] = collective  # Cache it
-                logger.info(f"Created missing StackCollective: {slug}")
+                try:
+                    collective, _ = StackCollective.objects.get_or_create(
+                        slug=slug,
+                        defaults={
+                            "name": fallback.get("name"),
+                            "description": fallback.get("description", ""),
+                            "link": fallback.get("link") or "",
+                            "last_sync": int(timezone.now().timestamp())
+                        }
+                    )
+                    slug_to_collective[slug] = collective  # Cache it
+                    logger.info(f"Created missing StackCollective: {slug}")
+                except IntegrityError as e:
+                    logger.error(f"Integrity error while creating fallback collective {slug}: {e}")
             else:
                 logger.warning(f"Slug '{slug}' not found in fallback_collectives_data")
 
@@ -310,11 +343,15 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
             logger.warning(f"Could not link user {user.user_id} to missing slug '{slug}'")
             continue
 
-        obj, created = StackCollectiveUser.objects.get_or_create(
-            user=user,
-            collective=collective,
-            defaults={"role": role or "unknown"}
-        )
+        try:
+            obj, created = StackCollectiveUser.objects.get_or_create(
+                user=user,
+                collective=collective,
+                defaults={"role": role or "unknown"}
+            )
+        except IntegrityError as e:
+            logger.error(f"Integrity error while linking user {user} to collective {collective.slug}: {e}")
+
 
         # If it already exists, update role if it's changed
         if not created and obj.role != (role or "unknown"):
@@ -375,12 +412,16 @@ def sync_collective_tags(collectives_data: list):
                 logger.warning(f"Tag '{tag_name}' not found. Skipping.")
                 continue
 
-            _, created = StackCollectiveTag.objects.get_or_create(
-                collective=collective,
-                tag=tag
-            )
-            if created:
-                created_count += 1
+            try:
+                _, created = StackCollectiveTag.objects.get_or_create(
+                    collective=collective,
+                    tag=tag
+                )
+                if created:
+                    created_count += 1
+            except IntegrityError as e:
+                logger.error(f"Integrity error while linking tag '{tag}' to collective '{collective.slug}': {e}")
+
 
     logger.info(f"Created {created_count} StackCollectiveTag relationships.")
 
@@ -423,10 +464,11 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
             base_url = f"https://api.stackexchange.com/2.3/users/{ids_string}"
 
             try:
-                response = requests.get(base_url, params=params)
-                response.raise_for_status()
-                data = response.json()
-
+                data = safe_api_call(base_url, params=params)
+                if not data:
+                    logger.warning("No data returned or API error occurred.")
+                    return []
+                
                 items = data.get('items', [])
                 if items:
                     all_users_data.extend(items)
