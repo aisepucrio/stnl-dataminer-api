@@ -163,11 +163,11 @@ def get_users_to_update():
     """
     check_required_config()
     current_time = int(timezone.now().timestamp())
-    week_in_seconds = 7 * 24 * 60 * 60  # 7 days in seconds
+    time_for_recheck = 7 * 24 * 60 * 60  # 7 days in seconds
     
     return StackUser.objects.filter(
         Q(time_mined__isnull=True) |  # Never mined
-        Q(time_mined__lt=current_time - week_in_seconds)  # Mined more than a week ago
+        Q(time_mined__lt=current_time - time_for_recheck)  # Mined longer ago than the set time for recheck
     )
 
 
