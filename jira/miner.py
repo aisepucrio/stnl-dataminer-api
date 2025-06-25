@@ -10,9 +10,14 @@ import time
 from dotenv import load_dotenv
 from django.utils import timezone
 from jira.models import JiraIssueType
+from django.core.exceptions import PermissionDenied
 
 
 class JiraMiner:
+    class NoValidJiraTokenError(Exception):
+        """Token inválido ou todos os tokens expiraram."""
+        pass
+
     def __init__(self, jira_domain):
         load_dotenv()
         self.jira_domain = jira_domain.strip()
@@ -56,7 +61,8 @@ class JiraMiner:
 
             self.switch_token()
 
-        raise Exception("❌ No valid Jira token found.")
+        raise self.NoValidJiraTokenError("❌ No valid Jira token found.")
+
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
@@ -80,6 +86,15 @@ class JiraMiner:
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         max_results, start_at, total_collected = 100, 0, 0
         custom_fields_mapping = self.get_custom_fields_mapping()
+
+        # 🧠 Encontra o campo Sprint (ex: customfield_10020)
+        sprint_field_key = None
+        for field_id, field_name in custom_fields_mapping.items():
+            if field_name.lower() == "sprint":
+                sprint_field_key = field_id
+                break
+
+        print(f"[DEBUG] Campo Sprint mapeado como: {sprint_field_key}", flush=True)
 
         jql_query = f'project="{project_key}"'
 
@@ -118,6 +133,11 @@ class JiraMiner:
                 current_timestamp = timezone.now()
                 description = self.extract_words_from_description(fields.get("description"))
 
+                # ✅ Injeta o campo sprint legível
+                if sprint_field_key:
+                    fields["sprint"] = fields.get(sprint_field_key)
+
+
                 # Ensure related objects
                 project_obj, _ = JiraProject.objects.get_or_create(
                     id=fields['project']['id'],
@@ -129,7 +149,6 @@ class JiraMiner:
                     }
                 )
 
-
                 creator_obj = self.ensure_user(fields["creator"])
                 assignee_obj = self.ensure_user(fields.get("assignee"))
                 reporter_obj = self.ensure_user(fields.get("reporter"))
@@ -139,8 +158,6 @@ class JiraMiner:
                 if parent_issue_id:
                     parent_issue_obj = JiraIssue.objects.filter(issue_id=parent_issue_id).first()
 
-
-                # Save main issue
                 issue_obj, _ = JiraIssue.objects.update_or_create(
                     issue_id=issue_id,
                     defaults={
@@ -174,6 +191,23 @@ class JiraMiner:
                     }
                 )
 
+                created_date = parse_datetime(fields["created"]).strftime('%d/%m/%Y')
+
+                # Verifica nome da sprint (pode ser uma ou várias)
+                sprints_data = fields.get("sprint")
+                sprint_names = ""
+
+                if sprints_data:
+                    if isinstance(sprints_data, dict):  # caso venha como dict
+                        sprint_names = sprints_data.get("name", "")
+                    elif isinstance(sprints_data, list):  # lista de dicts
+                        sprint_names = ", ".join(s.get("name", "") for s in sprints_data if isinstance(s, dict))
+
+                sprint_info = f" | Sprint: {sprint_names}" if sprint_names.strip() else ""
+
+                print(f"[JiraMiner] 🛠️ Minerado: {issue_key}, criada em {created_date}{sprint_info}", flush=True)
+
+
 
                 # Sub-tabelas
                 self.save_comments(issue_key, issue_obj)
@@ -181,6 +215,7 @@ class JiraMiner:
                 self.save_activity(issue_key, issue_obj)
                 self.save_checklist(issue_key, issue_obj)
                 self.save_commits(issue_key, issue_obj)
+                self.save_sprints(fields, issue_obj)
 
             total_collected += len(issues)
             start_at += max_results
@@ -190,7 +225,7 @@ class JiraMiner:
         return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
 
     def get_commits_for_issue(self, issue_key):
-        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueId={issue_key}&applicationType=git&dataType=repository"
+        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueIdOrKey={issue_key}&applicationType=git&dataType=repository"
 
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -207,6 +242,7 @@ class JiraMiner:
                         'id': commit.get('id'),
                         'message': commit.get('message'),
                         'author': commit.get('author', {}).get('name'),
+                        'author_email': commit.get('author', {}).get('emailAddress'),
                         'url': commit.get('url')
                     })
         return commits
@@ -638,5 +674,33 @@ class JiraMiner:
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
             )
+                
+    def save_sprints(self, fields, issue_obj):      
+        sprints_data = fields.get("sprint")
+        if not sprints_data:
+            return
 
-    
+        if isinstance(sprints_data, dict):  # Caso venha como dict único
+            sprints_data = [sprints_data]
+
+        for sprint in sprints_data:
+            try:
+                sprint_obj, _ = JiraSprint.objects.update_or_create(
+                    id=sprint["id"],
+                    defaults={
+                        "name": sprint["name"],
+                        "goal": sprint.get("goal", ""),
+                        "state": sprint.get("state"),
+                        "boardId": sprint.get("originBoardId", 0),
+                        "startDate": parse_datetime(sprint.get("startDate")) if sprint.get("startDate") else None,
+                        "endDate": parse_datetime(sprint.get("endDate")) if sprint.get("endDate") else None,
+                        "completeDate": parse_datetime(sprint.get("completeDate")) if sprint.get("completeDate") else None,
+                    }
+                )
+                issue_obj.sprints.add(sprint_obj)
+
+
+            except Exception as e:
+                print(f"[JiraMiner] ⚠️ Erro ao salvar sprint para {issue_obj.issue_key}: {e}", flush=True)
+
+

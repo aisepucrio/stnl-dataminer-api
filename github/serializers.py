@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import GitHubCommit, GitHubIssue, GitHubPullRequest, GitHubBranch, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata, GitHubIssuePullRequest
+from .utils import DateTimeHandler
 
 class GitHubAuthorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,10 +37,10 @@ class GitHubIssueSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        return DateTimeHandler.format_date(obj.created_at)
 
     def get_updated_at_formatted(self, obj):
-        return obj.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+        return DateTimeHandler.format_date(obj.updated_at)
 
 class GitHubPullRequestSerializer(serializers.ModelSerializer):
     created_at_formatted = serializers.SerializerMethodField()
@@ -51,10 +52,10 @@ class GitHubPullRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        return DateTimeHandler.format_date(obj.created_at)
 
     def get_updated_at_formatted(self, obj):
-        return obj.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+        return DateTimeHandler.format_date(obj.updated_at)
 
     def get_labels_list(self, obj):
         return obj.labels if isinstance(obj.labels, list) else []
@@ -100,17 +101,16 @@ class GitHubIssuePullRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return obj.created_at.strftime("%Y-%m-%d %H:%M:%S") if obj.created_at else None
+        return DateTimeHandler.format_date(obj.created_at)
 
     def get_updated_at_formatted(self, obj):
-        return obj.updated_at.strftime("%Y-%m-%d %H:%M:%S") if obj.updated_at else None
+        return DateTimeHandler.format_date(obj.updated_at)
 
     def get_closed_at_formatted(self, obj):
-        return obj.closed_at.strftime("%Y-%m-%d %H:%M:%S") if obj.closed_at else None
+        return DateTimeHandler.format_date(obj.closed_at)
 
     def get_merged_at_formatted(self, obj):
-        return obj.merged_at.strftime("%Y-%m-%d %H:%M:%S") if obj.merged_at else None
-
+        return DateTimeHandler.format_date(obj.merged_at)
 
 class GraphDashboardSerializer(serializers.Serializer):
     repository_id = serializers.IntegerField(required=False)
@@ -127,6 +127,58 @@ class GraphDashboardSerializer(serializers.Serializer):
         Check that start_date is before end_date if both are provided.
         """
         if 'start_date' in data and 'end_date' in data:
-            if data['start_date'] > data['end_date']:
-                raise serializers.ValidationError("start_date must be before end_date")
+            DateTimeHandler.validate_date_range(data['start_date'], data['end_date'])
         return data
+
+class GitHubCollectAllSerializer(serializers.Serializer):
+    repositories = serializers.ListField(
+        child=serializers.CharField(help_text="Repository name in format owner/repo"),
+        help_text="List of repositories to mine"
+    )
+    start_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Start date for mining (optional)")
+    end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="End date for mining (optional)")
+    depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Mining depth (basic or complex)")
+    collect_types = serializers.ListField(
+        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata', 'comments']),
+        help_text="List of data types to mine (commits, issues, pull_requests, branches, metadata, comments)"
+    )
+
+    def validate_collect_types(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one data type must be selected for mining")
+        return value
+
+    def validate_repositories(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one repository must be provided for mining")
+        return value
+
+    def validate(self, data):
+        if 'start_date' in data and 'end_date' in data:
+            DateTimeHandler.validate_date_range(data['start_date'], data['end_date'])
+        if 'comments' in data.get('collect_types', []):
+            data['depth'] = 'complex'
+        return data
+
+class ExportDataSerializer(serializers.Serializer):
+    table = serializers.ChoiceField(
+        choices=[
+            'githubcommit',
+            'githubissue',
+            'githubpullrequest',
+            'githubbranch',
+            'githubmetadata',
+            'githubissuepullrequest'
+        ],
+        help_text="Table name to export"
+    )
+    ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="List of IDs to export (optional)"
+    )
+    format = serializers.ChoiceField(
+        choices=['json'],
+        default='json',
+        help_text="Output format (only JSON is supported)"
+    )

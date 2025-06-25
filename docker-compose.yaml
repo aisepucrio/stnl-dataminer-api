@@ -1,72 +1,94 @@
-  services:
-    web:
-      build: .
-      volumes:
-        - .:/app
-        - .env:/app/.env # Monta o .env no container para ser acessado diretamente
-      ports:
-        - "8000:8000"
-      env_file:
-        - .env # Carrega as variáveis do .env
-      depends_on:
-        db:
-          condition: service_healthy
-      healthcheck:
-        test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-        interval: 30s
-        timeout: 10s
-        retries: 3
-      environment:
-        DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD}"
-        POSTGRES_USER: "${POSTGRES_USER}"
-        POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-        POSTGRES_DB: "${POSTGRES_DB}"
-        POSTGRES_PORT: "${POSTGRES_PORT}"
+services:
+  web:
+    build: .
+    volumes:
+      - .:/app
+      - .env:/app/.env
+      - ./exports:/app/exports
+      - static_volume:/app/static
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env 
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    environment:
+      IS_DEBUG: "${IS_DEBUG}"
+      DJANGO_SUPERUSER_USERNAME: "${DJANGO_SUPERUSER_USERNAME}"
+      DJANGO_SUPERUSER_PASSWORD: "${DJANGO_SUPERUSER_PASSWORD}"
+      DJANGO_SUPERUSER_EMAIL: "${DJANGO_SUPERUSER_EMAIL}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_PORT: "${POSTGRES_PORT}"
+      GITHUB_TOKENS: "${GITHUB_TOKENS}"
+      JIRA_EMAIL: "${JIRA_EMAIL}"
+      JIRA_API_TOKEN: "${JIRA_API_TOKEN}"
 
-    worker:
-      build: .
-      command: celery -A dataminer_api worker --loglevel=info
-      deploy:
-        resources:
-          limits:
-            memory: 4G
-          reservations:
-            memory: 512M
-      volumes:
-        - .:/app
-        - .env:/app/.env
-      env_file:
-        - .env
-      depends_on:
-        redis:
-          condition: service_healthy
+  worker:
+    build: .
+    command: celery -A dataminer_api worker --loglevel=info
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
+    volumes:
+      - .:/app
+      - .env:/app/.env
+      - ./exports:/app/exports 
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
 
-    redis:
-      image: redis:latest
-      ports:
-        - "6379:6379"
-      healthcheck:
-        test: ["CMD", "redis-cli", "ping"]
-        interval: 10s
-        timeout: 30s
-        retries: 3
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
 
-    db:
-      image: postgres:16-alpine
-      environment:
-        POSTGRES_DB: "${POSTGRES_DB}"
-        POSTGRES_USER: "${POSTGRES_USER}"
-        POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-      ports:
-        - "5432:5432"
-      volumes:
-        - postgres_data:/var/lib/postgresql/data/
-      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
-        interval: 10s
-        timeout: 30s
-        retries: 3
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
 
-  volumes:
-    postgres_data:
-      driver: local
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - static_volume:/app/static
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "8080:8080"
+    depends_on:
+      - web
+
+volumes:
+  postgres_data:
+    driver: local
+  static_volume:
+    driver: local

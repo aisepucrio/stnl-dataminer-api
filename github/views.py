@@ -12,13 +12,12 @@ from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
 from jobs.models import Task
-from jobs.tasks import (
+from .tasks import (
     fetch_commits,
     fetch_issues,
     fetch_pull_requests,
     fetch_branches,
-    fetch_metadata,
-    collect_all
+    fetch_metadata
 )
 from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
 from .models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest
@@ -27,8 +26,22 @@ from .serializers import (
     GitHubBranchSerializer,
     GitHubMetadataSerializer,
     GitHubIssuePullRequestSerializer,
-    GraphDashboardSerializer
+    GraphDashboardSerializer,
+    GitHubCollectAllSerializer,
+    ExportDataSerializer
 )
+from .utils import DateTimeHandler
+from django.http import JsonResponse, HttpResponse, FileResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.conf import settings
+from datetime import datetime
+import json
+import logging
+import csv
+import os
+
+logger = logging.getLogger(__name__)
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 100
@@ -65,6 +78,19 @@ class GitHubCommitViewSet(viewsets.ViewSet):
         if not repo_name:
             return Response(
                 {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -118,6 +144,19 @@ class GitHubIssueViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
         
         # Save the task in the database
@@ -165,6 +204,19 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
         if not repo_name:
             return Response(
                 {"error": "repo_name is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -576,24 +628,18 @@ class DashboardView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        if start_date or end_date:
-            try:
-                if start_date:
-                    start_datetime = timezone.datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                
-                if end_date:
-                    end_datetime = timezone.datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                
-                if start_date and end_date and start_datetime > end_datetime:
-                    return Response(
-                        {"error": "start_date must be before end_date"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            except ValueError:
-                return Response(
-                    {"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        try:
+            if start_date:
+                start_date = DateTimeHandler.parse_date(start_date)
+            if end_date:
+                end_date = DateTimeHandler.parse_date(end_date)
+            if start_date and end_date:
+                DateTimeHandler.validate_date_range(start_date, end_date)
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         issue_filters = {'data_type': 'issue'}
         pr_filters = {'data_type': 'pull_request'}
@@ -631,7 +677,7 @@ class DashboardView(APIView):
                     "forks_count": metadata.forks_count,
                     "stars_count": metadata.stars_count,
                     "watchers_count": metadata.watchers_count,
-                    "time_mined": metadata.time_mined
+                    "time_mined": DateTimeHandler.format_date(metadata.time_mined)
                 }
             except GitHubMetadata.DoesNotExist:
                 return Response(
@@ -651,46 +697,15 @@ class DashboardView(APIView):
         
         return Response(response_data)
 
-class GitHubCollectAllSerializer(serializers.Serializer):
-    repositories = serializers.ListField(
-        child=serializers.CharField(help_text="Nome do repositório no formato owner/repo"),
-        help_text="Lista de repositórios para minerar"
-    )
-    start_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data inicial para mineração (opcional)")
-    end_date = serializers.DateTimeField(required=False, allow_null=True, help_text="Data final para mineração (opcional)")
-    depth = serializers.ChoiceField(choices=['basic', 'complex'], default='basic', help_text="Profundidade da mineração (basic ou complex)")
-    collect_types = serializers.ListField(
-        child=serializers.ChoiceField(choices=['commits', 'issues', 'pull_requests', 'branches', 'metadata', 'comments']),
-        help_text="Lista de tipos de dados para minerar (commits, issues, pull_requests, branches, metadata, comments)"
-    )
-
-    def validate_collect_types(self, value):
-        if not value:
-            raise serializers.ValidationError("É necessário selecionar pelo menos um tipo de dado para minerar")
-        return value
-
-    def validate_repositories(self, value):
-        if not value:
-            raise serializers.ValidationError("É necessário fornecer pelo menos um repositório para minerar")
-        return value
-
-    def validate(self, data):
-        """
-        Validação adicional que força depth=complex quando comments está presente em collect_types
-        """
-        if 'comments' in data.get('collect_types', []):
-            data['depth'] = 'complex'
-        return data
-
 class GitHubCollectAllViewSet(viewsets.ViewSet):
     @extend_schema(
-        summary="Minerar dados selecionados de múltiplos repositórios",
+        summary="Mine selected data from multiple repositories",
         tags=["GitHub"],
-        description="Endpoint para minerar dados específicos de múltiplos repositórios simultaneamente",
+        description="Endpoint to mine specific data from multiple repositories simultaneously",
         request=GitHubCollectAllSerializer,
         responses={
-            202: OpenApiResponse(description="Tarefas iniciadas com sucesso"),
-            400: OpenApiResponse(description="Requisição inválida - parâmetros ausentes ou inválidos")
+            202: OpenApiResponse(description="Tasks successfully initiated"),
+            400: OpenApiResponse(description="Bad request - missing or invalid parameters")
         }
     )
     def create(self, request):
@@ -799,21 +814,21 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                             })
 
                 except Exception as e:
-                    print(f"Erro ao processar repositório {repo_name}: {str(e)}")
+                    print(f"Error processing repository {repo_name}: {str(e)}")
                     repo_results['error'] = str(e)
 
                 results.append(repo_results)
 
             return Response({
-                'message': 'Tarefas de mineração iniciadas com sucesso',
+                'message': 'Mining tasks successfully initiated',
                 'results': results
             }, status=status.HTTP_202_ACCEPTED)
 
         except Exception as e:
-            print(f"Erro na view collect-all: {str(e)}")
+            print(f"Error in collect-all view: {str(e)}")
             return Response({
                 'error': str(e),
-                'detail': 'Erro interno ao processar a requisição'
+                'detail': 'Internal error processing request'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @extend_schema(
@@ -1043,3 +1058,78 @@ class GraphDashboardView(APIView):
             response_data["repository_name"] = repository_name
         
         return Response(response_data)
+
+class ExportDataView(APIView):
+    @extend_schema(
+        summary="Export GitHub data",
+        tags=["GitHub"],
+        request=ExportDataSerializer,
+        responses={
+            200: OpenApiResponse(description="Exported data file"),
+            400: OpenApiResponse(description="Invalid parameters"),
+            404: OpenApiResponse(description="Table not found"),
+            500: OpenApiResponse(description="Server error")
+        }
+    )
+    def post(self, request):
+        serializer = ExportDataSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        table = serializer.validated_data['table']
+        ids = serializer.validated_data.get('ids', [])
+        format_type = serializer.validated_data['format']
+
+        model_mapping = {
+            'githubcommit': GitHubCommit,
+            'githubbranch': GitHubBranch,
+            'githubmetadata': GitHubMetadata,
+            'githubissuepullrequest': GitHubIssuePullRequest
+        }
+
+        if table not in model_mapping:
+            return Response(
+                {"error": f"Table '{table}' not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        model = model_mapping[table]
+        queryset = model.objects.all()
+
+        if ids:
+            queryset = queryset.filter(id__in=ids)
+
+        data = []
+        for obj in queryset:
+            obj_dict = {}
+            for field in obj._meta.fields:
+                value = getattr(obj, field.name)
+                if hasattr(value, 'id'):
+                    obj_dict[field.name] = value.id
+                else:
+                    obj_dict[field.name] = value
+            data.append(obj_dict)
+
+        if not data:
+            return Response(
+                {"error": "No data found to export"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        filename = f"{table}_export.json"
+
+        try:
+            response = HttpResponse(
+                json.dumps(data, default=str, indent=2),
+                content_type='application/json'
+            )
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            response['Access-Control-Expose-Headers'] = 'Content-Disposition'
+
+            return response
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error exporting data: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

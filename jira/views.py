@@ -8,12 +8,11 @@ from rest_framework import generics, status
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
 from jobs.models import Task
-from jobs.tasks import collect_jira_issues_task
+from jira.tasks import collect_jira_issues_task
 from .filters import JiraIssueFilter
 from .models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit
-from .serializers import JiraIssueSerializer, JiraIssueCollectSerializer
+from .serializers import JiraIssueSerializer
 
 import logging
 
@@ -380,7 +379,7 @@ class JiraDashboardView(APIView):
                     else:
                         latest_time_mined = None
 
-                    sprints_count = JiraSprint.objects.filter(issue__in=project_issues).count()
+                    sprints_count = JiraSprint.objects.filter(issues__in=project_issues).count()
                     comments_count = JiraComment.objects.filter(issue__in=project_issues).count()
                     commits_count = JiraCommit.objects.filter(issue__in=project_issues).count()
 
@@ -404,9 +403,9 @@ class JiraDashboardView(APIView):
                     )
             else:
                 projects = JiraProject.objects.all()
-                projects_list = [{"id": p.id, "name": p.name} for p in projects]
+                projects_list = [{"id": p.id, "name": f"{p.name} ({p.key})"} for p in projects]
 
-                sprints_count = JiraSprint.objects.filter(issue__in=issues_query).count()
+                sprints_count = JiraSprint.objects.filter(issues__in=issues_query).count()
                 comments_count = JiraComment.objects.filter(issue__in=issues_query).count()
                 commits_count = JiraCommit.objects.filter(issue__in=issues_query).count()
 
@@ -517,6 +516,7 @@ class JiraDashboardView(APIView):
 class JiraGraphDashboardView(APIView):
     def get(self, request):
         try:
+            logger.info(f"JiraGraphDashboardView called with params: {request.query_params}")
             project_id = request.query_params.get('project_id')
             start_date = request.query_params.get('start_date')
             end_date = request.query_params.get('end_date')
@@ -554,7 +554,7 @@ class JiraGraphDashboardView(APIView):
             base_issues = JiraIssue.objects.filter(**project_filter)
             base_comments = JiraComment.objects.filter(issue__in=base_issues)
             base_commits = JiraCommit.objects.filter(issue__in=base_issues)
-            base_sprints = JiraSprint.objects.filter(issue__in=base_issues)
+            base_sprints = JiraSprint.objects.filter(issues__in=base_issues)
 
             # Get the date range for display
             display_issues = base_issues.filter(**display_filters)
@@ -591,6 +591,7 @@ class JiraGraphDashboardView(APIView):
                     project = JiraProject.objects.get(id=project_id)
                     project_name = project.name
                 except JiraProject.DoesNotExist:
+                    logger.error(f"Project with ID {project_id} not found", exc_info=True)
                     project_name = None
 
             response_data = {
@@ -609,6 +610,7 @@ class JiraGraphDashboardView(APIView):
             return Response(response_data)
 
         except Exception as e:
+            logger.error(f"Error in JiraGraphDashboardView: {e}", exc_info=True)
             return Response(
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
