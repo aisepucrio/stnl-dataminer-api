@@ -5,12 +5,12 @@ from django.conf import settings
 from datetime import datetime
 import traceback
 
-from jobs.models import Task  # ⬅️ Importa o modelo que salvará o progresso
+from jobs.models import Task  # ⬅️ Imports the model that will save the progress
 
 
 @shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None):
-    # ⬇️ Cria ou atualiza o Task no banco de dados
+    # ⬇️ Creates or updates the Task in the database
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
@@ -23,13 +23,13 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
     try:
         print(f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}", flush=True)
 
-        # ⬇️ Passa o task_obj para o JiraMiner
+        # ⬇️ Passes the task_obj to the JiraMiner
         miner = JiraMiner(jira_domain, task_obj=task_obj)
         issues = miner.collect_jira_issues(project_key, issuetypes, start_date, end_date)
 
         print(f"✅ Collection completed: {issues['total_issues']} issues collected.", flush=True)
 
-        # ⬇️ Atualiza a task com sucesso
+        # ⬇️ Updates the task with success
         task_obj.status = "SUCCESS"
         task_obj.operation = f"✅ Collection completed: {issues['total_issues']} issues collected."
         task_obj.result = issues
@@ -43,7 +43,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
         }
 
     except JiraMiner.NoValidJiraTokenError as e:
-        print(f"[JiraTask] ❌ Sem token válido: {e}", flush=True)
+        print(f"[JiraTask] ❌ No valid token: {e}", flush=True)
         task_obj.status = "FAILURE"
         task_obj.error_type = "NO_VALID_JIRA_TOKEN"
         task_obj.error = str(e)
@@ -60,12 +60,12 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
         }
 
     except Exception as e:
-        print(f"❌ Erro inesperado ao coletar issues do Jira: {e}\n{traceback.format_exc()}", flush=True)
+        print(f"❌ Unexpected error while collecting Jira issues: {e}\n{traceback.format_exc()}", flush=True)
         task_obj.status = "FAILURE"
         task_obj.error_type = "UNEXPECTED_EXCEPTION"
         task_obj.error = str(e)
         task_obj.result = {"traceback": traceback.format_exc()}
-        task_obj.operation = f"❌ Erro inesperado: {str(e)}"
+        task_obj.operation = f"❌ Unexpected error: {str(e)}"
         task_obj.save(update_fields=["status", "error_type", "error", "result", "operation"])
 
         return {

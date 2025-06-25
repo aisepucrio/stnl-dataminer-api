@@ -1,6 +1,5 @@
 import os
 import requests
-import json
 from dotenv import load_dotenv
 from git import Repo, GitCommandError
 from pydriller import Repository
@@ -389,20 +388,6 @@ class GitHubMiner:
             print(f"Error updating repo: {e}", flush=True)
             raise Exception(f"Error updating repo: {e}")
 
-    def save_to_json(self, data, filename):
-        """Save data to a JSON file"""
-        try:
-            def datetime_handler(obj):
-                if isinstance(obj, datetime):
-                    return obj.isoformat()
-                raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2, default=datetime_handler)
-            print(f"Data successfully saved to {filename}")
-        except Exception as e:
-            print(f"Failed to save data to {filename}: {str(e)}")
-    
     def convert_to_iso8601(self, date):
         return date.isoformat()
 
@@ -554,10 +539,6 @@ class GitHubMiner:
 
                 essential_commits.append(commit_data)
 
-            print("\n[COMMITS] Saving data to JSON...", flush=True)
-            filename = f"{repo_name.replace('/', '_')}_commit_{commit_sha}.json" if commit_sha else f"{repo_name.replace('/', '_')}_commits.json"
-            self.save_to_json(essential_commits, filename)
-            print("[COMMITS] Detailed commits saved to database and JSON successfully.", flush=True)
             print(f"[COMMITS] Total commits processed: {len(essential_commits)}", flush=True)
             return essential_commits
 
@@ -656,7 +637,6 @@ class GitHubMiner:
                 response = requests.get(url, headers=self.headers)
             response.raise_for_status()
             branches = response.json()
-            self.save_to_json(branches, f"{repo_name.replace('/', '_')}_branches.json")
 
             for branch in branches:
                 current_timestamp = timezone.now()
@@ -668,7 +648,7 @@ class GitHubMiner:
                         'time_mined': current_timestamp
                     }
                 )
-            print("Branches successfully saved to database and JSON.", flush=True)
+            print("Branches successfully saved to database.", flush=True)
             return branches
         except requests.exceptions.RequestException as e:
             print(f"Error accessing branches: {e}", flush=True)
@@ -1133,9 +1113,7 @@ class GitHubMiner:
                     time.sleep(1)
 
             print("\n" + "="*50)
-            print("[PRs] 💾 Saving data to JSON...")
-            self.save_to_json(all_prs, f"{repo_name.replace('/', '_')}_pull_requests.json")
-            print(f"[PRs] ✨ Extraction completed! Total PRs collected: {len(all_prs)}")
+            print(f"[PRs] Extraction completed! Total PRs collected: {len(all_prs)}")
             print("="*50 + "\n")
             return all_prs
 
@@ -1318,9 +1296,7 @@ class GitHubMiner:
                 print(f"\n✅ Period completed: {period_issues_count} issues collected in {page} pages")
 
             print("\n" + "="*50)
-            print("💾 Saving data in JSON...")
-            self.save_to_json(all_issues, f"{repo_name.replace('/', '_')}_issues.json")
-            print(f"✨ Extraction completed! Total issues collected: {len(all_issues)}")
+            print(f"Extraction completed! Total issues collected: {len(all_issues)}")
             print("="*50 + "\n")
             return all_issues
 
