@@ -23,7 +23,7 @@ class JiraMiner:
         load_dotenv()
         self.jira_domain = jira_domain.strip()
         self.task_obj = task_obj 
-        self.log_progress(f"DEBUG received domain in JiraMiner: '{self.jira_domain}'")
+        self.log_progress(f"[DEBUG] received domain in JiraMiner: '{self.jira_domain}'")
 
 
         # Loading tokens
@@ -67,7 +67,7 @@ class JiraMiner:
                 url = f"https://{self.jira_domain}/rest/api/3/myself"
                 response = requests.get(url, headers=self.headers, auth=self.auth)
                 if response.status_code == 200:
-                    self.log_progress(f"Token {self.current_token_index + 1} is valid")
+                    print(f"Token {self.current_token_index + 1} is valid")
                     return
                 else:
                     self.log_progress(f"Token {self.current_token_index + 1} is invalid: {response.status_code}")
@@ -137,6 +137,24 @@ class JiraMiner:
 
         encoded_jql = quote(jql_query)
 
+
+        self.log_progress("Verificando o total de issues a serem mineradas...")
+        preflight_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&maxResults=0"
+        try:
+            preflight_response = requests.get(preflight_url, headers=self.headers, auth=self.auth)
+            if preflight_response.status_code != 200:
+
+                raise Exception(f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}")
+
+ 
+            total_issues_count = preflight_response.json().get('total', 0)
+            self.log_progress(f"Total de {total_issues_count} issues encontradas. Iniciando a coleta.")
+
+        except Exception as e:
+
+            return {"error": f"Não foi possível obter a contagem total de issues: {e}"}
+
+
         while True:
             jira_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&startAt={start_at}&maxResults={max_results}&expand=changelog"
             response = requests.get(jira_url, headers=self.headers, auth=self.auth)
@@ -151,7 +169,8 @@ class JiraMiner:
             if not issues:
                 break
 
-            for issue_data in issues:
+            for index, issue_data in enumerate(issues):
+                issue_count = total_collected + index + 1
                 fields = issue_data["fields"]
                 issue_id = issue_data["id"]
                 issue_key = issue_data["key"]
@@ -216,22 +235,7 @@ class JiraMiner:
                     }
                 )
 
-                created_date = parse_datetime(fields["created"]).strftime('%d/%m/%Y')
-
-                # # Verify sprint names(can be a single dict or a list of dicts)
-                sprints_data = fields.get("sprint")
-                sprint_names = ""
-
-                if sprints_data:
-                    if isinstance(sprints_data, dict):  # in case it comes as a single dict
-                        sprint_names = sprints_data.get("name", "")
-                    elif isinstance(sprints_data, list):  # list of dicts
-                        sprint_names = ", ".join(s.get("name", "") for s in sprints_data if isinstance(s, dict))
-
-                sprint_info = f" | Sprint: {sprint_names}" if sprint_names.strip() else ""
-
-                self.log_progress(f" Mined: {issue_key}, created in {created_date}{sprint_info}")
-
+                self.log_progress(f"Minerando issue {issue_count} de {total_issues_count}")
 
 
 
