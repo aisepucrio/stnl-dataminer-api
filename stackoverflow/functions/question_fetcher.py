@@ -2,8 +2,9 @@ import requests
 from datetime import datetime
 import time
 import logging
-from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag # Import StackQuestion and StackUser models
+from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment# Import StackQuestion and StackUser models
 from django.utils import timezone
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,60 @@ def create_answer(answer_data, question, owner):
     )
     return answer
 
+def create_comment(comment_data, parent, owner):
+    # figure out which FK to set
+    question_obj = parent if isinstance(parent, StackQuestion) else None
+    answer_obj   = parent if isinstance(parent, StackAnswer)  else None
+
+    comment, _ = StackComment.objects.get_or_create(
+        comment_id=comment_data.get('comment_id'),
+        defaults={
+            'post_type':       comment_data.get('post_type'),
+            'post_id':         comment_data.get('post_id'),
+            'body':            comment_data.get('body'),
+            'score':           comment_data.get('score', 0),
+            'creation_date':   comment_data.get('creation_date'),
+            'content_license': comment_data.get('content_license'),
+            'edited':          comment_data.get('edited', False),
+            'owner':           owner,
+            'body_markdown':   comment_data.get('body_markdown'),
+            'link':            comment_data.get('link'),
+            'time_mined':      int(time.time()),
+            'question':        question_obj,
+            'answer':          answer_obj,
+        }
+    )
+    return comment
+
+def make_question_serializable(question_data, stack_user, question_tags):
+    """Convert question data to JSON-serializable format"""
+    return {
+        'question_id': question_data['question_id'],
+        'title': question_data.get('title'),
+        'body': question_data.get('body'),
+        'creation_date': question_data.get('creation_date'),
+        'score': question_data.get('score', 0),
+        'view_count': question_data.get('view_count', 0),
+        'answer_count': question_data.get('answer_count', 0),
+        'comment_count': question_data.get('comment_count', 0),
+        'up_vote_count': question_data.get('up_vote_count', 0),
+        'down_vote_count': question_data.get('down_vote_count', 0),
+        'is_answered': question_data.get('is_answered', False),
+        'accepted_answer_id': question_data.get('accepted_answer_id'),
+        'tags': question_tags,
+        'owner': {
+            'user_id': stack_user.user_id if stack_user else None,
+            'display_name': stack_user.display_name if stack_user else None,
+            'reputation': stack_user.reputation if stack_user else None,
+        } if stack_user else None,
+        'share_link': question_data.get('share_link'),
+        'body_markdown': question_data.get('body_markdown'),
+        'link': question_data.get('link'),
+        'favorite_count': question_data.get('favorite_count', 0),
+        'content_license': question_data.get('content_license'),
+        'last_activity_date': question_data.get('last_activity_date'),
+        'time_mined': question_data.get('time_mined'),
+    }
 
 def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100):
     """
@@ -157,28 +212,25 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             response.raise_for_status()
             
             data = response.json()
-            logger.info(f"API Response Data: {data}")
+            # logger.info(f"API Response Data: {data}")
             
             if 'error_id' in data:
                 raise Exception(f"API Error: {data.get('error_message', 'Unknown error')}")
             
             # Process questions
             for item in data.get('items', []):
-                # print(item)
+                # Extract owner data and create/update user
                 owner_data = item.get('owner', {})
                 owner_id = owner_data.get('user_id')
-                # Creating user
+                stack_user = None
                 if owner_id:
                     stack_user = create_or_update_user(owner_id, owner_data)
-                
-                # Creating user from comments
-                comments = item.get('comments', [])
-                if (comments):
-                    for comment in comments:
-                        comment_data = comment.get('owner', {})
-                        comment_id = comment_data.get('user_id')
-                        create_or_update_user(comment_id, comment_data)
 
+                # Extract tags before creating question
+                question_tags = item.get('tags', [])
+                print(f"Extracted tags: {question_tags}")
+
+                # Create question data
                 question = {
                     'question_id': item['question_id'],
                     'title': item.get('title'),
@@ -190,10 +242,9 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     'comment_count': item.get('comment_count', 0),
                     'up_vote_count': item.get('up_vote_count', 0),
                     'down_vote_count': item.get('down_vote_count', 0),
-                    'tags': item.get('tags', []),
                     'is_answered': item.get('is_answered', False),
                     'accepted_answer_id': item.get('accepted_answer_id'),
-                    'owner': stack_user,  # Assign the StackUser object
+                    'owner': stack_user,
                     'share_link': item.get('share_link'),
                     'body_markdown': item.get('body_markdown'),
                     'link': item.get('link'),
@@ -203,64 +254,65 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     'time_mined': int(time.time()),
                 }
 
-                question_tags = question.pop('tags', [])  
-
+                # Create or update the question
                 stack_question, created = StackQuestion.objects.get_or_create(
                     question_id=question['question_id'],
                     defaults=question
                 )
-                questions.append(question)
+                
+                # Add question to return list
+                serializable_question = make_question_serializable(question, stack_user, question_tags)
+                questions.append(serializable_question)
 
-                # Creating user from answers and comments
+                # Process comments for the question
+                comments = item.get('comments', [])
+                if comments:
+                    for comment in comments:
+                        comment_owner_data = comment.get('owner', {})
+                        comment_owner_id = comment_owner_data.get('user_id')
+                        comment_owner = None
+                        if comment_owner_id:
+                            comment_owner = create_or_update_user(comment_owner_id, comment_owner_data)
+                        create_comment(comment, stack_question, comment_owner)
+
+                # Process answers and their comments
                 if item.get('is_answered'):
                     for answer in item.get('answers', []):
-                        # extract the owner so you can upsert the StackUser:
-                        owner_data = answer.get('owner', {})
-                        owner_id   = owner_data.get('user_id')
-                        stack_user = create_or_update_user(owner_id, owner_data)
-                        create_answer(answer, stack_question, stack_user)
-                        comments = answer.get('comments', [])
-                        if comments:
-                            for comment in comments:
-                                comment_data = comment.get('owner', {})
-                                comment_id = comment_data.get('user_id')
-                                create_or_update_user(comment_id, comment_data)
+                        # Create/update answer owner
+                        answer_owner_data = answer.get('owner', {})
+                        answer_owner_id = answer_owner_data.get('user_id')
+                        answer_owner = None
+                        if answer_owner_id:
+                            answer_owner = create_or_update_user(answer_owner_id, answer_owner_data)
+                        
+                        # Create answer
+                        stack_answer = create_answer(answer, stack_question, answer_owner)
+                        
+                        # Process answer comments
+                        answer_comments = answer.get('comments', [])
+                        if answer_comments:
+                            for comment in answer_comments:
+                                comment_owner_data = comment.get('owner', {})
+                                comment_owner_id = comment_owner_data.get('user_id')
+                                comment_owner = None
+                                if comment_owner_id:
+                                    comment_owner = create_or_update_user(comment_owner_id, comment_owner_data)
+                                create_comment(comment, stack_answer, comment_owner)
+
+                # Process tags - ADD MORE PRINT STATEMENTS
                 tag_objs = []
                 for tag_name in question_tags:
-                    tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
+                    print(f"Processing tag: {tag_name}")
+                    tag_obj, created = StackTag.objects.get_or_create(name=tag_name)
                     tag_objs.append(tag_obj)
+                    print(f"Tag '{tag_name}' {'created' if created else 'already exists'}")
 
-            # Finally assign them all at once
-            stack_question.tags.set(tag_objs)
-            question_tags = question.pop('tags', [])  
-
-            stack_question, created = StackQuestion.objects.get_or_create(
-                question_id=question['question_id'],
-                defaults=question
-            )
-            questions.append(question)
-
-            # Creating user from answers and comments
-            if item.get('is_answered'):
-                for answer in item.get('answers', []):
-                    # 1️⃣ extract the owner so you can upsert the StackUser:
-                    owner_data = answer.get('owner', {})
-                    owner_id   = owner_data.get('user_id')
-                    stack_user = create_or_update_user(owner_id, owner_data)
-                    create_answer(answer, stack_question, stack_user)
-                    comments = answer.get('comments', [])
-                    if comments:
-                        for comment in comments:
-                            comment_data = comment.get('owner', {})
-                            comment_id = comment_data.get('user_id')
-                            create_or_update_user(comment_id, comment_data)
-            tag_objs = []
-            for tag_name in question_tags:
-                tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
-                tag_objs.append(tag_obj)
-
-            # Finally assign them all at once
-            stack_question.tags.set(tag_objs)
+                # Assign tags to the question
+                try:
+                    stack_question.tags.set(tag_objs)
+                except Exception as e:
+                    print(f"ERROR: Failed to assign tags to question {question['question_id']}: {e}")
+                    raise
             
             logger.info(f"Processed {len(data.get('items', []))} questions")
             
@@ -271,12 +323,17 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             has_more = False
                 
         except requests.exceptions.RequestException as e:
+            print(f"REQUEST ERROR: {str(e)}")
             logger.error(f"Request error: {str(e)}")
             if 'rate limit' in str(e).lower():
                 logger.info("Rate limit hit, waiting 60 seconds...")
                 time.sleep(60)  # Wait for rate limit to reset
                 continue
             raise Exception(f"Failed to fetch questions: {str(e)}")
+        except Exception as e:
+            print(f"GENERAL ERROR: {str(e)}")
+            raise
     
     logger.info(f"Total questions fetched: {len(questions)}")
+    print(f"=== Total questions fetched: {len(questions)} ===")
     return questions 
