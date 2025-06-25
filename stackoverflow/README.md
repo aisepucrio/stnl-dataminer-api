@@ -30,35 +30,52 @@ Below is an overview of the main files and folders in this app:
 | `guide/`            | Contains guides for generating API tokens and setup (see referenced docs)   |
 
 ## Usage
-1. **Environment Setup**
-   - Ensure you have followed the main [README](../README.md#example-connecting-with-tableplus) and get your setup running.
-   - **Important notes from the main README:** 
-     1. Ensure you have Docker and Docker Compose installed, as the [Docker Desktop section](../README.md#1-docker-desktop) explains how to do this.
-     2. Recommended using TablePlus to easily manage and see what's happening in the database. This is also explained in the [tabelplus section](../README.md#example-connecting-with-tableplus).
-     3. Ensure you have a `.env` file updated as explained in the [.env section](../README.md#2-configure-a-file-named-env)
-   - Follow the guide for creating **Stack Api Key** and **Stack Access Token**. This is explained [here](guide/generateAccessToken.md)
-   - Put your `STACK_API_KEY` and your `STACK_ACCESS_TOKEN` in the `.env` file, and make sure it contains the following:
-     ```
-     GITHUB_TOKENS="your_github_token"
-     ...
-     other fields
-     ...
-     POSTGRES_PORT=5432
-     STACK_API_KEY="you_api_key"
-     STACK_ACCESS_TOKEN="your_token"
-     ```
-   - If you have followed the instructions in the main readme file, and these steps above. Run this command
-     ```
-     docker compose up --build
-     ``` 
 
-3. **Admin Interface:**
-   - After setting up the enviroment variables you can access the Django admin interface at `http://localhost:8000/`.
-   - You can go down to the StackOverflow section and look at the two current funcitons. Collect-questions and Re-populate-data. 
+### 1. Environment Setup
 
-3. **Explination of the functions:**
-   - **Collect-questions:** This function fetches 100 questions at a time. You can yourself change the date of which period you want to fetch questions. This is by edting the **start** and **end** date on the infterface.  The functions starts when a user clicks on the **Execute**-button. It then fetches the questions, comments, answers and corresponding users and stores them in the database. 
-  - **Re-populate-data:** The `collect-questions` function retrieves a large amount of data, but some fields, such as user information, may be incomplete because they aren't provided in that specific API call. Therefore, we perform an additional request to fill in the missing fields and create more complete and consistent connections between the data. This function is triggered when you click on the **Execute**-button.
+1. **Follow the main [README](../README.md)** to set up Docker, and your `.env` file.
+2. **Follow the guide [here](/guide/generateAccessToken.md)** to generate a Stack Exchange API token.
+3. **Add Stack Overflow credentials** to your `.env`:
+    ```
+    STACK_API_KEY="your_api_key"
+    STACK_ACCESS_TOKEN="your_token"
+    ```
+4. **Start the application:**
+    ```sh
+    docker compose up --build
+    ```
+
+> **Tip:** Use TablePlus (see main README) to inspect the database. This is a great tool for inspecting your database.
+
+---
+
+### 2. Accessing the Admin Interface
+
+- Go to [http://localhost:8000/](http://localhost:8000/) in your browser.
+- Log in with your Django superuser credentials.
+- Scroll to the **StackOverflow** section to find:
+  - **Collect-questions**
+  - **Re-populate-data**
+
+---
+
+### 3. Explanation of Functions
+
+- **Collect-questions**
+  - Fetches 100 questions at a time (pagination required for more).
+  - You can set the date range using the **start** and **end** fields in the admin interface.
+  - Click **Execute** to start. The function fetches questions, comments, answers, and users, and stores them in the database.
+
+- **Re-populate-data**
+  - Fills in missing user and relational data not provided in the initial API call.
+  - Triggered by clicking **Execute** in the admin interface.
+
+---
+
+### 4. Notes
+
+- All data interaction is currently via the Django admin interface.
+- For troubleshooting, see the section below.
 
 ## Having issues / Troubleshooting
 - **Missing API Key/Token:** Ensure `STACK_API_KEY` and `STACK_ACCESS_TOKEN` are set in your environment (`.env`) or Django settings.
