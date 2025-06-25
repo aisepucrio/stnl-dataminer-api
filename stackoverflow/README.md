@@ -1,7 +1,7 @@
 # StackOverflow Django App
 
 ## Overview
-This Django app is responsible for mining, storing, and managing Stack Overflow user data, badges, collectives, and related metadata as part of the larger RAISE data mining platform. It integrates with the Stack Exchange API and keeps Stack Overflow-related data up to date in the local database.
+This Django app is responsible for mining, storing, and managing Stack Overflow user data, badges, collectives, and related metadata as part of the larger RAISE data mining platform. It integrates with the Stack Exchange API and keeps Stack Overflow-related data up to date in the local database. In order to use this part of RAISE follow the [usage section](#usage)
 
 ## Features
 - Fetches and updates Stack Overflow user profiles
@@ -52,7 +52,6 @@ Below is an overview of the main files and folders in this app:
 ### 2. Accessing the Admin Interface
 
 - Go to [http://localhost:8000/](http://localhost:8000/) in your browser.
-- Log in with your Django superuser credentials.
 - Scroll to the **StackOverflow** section to find:
   - **Collect-questions**
   - **Re-populate-data**
@@ -91,7 +90,7 @@ Below is an overview of the main files and folders in this app:
 - **Logging:** Check the console output for detailed logs and errors.
 
 ## Known Limitations
-- Paginazation is required, can not collect more than 100 objects each api call.
+- Pagination is required, can not collect more than 100 objects each api call.
 - Data is currently saved locally, not directly to the main database like the GitHub and Jira apps.
 - Celery-based parallel data mining is not yet implemented (intended for future work).
 - The api will call backoff if the miner is requesting too much too fast. (Not known what waiting time should be used.)
@@ -99,7 +98,7 @@ Below is an overview of the main files and folders in this app:
 ## Future Work
 - Currently this part of RAISE saves locally. Should save the data to the database, like Github and Jira.
 - Add a more comprehensive mining script that fetches more data and updates more frequently. Currently, it only fetches 100 questions and the corresponding data. The other function is populating missing columns from the first call.
-- Parrallelize data mining tasks. Using cellery like the other two (Github and Jira).
+- Parallelize data mining tasks. Using celery like the other two (Github and Jira).
 - Make tests for this part of the app.
 - Improve error handling and retry logic for unstable API responses
 - Expand coverage to additional Stack Exchange sites beyond Stack Overflow.  
