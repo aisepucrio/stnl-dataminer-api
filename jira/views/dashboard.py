@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
                 "If project_name is provided, returns detailed stats for that project.",
     parameters=[
         OpenApiParameter(
+            name="project_id",
+            description="ID of the project to get statistics for. If not provided, returns aggregated stats for all projects.",
+            required=False,
+            type=int
+        ),
+        OpenApiParameter(
             name="project_name",
             description="Name of the project to get statistics for. If not provided, returns aggregated stats for all projects.",
             required=False,
@@ -207,7 +213,7 @@ class JiraDashboardView(APIView):
             name='project_id',
             description='ID of the project to get statistics for',
             required=False,
-            type=str
+            type=int
         ),
         OpenApiParameter(
             name='start_date',
