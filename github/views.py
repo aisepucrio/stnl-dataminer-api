@@ -499,7 +499,7 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
 @extend_schema(
     tags=["GitHub"],
     summary="Dashboard statistics",
-    description="Provides statistics about repositories, issues, pull requests, and commits. "
+    description="Provides statistics about repositories, issues, pull requests, commits, and unique commit users. "
                 "If repository_id is provided, returns detailed stats for that repository.",
     parameters=[
         OpenApiParameter(
@@ -545,7 +545,8 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                         }
                     },
                     "nullable": True
-                }
+                },
+                "users_count": {"type": "integer", "description": "Number of unique commit users"}
             }
         },
         400: {
@@ -575,7 +576,8 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                 "forks_count": 25,
                 "stars_count": 100,
                 "watchers_count": 30,
-                "time_mined": "2024-01-01T12:00:00Z"
+                "time_mined": "2024-01-01T12:00:00Z",
+                "users_count": 10
             },
             summary="Example with repository_id"
         ),
@@ -592,7 +594,8 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                     {"id": 3, "repository": "owner/repo3"},
                     {"id": 4, "repository": "owner/repo4"},
                     {"id": 5, "repository": "owner/repo5"}
-                ]
+                ],
+                "users_count": 25
             },
             summary="Example without repository_id showing multiple repositories"
         ),
@@ -607,7 +610,8 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
                 "forks_count": 0,
                 "stars_count": 0,
                 "watchers_count": 0,
-                "time_mined": "2024-01-01T12:00:00Z"
+                "time_mined": "2024-01-01T12:00:00Z",
+                "users_count": 0
             },
             summary="Example of repository with no activity"
         )
@@ -677,7 +681,8 @@ class DashboardView(APIView):
                     "forks_count": metadata.forks_count,
                     "stars_count": metadata.stars_count,
                     "watchers_count": metadata.watchers_count,
-                    "time_mined": DateTimeHandler.format_date(metadata.time_mined)
+                    "time_mined": DateTimeHandler.format_date(metadata.time_mined),
+                    "users_count": commits_query.values('author').distinct().count(),
                 }
             except GitHubMetadata.DoesNotExist:
                 return Response(
@@ -692,7 +697,8 @@ class DashboardView(APIView):
                 "pull_requests_count": prs_query.count(),
                 "commits_count": commits_query.count(),
                 "repositories_count": repositories.count(),
-                "repositories": list(repositories)
+                "repositories": list(repositories),
+                "users_count": commits_query.values('author').distinct().count(),
             }
         
         return Response(response_data)
