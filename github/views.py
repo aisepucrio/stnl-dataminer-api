@@ -1,16 +1,21 @@
+import json
+import logging
+
 from django.db.models import Count
 from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+from django.http import HttpResponse
 from django.urls import reverse
-from django.utils import timezone
+
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics, serializers, status, viewsets
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
+from rest_framework import generics, status, viewsets
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.test import APIClient
 from rest_framework.views import APIView
-from rest_framework.pagination import PageNumberPagination
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
+
 from jobs.models import Task
 from .tasks import (
     fetch_commits,
@@ -19,8 +24,7 @@ from .tasks import (
     fetch_branches,
     fetch_metadata
 )
-from .filters import GitHubCommitFilter, GitHubBranchFilter, GitHubIssuePullRequestFilter
-from .models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest
+from .models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest, GitHubAuthor
 from .serializers import (
     GitHubCommitSerializer,
     GitHubBranchSerializer,
@@ -28,18 +32,11 @@ from .serializers import (
     GitHubIssuePullRequestSerializer,
     GraphDashboardSerializer,
     GitHubCollectAllSerializer,
-    ExportDataSerializer
+    ExportDataSerializer,
+    GitHubAuthorSerializer
 )
 from .utils import DateTimeHandler
-from django.http import JsonResponse, HttpResponse, FileResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.conf import settings
-from datetime import datetime
-import json
-import logging
-import csv
-import os
+from utils.lookup import get_filterset_fields as _get_filterset_fields, get_search_fields as _get_search_fields
 
 logger = logging.getLogger(__name__)
 
@@ -284,9 +281,9 @@ class CommitListView(generics.ListAPIView):
     queryset = GitHubCommit.objects.all()
     serializer_class = GitHubCommitSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = GitHubCommitFilter
-    search_fields = ['message', 'author__name']
-    ordering_fields = ['date']
+    filterset_fields = _get_filterset_fields(GitHubCommit)
+    search_fields = _get_search_fields(GitHubCommit)
+    ordering_fields = '__all__'
     pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub commit")
@@ -300,9 +297,9 @@ class IssueListView(generics.ListAPIView):
     queryset = GitHubIssuePullRequest.objects.filter(data_type='issue')
     serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = GitHubIssuePullRequestFilter
-    search_fields = ['title', 'creator']
-    ordering_fields = ['created_at', 'updated_at']
+    filterset_fields = _get_filterset_fields(GitHubIssuePullRequest)
+    search_fields = _get_search_fields(GitHubIssuePullRequest)
+    ordering_fields = '__all__'
     pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub issue")
@@ -316,9 +313,9 @@ class PullRequestListView(generics.ListAPIView):
     queryset = GitHubIssuePullRequest.objects.filter(data_type='pull_request')
     serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = GitHubIssuePullRequestFilter
-    search_fields = ['title', 'creator']
-    ordering_fields = ['created_at', 'updated_at']
+    filterset_fields = _get_filterset_fields(GitHubIssuePullRequest)
+    search_fields = _get_search_fields(GitHubIssuePullRequest)
+    ordering_fields = '__all__'
     pagination_class = StandardResultsSetPagination
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub pull request")
@@ -331,9 +328,11 @@ class PullRequestDetailView(generics.RetrieveAPIView):
 class BranchListView(generics.ListAPIView):
     queryset = GitHubBranch.objects.all()
     serializer_class = GitHubBranchSerializer
-    filter_backends = [DjangoFilterBackend]
-    filterset_class = GitHubBranchFilter
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = _get_filterset_fields(GitHubBranch)
+    search_fields = _get_search_fields(GitHubBranch)
     pagination_class = StandardResultsSetPagination
+    ordering_fields = '__all__'
 
 @extend_schema(tags=["GitHub"], summary="Retrieve a specific GitHub branch")
 class BranchDetailView(generics.RetrieveAPIView):
@@ -390,8 +389,9 @@ class MetadataListView(generics.ListAPIView):
     queryset = GitHubMetadata.objects.all()
     serializer_class = GitHubMetadataSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    search_fields = ['repository', 'language']
-    ordering_fields = ['stars_count', 'forks_count', 'created_at', 'updated_at']
+    filterset_fields = _get_filterset_fields(GitHubMetadata)
+    search_fields = _get_search_fields(GitHubMetadata)
+    ordering_fields = '__all__'
     pagination_class = StandardResultsSetPagination
 
 class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
@@ -442,14 +442,24 @@ class IssuePullRequestListView(generics.ListAPIView):
     queryset = GitHubIssuePullRequest.objects.all()
     serializer_class = GitHubIssuePullRequestSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_class = GitHubIssuePullRequestFilter
-    search_fields = ['title', 'creator']
-    ordering_fields = ['created_at', 'updated_at']
+    filterset_fields = _get_filterset_fields(GitHubIssuePullRequest)
+    search_fields = _get_search_fields(GitHubIssuePullRequest)
+    ordering_fields = _get_filterset_fields(GitHubIssuePullRequest)
+    pagination_class = StandardResultsSetPagination
 
 class IssuePullRequestDetailView(generics.RetrieveAPIView):
     queryset = GitHubIssuePullRequest.objects.all()
     serializer_class = GitHubIssuePullRequestSerializer
     lookup_field = 'record_id'
+
+class UserListView(generics.ListAPIView):
+    queryset = GitHubAuthor.objects.all()
+    serializer_class = GitHubAuthorSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = _get_filterset_fields(GitHubAuthor)
+    search_fields = _get_search_fields(GitHubAuthor)
+    ordering_fields = "__all__"
+    pagination_class = StandardResultsSetPagination
 
 class GitHubCommitByShaViewSet(viewsets.ViewSet):
     @extend_schema(

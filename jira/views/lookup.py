@@ -8,22 +8,7 @@ from drf_spectacular.utils import extend_schema
 from jira.models import JiraIssue, JiraProject, JiraSprint, JiraComment, JiraCommit, JiraUser, JiraChecklist, JiraIssueType, JiraIssueLink, JiraActivityLog, JiraHistory, JiraHistoryItem
 from jira.serializers import JiraIssueSerializer, JiraProjectSerializer, JiraUserSerializer, JiraSprintSerializer, JiraCommentSerializer, JiraChecklistSerializer, JiraIssueTypeSerializer, JiraIssueLinkSerializer, JiraCommitSerializer, JiraActivityLogSerializer, JiraHistorySerializer, JiraHistoryItemSerializer
 
-def _get_filterset_fields(model):
-    """Generate filterset_fields dictionary for django-filters"""
-    filterset_fields = {}
-    for field in model._meta.fields:
-        if isinstance(field, models.JSONField):
-            continue
-        elif isinstance(field, (models.DateField, models.TimeField, models.DateTimeField)):
-            filterset_fields[field.name] = ['exact', 'gte', 'lte', 'year', 'month', 'day']
-        elif isinstance(field, (models.CharField, models.TextField)):
-            filterset_fields[field.name] = ['exact', 'icontains', 'iexact']
-        elif isinstance(field, (models.IntegerField, models.FloatField, models.DecimalField)):
-            filterset_fields[field.name] = ['exact', 'gte', 'lte']
-        else:
-            filterset_fields[field.name] = ['exact']
-    
-    return filterset_fields
+from utils.lookup import get_filterset_fields as _get_filterset_fields, get_search_fields as _get_search_fields
 
 class StandardPagination(PageNumberPagination):
     page_size = 100
@@ -34,31 +19,33 @@ class StandardPagination(PageNumberPagination):
     tags=['Jira']
 )
 class JiraProjectListView(generics.ListAPIView):
-    queryset = JiraProject.objects.all()
+    queryset = JiraProject.objects.all().order_by('id')
     serializer_class = JiraProjectSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = _get_filterset_fields(JiraProject)
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraProject)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraUserListView(generics.ListAPIView):
-    queryset = JiraUser.objects.all()
+    queryset = JiraUser.objects.all().order_by('accountId')
     serializer_class = JiraUserSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = _get_filterset_fields(JiraUser)
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraUser)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraIssueListView(generics.ListAPIView):
-    queryset = JiraIssue.objects.all()
+    queryset = JiraIssue.objects.all().order_by('issue_id')
     serializer_class = JiraIssueSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
@@ -67,17 +54,17 @@ class JiraIssueListView(generics.ListAPIView):
         'project__id': ['exact']
     }
     ordering_fields = '__all__'
-    search_fields = ['summary', 'description']
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraIssue)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraChecklistListView(generics.ListAPIView):
-    queryset = JiraChecklist.objects.all()
+    queryset = JiraChecklist.objects.all().order_by('id')
     serializer_class = JiraChecklistSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraChecklist),
         'issue__project': ['exact'],
@@ -85,15 +72,16 @@ class JiraChecklistListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraChecklist)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraIssueTypeListView(generics.ListAPIView):
-    queryset = JiraIssueType.objects.all()
+    queryset = JiraIssueType.objects.all().order_by('id')
     serializer_class = JiraIssueTypeSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraIssueType),
         'issue__project': ['exact'],
@@ -101,15 +89,16 @@ class JiraIssueTypeListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraIssueType)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraSprintListView(generics.ListAPIView):
-    queryset = JiraSprint.objects.all()
+    queryset = JiraSprint.objects.all().order_by('id')
     serializer_class = JiraSprintSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraSprint),
         'issues__project': ['exact'],
@@ -117,15 +106,16 @@ class JiraSprintListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraSprint)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraCommentListView(generics.ListAPIView):
-    queryset = JiraComment.objects.all()
+    queryset = JiraComment.objects.all().order_by('id')
     serializer_class = JiraCommentSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraComment),
         'issue__project': ['exact'],
@@ -133,15 +123,16 @@ class JiraCommentListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraComment)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraIssueLinkListView(generics.ListAPIView):
-    queryset = JiraIssueLink.objects.all()
+    queryset = JiraIssueLink.objects.all().order_by('id')
     serializer_class = JiraIssueLinkSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraIssueLink),
         'issue__project': ['exact'],
@@ -151,15 +142,16 @@ class JiraIssueLinkListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraIssueLink)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraCommitListView(generics.ListAPIView):
-    queryset = JiraCommit.objects.all()
+    queryset = JiraCommit.objects.all().order_by('id')
     serializer_class = JiraCommitSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraCommit),
         'issue__project': ['exact'],
@@ -167,15 +159,16 @@ class JiraCommitListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraCommit)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraActivityLogListView(generics.ListAPIView):
-    queryset = JiraActivityLog.objects.all()
+    queryset = JiraActivityLog.objects.all().order_by('id')
     serializer_class = JiraActivityLogSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraActivityLog),
         'issue__project': ['exact'],
@@ -183,15 +176,16 @@ class JiraActivityLogListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraActivityLog)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraHistoryListView(generics.ListAPIView):
-    queryset = JiraHistory.objects.all()
+    queryset = JiraHistory.objects.all().order_by('id')
     serializer_class = JiraHistorySerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraHistory),
         'issue__project': ['exact'],
@@ -199,15 +193,16 @@ class JiraHistoryListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraHistory)
 
 
 @extend_schema(
     tags=['Jira']
 )
 class JiraHistoryItemListView(generics.ListAPIView):
-    queryset = JiraHistoryItem.objects.all()
+    queryset = JiraHistoryItem.objects.all().order_by('id')
     serializer_class = JiraHistoryItemSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = {
         **_get_filterset_fields(JiraHistoryItem),
         'history__issue__project': ['exact'],
@@ -215,3 +210,4 @@ class JiraHistoryItemListView(generics.ListAPIView):
     }
     ordering_fields = '__all__'
     pagination_class = StandardPagination
+    search_fields = _get_search_fields(JiraHistoryItem)
