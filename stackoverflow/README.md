@@ -98,7 +98,7 @@ Below is an overview of the main files and folders in this app:
 ## Future Work
 - Currently this part of RAISE saves locally. Should save the data to the database, like Github and Jira.
 - Add a more comprehensive mining script that fetches more data and updates more frequently. Currently, it only fetches 100 questions and the corresponding data. The other function is populating missing columns from the first call.
-- Parallelize data mining tasks. Using celery like the other two (Github and Jira).
+- Parallelize data mining tasks. Using celery like the other two (Github and Jira). The current implementation is incomplete and would possibly need to use several access tokens in parallell to avoid rate limiting. 
 - Make tests for this part of the app.
 - Improve error handling and retry logic for unstable API responses
 - Expand coverage to additional Stack Exchange sites beyond Stack Overflow.  
