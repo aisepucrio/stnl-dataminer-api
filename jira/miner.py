@@ -24,6 +24,7 @@ from .models import (
     JiraIssueType
 )
 
+
 class JiraMiner:
     class NoValidJiraTokenError(Exception):
         """Invalid token or all tokens have expired."""
@@ -48,22 +49,23 @@ class JiraMiner:
         self.update_auth()
         self.verify_token()
 
+
     def log_progress(self, message):
         print(message, flush=True)
         if self.task_obj:
             self.task_obj.operation = message
             self.task_obj.save(update_fields=["operation"])
-            print(f"[DEBUG] Salvo em Task.operation: {self.task_obj.operation}", flush=True)
             from jobs.models import Task
             refreshed = Task.objects.get(pk=self.task_obj.pk)
-            print(f"[DEBUG] Valor no banco após save: {refreshed.operation}", flush=True)
-
         
+
     def update_auth(self):
         self.auth = HTTPBasicAuth(self.jira_email, self.tokens[self.current_token_index])
 
+
     def _get_auth(self):
         return HTTPBasicAuth(self.jira_email, self.tokens[self.current_token_index])
+
 
     def switch_token(self):
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
@@ -114,6 +116,7 @@ class JiraMiner:
             return True
 
         return False
+
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         max_results, start_at, total_collected = 100, 0, 0
@@ -245,7 +248,7 @@ class JiraMiner:
                     }
                 )
 
-                self.log_progress(f"Minerando issue {issue_count} de {total_issues_count}")
+                self.log_progress(f"Mining issue {issue_count} of {total_issues_count}. Key: {issue_key} - {fields['summary']}")
 
 
 
@@ -263,6 +266,7 @@ class JiraMiner:
                 break
 
         return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
+
 
     def get_commits_for_issue(self, issue_key):
         jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueIdOrKey={issue_key}&applicationType=git&dataType=repository"
@@ -286,6 +290,7 @@ class JiraMiner:
                         'url': commit.get('url')
                     })
         return commits
+
 
     def get_comments_for_issue(self, issue_key):
         """
@@ -323,6 +328,7 @@ class JiraMiner:
             })
             
         return comments
+
 
     def get_issue_history(self, issue_key):
         """
@@ -368,6 +374,7 @@ class JiraMiner:
             
         return history
     
+
     def get_activity_log(self, issue_key):
         """
         Collects the activity log of a Jira issue, focusing on:
@@ -460,6 +467,7 @@ class JiraMiner:
         activities.sort(key=lambda x: x['created'], reverse=True)
         return activities
         
+
     def get_checklist(self, issue_key):
         """
         Collects the checklist of a Jira issue.
@@ -515,6 +523,7 @@ class JiraMiner:
         
         return checklist
     
+
     def extract_checklist_from_description(self, description):
         """
         Tries to extract checklist items from the description of an issue.
@@ -549,6 +558,7 @@ class JiraMiner:
         traverse_content(description.get('content', []))
         return checklist_items
     
+
     def get_custom_fields_mapping(self):
         url = f"https://{self.jira_domain}/rest/api/3/field"
         response = requests.get(url, headers=self.headers, auth=self.auth)
@@ -562,6 +572,7 @@ class JiraMiner:
         fields = response.json()
         return {field['id']: field['name'] for field in fields if field['id'].startswith('customfield_')}
         
+
     def extract_words_from_description(self, description):
         """
         Extracts all words from the description of a Jira issue, handling cases where the field is empty or nonexistent.
@@ -615,6 +626,7 @@ class JiraMiner:
         issue_json['fields'] = updated_fields
         return issue_json
 
+
     def validate_and_parse_date(self, date_string):
         formats = ["%Y-%m-%d", "%Y-%m-%d %H:%M"]
         for fmt in formats:
@@ -641,6 +653,7 @@ class JiraMiner:
         )
         return user_obj
 
+
     def save_comments(self, issue_key, issue_obj):
         comments = self.get_comments_for_issue(issue_key)
         for c in comments:
@@ -654,6 +667,7 @@ class JiraMiner:
                     'updated': parse_datetime(c['updated'])
                 }
             )
+
 
     def save_history(self, issue_key, issue_obj):
         history_list = self.get_issue_history(issue_key)
@@ -678,6 +692,7 @@ class JiraMiner:
                         'toString': item['toString']
                     }
                 )
+
 
     def save_activity(self, issue_key, issue_obj):
         activities = self.get_activity_log(issue_key)
@@ -704,6 +719,7 @@ class JiraMiner:
                 }
             )
 
+
     def save_commits(self, issue_key, issue_obj):
         commits = self.get_commits_for_issue(issue_key)
         for c in commits:
@@ -718,6 +734,7 @@ class JiraMiner:
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
             )
+                
                 
     def save_sprints(self, fields, issue_obj):      
         sprints_data = fields.get("sprint")

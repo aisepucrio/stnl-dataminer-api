@@ -332,10 +332,10 @@ class JiraGraphDashboardView(APIView):
             commits_data = []
             sprints_data = []
             
-            base_issues = JiraIssue.objects.filter(**project_filter)
-            base_comments = JiraComment.objects.filter(issue__in=base_issues)
-            base_commits = JiraCommit.objects.filter(issue__in=base_issues)
-            base_sprints = JiraSprint.objects.filter(issues__in=base_issues)
+            base_issues = JiraIssue.objects.filter(**project_filter).distinct()
+            base_comments = JiraComment.objects.filter(issue__in=base_issues).distinct()
+            base_commits = JiraCommit.objects.filter(issue__in=base_issues).distinct()
+            base_sprints = JiraSprint.objects.filter(issues__in=base_issues).distinct()
 
             # Get the date range for display
             display_issues = base_issues.filter(**display_filters)
@@ -380,7 +380,7 @@ class JiraGraphDashboardView(APIView):
                     "labels": date_range,
                     "issues": issues_list,
                     "comments": comments_list,
-                    "commits": commits_list,
+                    # "commits": commits_list,
                     "sprints": sprints_list
                 }
             }

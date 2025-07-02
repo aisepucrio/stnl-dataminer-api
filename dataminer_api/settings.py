@@ -175,8 +175,8 @@ REST_FRAMEWORK = {
 }
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Diggit API',
-    'DESCRIPTION': 'A Django-based API designed for mining and analyzing software development data.',
+    'TITLE': 'RAISE',
+    'DESCRIPTION': 'A Django-based API designed for mining and analyzing software engineering data.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
