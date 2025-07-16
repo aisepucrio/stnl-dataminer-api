@@ -31,6 +31,8 @@ services:
       GITHUB_TOKENS: "${GITHUB_TOKENS}"
       JIRA_EMAIL: "${JIRA_EMAIL}"
       JIRA_API_TOKEN: "${JIRA_API_TOKEN}"
+      STACK_API_KEY: "${STACK_API_KEY}"
+      STACK_ACCESS_TOKEN: "${STACK_ACCESS_TOKEN}"
 
   worker:
     build: .

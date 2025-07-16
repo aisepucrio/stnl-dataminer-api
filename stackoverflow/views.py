@@ -1,15 +1,22 @@
+# --- TRECHO CORRIGIDO (Imports) ---
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
-from django.db import transaction
 from datetime import datetime
-from .models import StackQuestion, StackTag
-from .miner import StackOverflowMiner
+from django.conf import settings  # Adicionado para buscar chaves da API de forma segura
+
+# Importa a função que realmente faz o trabalho
+from .functions.question_fetcher import fetch_questions 
+# Mantemos este import para a outra função que não vamos mexer agora
+from .functions.data_populator import populate_missing_data 
+
+# Mantemos os imports da documentação e de outros módulos
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiParameter
-from .functions.data_populator import populate_missing_data
-import os
-from dotenv import load_dotenv
+import logging # Adicionado para registrar erros no terminal
+
+# Cria um logger para este módulo
+logger = logging.getLogger(__name__)
 
 @extend_schema_view(
     collect_answers=extend_schema(
@@ -187,88 +194,79 @@ class StackOverflowViewSet(viewsets.ViewSet):
     Provides endpoints for collecting questions and populating db with all necessary data.
     """
     
-    @action(detail=False, methods=['post'])
+# --- TRECHO CORRIGIDO (Função collect_questions) ---
+    @action(detail=False, methods=['post'], url_path='collect-questions')
     def collect_questions(self, request):
         """
-        Collect all questions from Stack Overflow within a date range
-        
-        Parameters:
-        - site: The site to fetch from (default: stackoverflow)
-        - start_date: Start date in ISO format (YYYY-MM-DD)
-        - end_date: End date in ISO format (YYYY-MM-DD)
+        Coleta perguntas do Stack Overflow baseado em um intervalo de datas.
         """
         try:
-            # Get and validate parameters
+            # Pega os parâmetros do corpo da requisição do Bruno
             site = request.data.get('site', 'stackoverflow')
             start_date = request.data.get('start_date')
             end_date = request.data.get('end_date')
 
-            # Validate dates
-            try:
-                start = datetime.strptime(start_date, '%Y-%m-%d')
-                end = datetime.strptime(end_date, '%Y-%m-%d')
-            except ValueError:
-                return Response({
-                    'error': 'Invalid date format. Use YYYY-MM-DD'
-                }, status=status.HTTP_400_BAD_REQUEST)
+            # Validações básicas de data
+            if not start_date or not end_date:
+                return Response({'error': 'start_date e end_date são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            datetime.strptime(start_date, '%Y-%m-%d')
+            datetime.strptime(end_date, '%Y-%m-%d')
 
-            # Validate date range
-            if end < start:
-                return Response({
-                    'error': 'End date must be after start date'
-                }, status=status.HTTP_400_BAD_REQUEST)
+            print(f"▶️  API: Iniciando coleta de {start_date} a {end_date}")
+            
+            # AQUI ESTÁ A "PONTE": Chamamos diretamente a sua função original
+            questions_result = fetch_questions(
+                site=site,
+                start_date=start_date,
+                end_date=end_date,
+                api_key=settings.STACK_API_KEY,
+                access_token=settings.STACK_ACCESS_TOKEN
+            )
+            
+            total_questions = len(questions_result)
 
-            # Initialize miner and get questions
-            miner = StackOverflowMiner()
-            try:
-                questions = miner.get_questions(
-                    site=site,
-                    start_date=start_date,
-                    end_date=end_date
-                )
-            except Exception as e:
-                if 'rate limit' in str(e).lower():
-                    return Response({
-                        'error': 'Stack Overflow API rate limit exceeded. Please try again later.'
-                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
-                raise
-
-            # Prepare response
+            print(f"✅ API: Coleta finalizada. {total_questions} perguntas processadas.")
+            
             return Response({
-                'message': 'Successfully collected questions',
-                'total_questions': len(questions)
+                'message': 'Coleta de perguntas executada com sucesso.',
+                'total_questions_processed': total_questions
             }, status=status.HTTP_200_OK)
 
+        except ValueError:
+            return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({
-                'error': f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=False, methods=['post'])
+            logger.error(f"Erro inesperado em collect_questions: {e}", exc_info=True)
+            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    # --- TRECHO CORRIGIDO ---
+    @action(detail=False, methods=['post'], url_path='re-populate-data')
     def re_populate_data(self, request):
         """
-        Re-populate user data including badges, collectives, and other user-related information.
+        Inicia o processo de enriquecimento dos dados de usuários já coletados.
         """
         try:
-            # Load credentials
-            load_dotenv()
-            api_key = os.getenv("STACK_API_KEY")
-            access_token = os.getenv("STACK_ACCESS_TOKEN")
+            print("▶️  API: Iniciando processo de re-população de dados.")
+            
+            # Pegando as chaves pelas configurações do Django para manter o padrão
+            api_key = settings.STACK_API_KEY
+            access_token = settings.STACK_ACCESS_TOKEN
             
             if not api_key or not access_token:
                 return Response({
-                    'error': 'STACK_API_KEY and STACK_ACCESS_TOKEN must be set in .env file'
+                    'error': 'STACK_API_KEY e STACK_ACCESS_TOKEN devem estar configurados.'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # Populate missing data
+            # A chamada para a sua função continua a mesma
             populate_missing_data(api_key, access_token)
 
+            print("✅ API: Processo de re-população finalizado.")
+            
             return Response({
-                'message': 'Successfully re-populated user data',
+                'message': 'Processo de re-população de dados executado com sucesso.',
                 'status': 'completed'
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response({
-                'error': f'An unexpected error occurred: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+            logger.error(f"Erro inesperado em re_populate_data: {e}", exc_info=True)
+            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
