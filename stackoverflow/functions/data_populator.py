@@ -14,8 +14,9 @@ from stackoverflow.functions.safe_api_call import safe_api_call
 
 logger = logging.getLogger(__name__)
 
+
 def check_required_config() -> None:
-    required_env_vars = ["API_KEY", "ACCESS_TOKEN"]
+    required_env_vars = ["STACK_API_KEY", "STACK_ACCESS_TOKEN"] # <-- ÚNICA LINHA ALTERADA
 
     missing = [var for var in required_env_vars if not os.getenv(var)]
     if missing:
