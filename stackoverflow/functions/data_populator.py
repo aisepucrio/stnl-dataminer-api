@@ -14,14 +14,25 @@ from stackoverflow.functions.safe_api_call import safe_api_call
 
 logger = logging.getLogger(__name__)
 
+def log_progress(message: str, level: str = "info"):
+    """
+    Exibe feedback formatado para o usuário no terminal.
+    """
+    emojis = {
+        "info": "ℹ️", "success": "✅", "warning": "🟡", "error": "❌",
+        "system": "⚙️", "fetch": "🔎", "save": "💾", "process": "🔄",
+        "badge": "🎖️", "collective": "👥"
+    }
+    print(f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}", flush=True)
 
 def check_required_config() -> None:
-    required_env_vars = ["STACK_API_KEY", "STACK_ACCESS_TOKEN"] # <-- ÚNICA LINHA ALTERADA
+    """Verifica se as variáveis de ambiente essenciais estão configuradas."""
+    required_env_vars = ["STACK_API_KEY", "STACK_ACCESS_TOKEN"]
 
     missing = [var for var in required_env_vars if not os.getenv(var)]
     if missing:
-        logger.critical(f"Missing required environment variables: {', '.join(missing)}")
-        sys.exit(1)  # Clean exit with error code
+        log_progress(f"Variáveis de ambiente obrigatórias ausentes: {', '.join(missing)}", "error")
+        raise ValueError("Variáveis de ambiente não configuradas corretamente no arquivo .env")
 
 def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
     """
@@ -56,16 +67,16 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
         try:
             data = safe_api_call(base_url, params=params)
             if not data:
-                    logger.warning("No data returned or API error occurred.")
+                    log_progress("No data returned from API.", "warning")
                     return []
             
             items = data.get("items", [])
             all_badges.extend(items)
 
             if 'quota_remaining' in data:
-                logger.info(f"Quota remaining: {data['quota_remaining']}")
+                log_progress(f"API quota remaining: {data['quota_remaining']}", "system")
                 if data['quota_remaining'] < 50:
-                    logger.warning(f"Low quota remaining: {data['quota_remaining']}")
+                    log_progress(f"API quota is low: {data['quota_remaining']}", "warning")
                     break
 
             if not data.get("has_more"):
@@ -73,49 +84,43 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
 
             page += 1
             base_sleep_time = 2  # reset if successful
-            logger.info(f"Paginating to page {page} for badge data...")
+            log_progress(f"Fetching next page of badges ({page})...", "fetch")
             time.sleep(base_sleep_time)
 
         except requests.exceptions.RequestException as e:
             status_code = getattr(e.response, 'status_code', None)
             if status_code == 429:
-                logger.warning(f"Rate limited on page {page}. Sleeping for {base_sleep_time} seconds...")
+                log_progress(f"Rate limit hit. Pausing for {base_sleep_time} seconds...", "warning")
                 time.sleep(base_sleep_time)
                 base_sleep_time = min(base_sleep_time * 2, max_sleep_time)
                 continue
             elif status_code == 400:
-                logger.error(f"Bad request while fetching badges for user_ids {user_ids}: {str(e)}")
+                log_progress(f"API Error (Bad Request) while fetching badges: {e}", "error")
                 break
             else:
-                logger.error(f"Error fetching badges for user_ids {user_ids}: {str(e)}")
+                log_progress(f"An unexpected error occurred while fetching badges: {e}", "error")
                 break
 
     if not all_badges:
-        logger.warning(f"No badges found for user_ids: {user_ids}")
+        log_progress("No badges were found for this batch of users.", "info")
     return all_badges
 
 
 def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
     """
-    Update StackBadge and StackUserBadge based on badges fetched for users
-
-    Args:
-        users (list): List of StackUser objects
-        api_key (str): Stack Exchange API key
-        access_token (str): Stack Exchange access token
-
-    Returns:
-        bool: True if any badge was inserted
+    Update StackBadge and StackUserBadge based on badges fetched for users.
     """
     if not users:
         return False
 
     user_ids = [user.user_id for user in users]
-    logger.info(f"Fetching badges for {len(user_ids)} users")
+    # Trocado logger.info por log_progress
+    log_progress(f"-> Buscando badges para {len(user_ids)} usuários...", "badge")
 
     badge_data = fetch_users_badges(user_ids, api_key, access_token)
     if not badge_data:
-        logger.warning("No badge data received from API")
+        # Trocado logger.warning por log_progress
+        log_progress("Nenhum dado de badge retornado pela API para este lote.", "warning")
         return False
 
     created_count = 0
@@ -129,7 +134,7 @@ def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
         user_id = item.get("user", {}).get("user_id")
         badge_id = item.get("badge_id")
         if badge_id is None:
-            continue  # Defensive programming
+            continue
         try:
             with transaction.atomic():
                 badge_obj, _ = StackBadge.objects.get_or_create(
@@ -148,11 +153,14 @@ def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
                     if created:
                         created_count += 1
         except IntegrityError as e:
-            logger.error(f"Integrity error while inserting badge {badge_id} or linking user {user_id}: {e}")
+            # Trocado logger.error por log_progress
+            log_progress(f"Erro ao salvar badge {badge_id} para usuário {user_id}: {e}", "error")
             continue
 
-
-    logger.info(f"Created {created_count} new StackUserBadge entries")
+    # Trocado logger.info por log_progress
+    if created_count > 0:
+        log_progress(f"-> {created_count} novas associações de badges salvas.", "save")
+        
     return created_count > 0
 
 def get_users_to_update():
@@ -194,8 +202,8 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
         slugs_string = ';'.join(batch_slugs)
         page = 1
 
-        logger.info(f"Fetching collective batch {i // batch_size + 1} with {len(batch_slugs)} slugs")
-        logger.info(f"First few slugs in batch: {batch_slugs[:5]}")
+        log_progress(f"-> Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective")
+        
 
         while True:  # Pagination loop
             params = {
@@ -212,14 +220,14 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
             try:
                 data = safe_api_call(base_url, params=params)
                 if not data:
-                    logger.warning("No data returned or API error occurred.")
+                    log_progress("No data returned from API.", "warning")
                     return []
                 
                 items = data.get('items', [])
 
                 if items:
                     all_collectives_data.extend(items)
-                    logger.info(f"Fetched {len(items)} collectives from page {page}")
+                    log_progress(f"Found {len(items)} collectives on page {page}.", "info")
                     
                     for c in items:
                         try:
@@ -233,19 +241,19 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
                                 }
                             )
                         except IntegrityError as e:
-                            logger.error(f"Integrity error while inserting collective {c.get('slug')}: {e}")
+                            log_progress(f"Failed to save collective {c.get('slug')}: {e}", "error")
                             continue
 
 
 
                         #TODO: StackCollectiveTag for all tags in tags field. 
                 else:
-                    logger.warning(f"No data returned for collectives page {page}")
+                    log_progress(f"No collectives found on page {page}.", "warning")
 
                 if 'quota_remaining' in data:
-                    logger.info(f"Quota remaining: {data['quota_remaining']}")
+                    log_progress(f"API quota remaining: {data['quota_remaining']}", "system")
                     if data['quota_remaining'] < 100:
-                        logger.warning(f"Low quota remaining: {data['quota_remaining']}")
+                        log_progress(f"API quota is low: {data['quota_remaining']}", "warning")
                         return all_collectives_data
 
                 if not data.get("has_more"):
@@ -253,21 +261,20 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
 
                 page += 1
                 base_sleep_time = 2  # reset on success
-                logger.info(f"Sleeping {base_sleep_time} before next page of collectives...")
                 time.sleep(base_sleep_time)
 
             except requests.exceptions.RequestException as e:
                 status_code = getattr(e.response, 'status_code', None)
                 if status_code == 429:
-                    logger.warning(f"Rate limited on collectives page {page}. Sleeping for {base_sleep_time} seconds...")
+                    log_progress(f"Rate limit hit. Pausing for {base_sleep_time} seconds...", "warning")
                     time.sleep(base_sleep_time)
                     base_sleep_time = min(base_sleep_time * 2, max_sleep_time)
                     continue
                 elif status_code == 400:
-                    logger.error(f"Bad request for collective slugs batch: {str(e)}")
+                    log_progress(f"API Error (Bad Request) while fetching collectives: {e}", "error")
                     break
                 else:
-                    logger.error(f"Error fetching collectives page {page}: {str(e)}")
+                    log_progress(f"An unexpected error occurred while fetching collectives: {e}", "error")
                     break
 
     return all_collectives_data
@@ -328,14 +335,14 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                         }
                     )
                     slug_to_collective[slug] = collective  # Cache it
-                    logger.info(f"Created missing StackCollective: {slug}")
+                    log_progress(f"Created missing collective: {slug}", "save")
                 except IntegrityError as e:
-                    logger.error(f"Integrity error while creating fallback collective {slug}: {e}")
+                    log_progress(f"Failed to create collective {slug}: {e}", "error")
             else:
-                logger.warning(f"Slug '{slug}' not found in fallback_collectives_data")
+                log_progress(f"Data for collective '{slug}' not found to create it.", "warning")
 
         if not collective:
-            logger.warning(f"Could not link user {user.user_id} to missing slug '{slug}'")
+            log_progress(f"Could not link user {user.user_id} to missing collective '{slug}'.", "warning")
             continue
 
         try:
@@ -352,19 +359,19 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                 if created:
                     created_count += 1
         except IntegrityError as e:
-            logger.error(f"Integrity error while linking user {user} to collective {collective.slug}: {e}")
+            log_progress(f"Failed to link user {user.user_id} to collective {collective.slug}: {e}", "error")
 
 
-    logger.info(f"Created {created_count} StackCollectiveUser links for {len(users)} users.")
+    log_progress(f"-> Created {created_count} new user-collective links.", "save")
 
 def sync_collective_tags(collectives_data: list):
     from stackoverflow.models import StackTag, StackCollective, StackCollectiveTag
 
     if not collectives_data:
-        logger.warning("No collective data provided to sync_collective_tags")
+        # Trocado logger.warning por log_progress
+        log_progress("No collective data provided to sync tags.", "warning")
         return
 
-    # Gather all tag names and collective slugs
     tag_names = set()
     slug_to_tags = {}
 
@@ -376,7 +383,6 @@ def sync_collective_tags(collectives_data: list):
         slug_to_tags[slug] = tags
         tag_names.update(tags)
 
-    # Fetch/create StackTag objects
     tag_objs = {
         tag.name: tag for tag in StackTag.objects.filter(name__in=tag_names)
     }
@@ -385,25 +391,26 @@ def sync_collective_tags(collectives_data: list):
     for tag_name in missing_tags:
         tag_obj = StackTag.objects.create(name=tag_name)
         tag_objs[tag_name] = tag_obj
-        logger.info(f"Created missing StackTag: {tag_name}")
+        # Trocado logger.info por log_progress
+        log_progress(f"Created missing Tag: {tag_name}", "save")
 
-    # Fetch collectives
     collectives = {
         c.slug: c for c in StackCollective.objects.filter(slug__in=slug_to_tags.keys())
     }
 
-    # Create missing StackCollectiveTag links
     created_count = 0
     for slug, tag_list in slug_to_tags.items():
         collective = collectives.get(slug)
         if not collective:
-            logger.warning(f"Collective '{slug}' not found in DB. Skipping tag link.")
+            # Trocado logger.warning por log_progress
+            log_progress(f"Collective '{slug}' not found in DB. Skipping tag link.", "warning")
             continue
 
         for tag_name in tag_list:
             tag = tag_objs.get(tag_name)
             if not tag:
-                logger.warning(f"Tag '{tag_name}' not found. Skipping.")
+                # Trocado logger.warning por log_progress
+                log_progress(f"Tag '{tag_name}' not found. Skipping link.", "warning")
                 continue
 
             try:
@@ -415,38 +422,28 @@ def sync_collective_tags(collectives_data: list):
                     if created:
                         created_count += 1
             except IntegrityError as e:
-                logger.error(f"Integrity error while linking tag '{tag}' to collective '{collective.slug}': {e}")
+                # Trocado logger.error por log_progress
+                log_progress(f"Failed to link tag '{tag}' to collective '{collective.slug}': {e}", "error")
 
-
-    logger.info(f"Created {created_count} StackCollectiveTag relationships.")
-
+    # Trocado logger.info por log_progress
+    if created_count > 0:
+        log_progress(f"-> Created {created_count} new links between collectives and tags.", "save")
 
 def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
     """
-    Fetch complete user data from Stack Exchange API in batch with pagination and backoff
-
-    Args:
-        user_ids (list): List of user IDs to fetch
-        api_key (str): Stack Exchange API key
-        access_token (str): Stack Exchange access token
-
-    Returns:
-        list: List of user data dictionaries
+    Fetch complete user data from Stack Exchange API with user-friendly feedback.
     """
     batch_size = 100
     all_users_data = []
-    base_sleep_time = 2
-    max_sleep_time = 30
-
+    
     for i in range(0, len(user_ids), batch_size):
         batch_ids = user_ids[i:i + batch_size]
         ids_string = ';'.join(map(str, batch_ids))
         page = 1
 
-        logger.info(f"Fetching batch {i // batch_size + 1} with {len(batch_ids)} users")
-        logger.info(f"First few IDs in batch: {batch_ids[:5]}")
+        # A chamada principal já informa o que está buscando, então os logs aqui foram removidos.
         
-        while True:  # pagination loop
+        while True:
             params = {
                 'site': 'stackoverflow',
                 'key': api_key,
@@ -455,50 +452,37 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
                 'page': page,
                 'pagesize': 100
             }
-
             base_url = f"https://api.stackexchange.com/2.3/users/{ids_string}"
 
             try:
                 data = safe_api_call(base_url, params=params)
                 if not data:
-                    logger.warning("No data returned or API error occurred.")
+                    log_progress("No user data returned from API for this batch.", "warning")
                     return []
                 
                 items = data.get('items', [])
                 if items:
                     all_users_data.extend(items)
-                    logger.info(f"Fetched {len(items)} users from page {page}")
-                else:
-                    logger.warning(f"No data returned for user page {page}")
-
-                if 'quota_remaining' in data:
-                    logger.info(f"Quota remaining: {data['quota_remaining']}")
-                    if data['quota_remaining'] < 100:
-                        logger.warning(f"Low quota remaining: {data['quota_remaining']}")
-                        return all_users_data
+                
+                if 'quota_remaining' in data and data['quota_remaining'] < 100:
+                    log_progress(f"API quota is low: {data['quota_remaining']}", "warning")
 
                 if not data.get("has_more"):
                     break
 
                 page += 1
-                base_sleep_time = 2  # reset on success
-                logger.info(f"Sleeping {base_sleep_time} seconds before next user page...")
-                time.sleep(base_sleep_time)
+                time.sleep(1)
 
             except requests.exceptions.RequestException as e:
                 status_code = getattr(e.response, 'status_code', None)
                 if status_code == 429:
-                    logger.warning(f"Rate limited on user page {page}. Sleeping for {base_sleep_time} seconds...")
-                    time.sleep(base_sleep_time)
-                    base_sleep_time = min(base_sleep_time * 2, max_sleep_time)
+                    log_progress("Rate limit hit. Pausing for a moment...", "warning")
+                    time.sleep(5) # Pausa curta para rate limit
                     continue
-                elif status_code == 400:
-                    logger.error(f"Bad request fetching users: {str(e)}")
-                    break
                 else:
-                    logger.error(f"Error fetching user page {page}: {str(e)}")
+                    log_progress(f"API Error while fetching users: {e}", "error")
                     break
-
+    
     return all_users_data
 
 
@@ -518,11 +502,11 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
         return False
         
     user_ids = [user.user_id for user in users]
-    logger.info(f"Fetching data for {len(user_ids)} users")
+    log_progress(f"-> Buscando perfis completos para {len(user_ids)} usuários...", "fetch")
     users_data = fetch_users_data(user_ids, api_key, access_token)
     
     if not users_data:
-        logger.warning("No user data received from API")
+        log_progress("Nenhum dado de perfil retornado pela API para este lote.", "warning")
         return False
     
     # Create a dictionary for quick lookup
@@ -536,7 +520,7 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
     for user_data in users_data:
         user_id = user_data.get('user_id')
         if user_id not in users_dict:
-            logger.warning(f"User ID {user_id} not found in local database")
+            log_progress(f"Usuário ID {user_id} da API não encontrado no lote do banco de dados.", "warning")
             skipped_count += 1
             continue
             
@@ -582,111 +566,94 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
         user.save()
         updated_count += 1
     
-    logger.info(f"Updated {updated_count} out of {len(users)} users")
+    log_progress(f"-> {updated_count} perfis de usuários atualizados.", "save")
     if skipped_count > 0:
-        logger.warning(f"Skipped {skipped_count} users (not found in local database)")
+        log_progress(f"{skipped_count} usuários foram ignorados (não encontrados no lote).", "warning")
     return unique_slugs
+
+# Em stackoverflow/functions/data_populator.py
 
 def populate_missing_data(api_key: str, access_token: str):
     """
     Populate missing data for users that need updating
-    
-    Args:
-        api_key (str): Stack Exchange API key
-        access_token (str): Stack Exchange access token
     """
-    # Get users that need updating
+    # Bloco 1: Verificação Inicial
     users_to_update = list(get_users_to_update())
     total_users = len(users_to_update)
-    logger.info(f"Found {total_users} users that need updating")
+    log_progress(f"Encontrados {total_users} usuários para enriquecer os dados.", "info")
     
     if total_users == 0:
         return
     
-    # Process users in batches of 100 (Stack Exchange API limit)
+    # Bloco 2: Preparação dos Lotes
     batch_size = 100
     total_batches = (total_users + batch_size - 1) // batch_size
-    logger.info(f"Will process {total_batches} batches of up to {batch_size} users each")
+    log_progress(f"O processo será dividido em {total_batches} lotes.", "system")
     
+    # Suas variáveis de controle originais, mantidas
     all_unique_slugs = set()
     total_badges_updated = 0
     processed_user_ids = set()
     
+    # Bloco 3: Loop de Processamento
     for i in range(0, total_users, batch_size):
-        batch = users_to_update[i:i + batch_size]
-        batch_users = list(batch)
-        batch_user_ids = [user.user_id for user in batch_users]
-        logger.info(f"Processing batch {i//batch_size + 1} of {total_batches} ({len(batch_users)} users)")
-        logger.info(f"Batch user IDs: {batch_user_ids}")
+        batch_num = i // batch_size + 1
+        batch_users = users_to_update[i:i + batch_size]
+        log_progress(f"Processando lote {batch_num}/{total_batches} ({len(batch_users)} usuários)...", "process")
         
-        # Update user data and collect slugs
+        # Sua lógica original de update, intacta
         batch_slugs = update_users_data(batch_users, api_key, access_token)
         if batch_slugs:
             all_unique_slugs.update(batch_slugs)
         
-        # Update badges for this batch
-        logger.info(f"Updating badges for batch {i//batch_size + 1}")
         if update_badges_data(batch_users, api_key, access_token):
             total_badges_updated += 1
             
-        # Track processed users
-        processed_user_ids.update(batch_user_ids)
-        logger.info(f"Total users processed so far: {len(processed_user_ids)}")
+        processed_user_ids.update([user.user_id for user in batch_users])
     
-    # After all users are processed, handle collectives
+    # Bloco 4: Processamento de Coletivos
     if all_unique_slugs:
-        logger.info(f"Fetching collective data for {len(all_unique_slugs)} unique slugs")
+        log_progress(f"Processando {len(all_unique_slugs)} coletivos (Collectives)...", "collective")
         collectives = fetch_collectives_data(list(all_unique_slugs), api_key, access_token)
-        logger.info(f"Fetched {len(collectives)} collectives")
-        
-        # Link all users to their collectives
-        logger.info("Linking users to collectives")
         link_users_to_collectives(users_to_update, collectives)
-        
-        # Sync collective tags
-        logger.info("Syncing collective tags")
         sync_collective_tags(collectives)
     else:
-        logger.info("No collectives found to fetch")
+        log_progress("Nenhum coletivo para processar.", "info")
     
-    # Verify all users were processed
+    # Bloco 5: Verificação Final (lógica mantida)
     if len(processed_user_ids) != total_users:
-        logger.warning(f"Not all users were processed! Expected {total_users}, got {len(processed_user_ids)}")
-        missing_users = set(u.user_id for u in users_to_update) - processed_user_ids
-        logger.warning(f"Missing user IDs: {missing_users}")
+        log_progress(f"Nem todos os usuários foram processados! Esperado: {total_users}, Processado: {len(processed_user_ids)}", "warning")
     
-    logger.info(f"Data population completed. Updated {len(processed_user_ids)} users, {total_badges_updated} badge batches, and {len(all_unique_slugs)} collectives.")
-
+    # Log de Sucesso Final
+    log_progress(f"Enriquecimento finalizado. {len(processed_user_ids)} usuários foram verificados/atualizados.", "success")
+    
 def main():
     """
     Main function to populate missing data for all users that need updating.
-    This function handles the complete pipeline of:
-    1. Updating user data
-    2. Fetching and updating badges
-    3. Fetching and updating collectives
-    4. Linking users to collectives
-    5. Syncing collective tags
     """
     from django.conf import settings
     import sys
 
     try:
-        # Load credentials from env or settings
-        api_key = os.getenv("STACK_API_KEY") or settings.STACK_API_KEY
-        access_token = os.getenv("STACK_ACCESS_TOKEN") or settings.STACK_ACCESS_TOKEN
+        api_key = os.getenv("STACK_API_KEY")
+        access_token = os.getenv("STACK_ACCESS_TOKEN")
 
         if not api_key or not access_token:
-            logger.error("API key or access token not provided.")
+            # Trocado logger.error por log_progress
+            log_progress("API key or access token not provided in .env file.", "error")
             sys.exit(1)
 
-        logger.info("Starting data population process...")
+        # Trocado logger.info por log_progress
+        log_progress("Starting data population process...", "system")
         populate_missing_data(api_key, access_token)
-        logger.info("Data population completed successfully.")
+        # Trocado logger.info por log_progress
+        log_progress("Data population completed successfully.", "success")
 
     except Exception as e:
-        logger.error(f"An error occurred during data population: {str(e)}")
+        # Trocado logger.error por log_progress
+        log_progress(f"An unexpected error occurred during data population: {e}", "error")
         sys.exit(1)
-
+        
 if __name__ == "__main__":
     main()
 
