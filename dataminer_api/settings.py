@@ -226,6 +226,9 @@ CELERY_MAX_MEMORY_PER_CHILD = 1024*1024*2
 # Defines the number of concurrent worker processes
 CELERY_CONCURRENCY = 4
 
+# Adicione esta linha para dizer ao Celery para procurar tarefas em outros apps
+CELERY_IMPORTS = ('jobs.tasks', 'stackoverflow.tasks')
+
 STACK_API_KEY = os.getenv("STACK_API_KEY")
 STACK_ACCESS_TOKEN = os.getenv("STACK_ACCESS_TOKEN")
 

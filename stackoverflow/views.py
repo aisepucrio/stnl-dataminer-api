@@ -7,7 +7,7 @@ from datetime import datetime
 from django.conf import settings  # Adicionado para buscar chaves da API de forma segura
 
 # Importa a função que realmente faz o trabalho
-from .functions.question_fetcher import fetch_questions 
+from .tasks import collect_questions_task
 # Mantemos este import para a outra função que não vamos mexer agora
 from .functions.data_populator import populate_missing_data 
 
@@ -198,47 +198,36 @@ class StackOverflowViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='collect-questions')
     def collect_questions(self, request):
         """
-        Coleta perguntas do Stack Overflow baseado em um intervalo de datas.
+        Enfileira uma tarefa no Celery para coletar perguntas do Stack Overflow.
         """
         try:
-            # Pega os parâmetros do corpo da requisição do Bruno
-            site = request.data.get('site', 'stackoverflow')
+            # Esta parte continua igual
             start_date = request.data.get('start_date')
             end_date = request.data.get('end_date')
 
-            # Validações básicas de data
             if not start_date or not end_date:
                 return Response({'error': 'start_date e end_date são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
             
+            # Validação simples de data
             datetime.strptime(start_date, '%Y-%m-%d')
             datetime.strptime(end_date, '%Y-%m-%d')
-
-            print(f"▶️  API: Iniciando coleta de {start_date} a {end_date}")
             
-            # AQUI ESTÁ A "PONTE": Chamamos diretamente a sua função original
-            questions_result = fetch_questions(
-                site=site,
-                start_date=start_date,
-                end_date=end_date,
-                api_key=settings.STACK_API_KEY,
-                access_token=settings.STACK_ACCESS_TOKEN
-            )
+            # --- AQUI ESTÁ A MUDANÇA ---
+            # Em vez de chamar a função diretamente, usamos .delay() para
+            # colocar a tarefa na fila do Celery (Redis).
+            collect_questions_task.delay(start_date=start_date, end_date=end_date)
             
-            total_questions = len(questions_result)
-
-            print(f"✅ API: Coleta finalizada. {total_questions} perguntas processadas.")
-            
+            # A resposta para o Bruno é imediata
             return Response({
-                'message': 'Coleta de perguntas executada com sucesso.',
-                'total_questions_processed': total_questions
-            }, status=status.HTTP_200_OK)
+                'message': f'Tarefa de coleta para o período de {start_date} a {end_date} foi enviada para a fila. Monitore o terminal do WORKER para ver o progresso.'
+            }, status=status.HTTP_202_ACCEPTED) # 202 Accepted é o status ideal para "Recebi, vou fazer".
 
         except ValueError:
             return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Erro inesperado em collect_questions: {e}", exc_info=True)
-            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+            logger.error(f"Erro ao enfileirar a tarefa collect_questions: {e}", exc_info=True)
+            return Response({'error': f'Um erro inesperado ocorreu ao enviar a tarefa: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
     # --- TRECHO CORRIGIDO ---
     @action(detail=False, methods=['post'], url_path='re-populate-data')
     def re_populate_data(self, request):
