@@ -8,6 +8,23 @@ from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
+def log_progress(message: str, level: str = "info"):
+    """
+    Exibe feedback formatado para o usuário no terminal, inspirado no JiraMiner.
+    """
+    emojis = {
+        "info": "ℹ️",
+        "success": "✅",
+        "warning": "🟡",
+        "error": "❌",
+        "system": "⚙️",
+        "fetch": "🔎",
+        "save": "💾",
+    }
+    # O flush=True garante que a mensagem apareça imediatamente no terminal
+    print(f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}", flush=True)
+
+
 def create_or_update_user(user_id, user_data):
     stack_user = None
     try:
@@ -159,19 +176,7 @@ def make_question_serializable(question_data, stack_user, question_tags):
 
 def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100):
     """
-    Fetch questions from Stack Overflow within a date range
-    
-    Args:
-        site (str): The site to fetch from (e.g., 'stackoverflow')
-        start_date (str): Start date in ISO format (YYYY-MM-DD)
-        end_date (str): End date in ISO format (YYYY-MM-DD)
-        api_key (str): Stack Exchange API key
-        access_token (str): Stack Exchange access token
-        page (int, optional): Page number for pagination (default: 1)
-        page_size (int, optional): Number of items per page (default: 100, max: 100)
-        
-    Returns:
-        list: List of questions
+    Fetch questions from Stack Overflow with user-friendly feedback.
     """
     base_url = f"https://api.stackexchange.com/2.3/questions"
     
@@ -181,16 +186,14 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
     start_timestamp = int(datetime.combine(start_dt.date(), datetime.min.time()).timestamp())
     end_timestamp = int(datetime.combine(end_dt.date(), datetime.max.time()).timestamp())
     
-    logger.info(f"Fetching questions from {start_date} to {end_date}")
-    logger.info(f"Timestamps: {start_timestamp} to {end_timestamp}")
+    log_progress(f"Iniciando coleta de {start_date} a {end_date}", "system")
     
-    # Construct the API request
     params = {
         'site': site,
         'fromdate': start_timestamp,
         'todate': end_timestamp,
         'page': page,
-        'pagesize': min(page_size, 100),  # API limit is 100
+        'pagesize': min(page_size, 100),
         'order': 'desc',
         'sort': 'creation',
         'filter': '!2xWEp6FHz8hT56C1LBQjFx25D4Dzmr*3(8D4ngdB5g',  # Beast filter
@@ -198,73 +201,75 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
         'access_token': access_token
     }
     
-    logger.info(f"API Request URL: {base_url}")
-    logger.info(f"API Request Params: {params}")
-    
     questions = []
+    total_questions_api = 0
+    total_processed = 0
     has_more = True
-    
+    page = 1
+
+    # --- Loop principal para processar todas as páginas ---
     while has_more:
         try:
+            params['page'] = page
+
+            log_progress(f"Buscando página {params['page']}...", "fetch")
             response = requests.get(base_url, params=params)
-            logger.info(f"API Response Status: {response.status_code}")
+            log_progress(f"API respondeu com status {response.status_code}", "info")
             
             response.raise_for_status()
             
             data = response.json()
-            # logger.info(f"API Response Data: {data}")
             
             if 'error_id' in data:
-                raise Exception(f"API Error: {data.get('error_message', 'Unknown error')}")
+                log_progress(f"API retornou um erro: {data.get('error_message', 'Erro desconhecido')}", "error")
+                break
+                        # Pega o total de perguntas na PRIMEIRA chamada e o armazena
+            if page == 1:
+                total_questions_api = data.get('total', 0)
+                if total_questions_api == 0:
+                    log_progress("Nenhuma pergunta encontrada para o período.", "warning")
+                    return []
+                log_progress(f"Total de {total_questions_api} perguntas encontradas na API. Iniciando processamento...", "info")
+
+            items = data.get('items', [])
+            if not items:
+                if params['page'] == 1: # Só avisa se não encontrar nada na primeira página
+                    log_progress("Nenhuma pergunta encontrada para o período.", "warning")
+                break
+                
+            log_progress(f"{len(items)} perguntas encontradas. Salvando no banco de dados...", "process")
             
-            # Process questions
-            for item in data.get('items', []):
-                # Extract owner data and create/update user
+            for item in items:
+                total_processed += 1
+                # --- A sua lógica original de salvamento permanece INTACTA ---
                 owner_data = item.get('owner', {})
                 owner_id = owner_data.get('user_id')
                 stack_user = None
                 if owner_id:
                     stack_user = create_or_update_user(owner_id, owner_data)
 
-                # Extract tags before creating question
                 question_tags = item.get('tags', [])
-                print(f"Extracted tags: {question_tags}")
 
-                # Create question data
-                question = {
-                    'question_id': item['question_id'],
-                    'title': item.get('title'),
-                    'body': item.get('body'),
-                    'creation_date': item.get('creation_date'),
-                    'score': item.get('score', 0),
-                    'view_count': item.get('view_count', 0),
-                    'answer_count': item.get('answer_count', 0),
-                    'comment_count': item.get('comment_count', 0),
-                    'up_vote_count': item.get('up_vote_count', 0),
-                    'down_vote_count': item.get('down_vote_count', 0),
-                    'is_answered': item.get('is_answered', False),
-                    'accepted_answer_id': item.get('accepted_answer_id'),
-                    'owner': stack_user,
-                    'share_link': item.get('share_link'),
-                    'body_markdown': item.get('body_markdown'),
-                    'link': item.get('link'),
-                    'favorite_count': item.get('favorite_count', 0),
-                    'content_license': item.get('content_license', None),
-                    'last_activity_date': item.get('last_activity_date'),
+                question_dict_for_saving = {
+                    'question_id': item['question_id'], 'title': item.get('title'), 'body': item.get('body'),
+                    'creation_date': item.get('creation_date'), 'score': item.get('score', 0),
+                    'view_count': item.get('view_count', 0), 'answer_count': item.get('answer_count', 0),
+                    'comment_count': item.get('comment_count', 0), 'up_vote_count': item.get('up_vote_count', 0),
+                    'down_vote_count': item.get('down_vote_count', 0), 'is_answered': item.get('is_answered', False),
+                    'accepted_answer_id': item.get('accepted_answer_id'), 'owner': stack_user,
+                    'share_link': item.get('share_link'), 'body_markdown': item.get('body_markdown'),
+                    'link': item.get('link'), 'favorite_count': item.get('favorite_count', 0),
+                    'content_license': item.get('content_license', None), 'last_activity_date': item.get('last_activity_date'),
                     'time_mined': int(time.time()),
                 }
-
-                # Create or update the question
                 stack_question, created = StackQuestion.objects.get_or_create(
-                    question_id=question['question_id'],
-                    defaults=question
+                    question_id=question_dict_for_saving['question_id'],
+                    defaults=question_dict_for_saving
                 )
                 
-                # Add question to return list
-                serializable_question = make_question_serializable(question, stack_user, question_tags)
+                serializable_question = make_question_serializable(question_dict_for_saving, stack_user, question_tags)
                 questions.append(serializable_question)
 
-                # Process comments for the question
                 comments = item.get('comments', [])
                 if comments:
                     for comment in comments:
@@ -275,20 +280,16 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                             comment_owner = create_or_update_user(comment_owner_id, comment_owner_data)
                         create_comment(comment, stack_question, comment_owner)
 
-                # Process answers and their comments
                 if item.get('is_answered'):
                     for answer in item.get('answers', []):
-                        # Create/update answer owner
                         answer_owner_data = answer.get('owner', {})
                         answer_owner_id = answer_owner_data.get('user_id')
                         answer_owner = None
                         if answer_owner_id:
                             answer_owner = create_or_update_user(answer_owner_id, answer_owner_data)
                         
-                        # Create answer
                         stack_answer = create_answer(answer, stack_question, answer_owner)
                         
-                        # Process answer comments
                         answer_comments = answer.get('comments', [])
                         if answer_comments:
                             for comment in answer_comments:
@@ -298,42 +299,33 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                                 if comment_owner_id:
                                     comment_owner = create_or_update_user(comment_owner_id, comment_owner_data)
                                 create_comment(comment, stack_answer, comment_owner)
-
-                # Process tags - ADD MORE PRINT STATEMENTS
+                
                 tag_objs = []
                 for tag_name in question_tags:
-                    print(f"Processing tag: {tag_name}")
-                    tag_obj, created = StackTag.objects.get_or_create(name=tag_name)
+                    tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
                     tag_objs.append(tag_obj)
-                    print(f"Tag '{tag_name}' {'created' if created else 'already exists'}")
+                stack_question.tags.set(tag_objs)
+                titulo = item.get('title', 'Sem Título')[:60]
+                log_progress(f"[{total_processed}/{total_questions_api}] Processando: '{titulo}...'", "save")
+            
+                # --- Fim da sua lógica original ---
 
-                # Assign tags to the question
-                try:
-                    stack_question.tags.set(tag_objs)
-                except Exception as e:
-                    print(f"ERROR: Failed to assign tags to question {question['question_id']}: {e}")
-                    raise
             
-            logger.info(f"Processed {len(data.get('items', []))} questions")
+
             
-            # has_more = data.get('has_more', False)
-            # if has_more:
-            #     params['page'] += 1
-            #     time.sleep(1)  # Respect rate limits
-            has_more = False
-                
+            # ATIVANDO A PAGINAÇÃO (MUDANÇA IMPORTANTE!)
+            has_more = data.get('has_more', False)
+            if has_more:
+                page += 1
+                log_progress(f"Avançando para a próxima página...", "info")
+                time.sleep(1)  # Pausa para respeitar a API
+
         except requests.exceptions.RequestException as e:
-            print(f"REQUEST ERROR: {str(e)}")
-            logger.error(f"Request error: {str(e)}")
-            if 'rate limit' in str(e).lower():
-                logger.info("Rate limit hit, waiting 60 seconds...")
-                time.sleep(60)  # Wait for rate limit to reset
-                continue
-            raise Exception(f"Failed to fetch questions: {str(e)}")
+            log_progress(f"Erro de conexão: {str(e)}", "error")
+            break # Interrompe o loop
         except Exception as e:
-            print(f"GENERAL ERROR: {str(e)}")
-            raise
+            log_progress(f"Um erro inesperado ocorreu: {str(e)}", "error")
+            break
     
-    logger.info(f"Total questions fetched: {len(questions)}")
-    print(f"=== Total questions fetched: {len(questions)} ===")
-    return questions 
+    log_progress(f"Coleta finalizada. Total de {total_processed} perguntas processadas.", "success")
+    return questions
