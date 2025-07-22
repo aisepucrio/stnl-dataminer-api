@@ -5,24 +5,30 @@ import logging
 from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment# Import StackQuestion and StackUser models
 from django.utils import timezone
 from django.db import transaction
+from jobs.models import Task
 
 logger = logging.getLogger(__name__)
 
-def log_progress(message: str, level: str = "info"):
+def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
-    Exibe feedback formatado para o usuário no terminal, inspirado no JiraMiner.
+    Exibe feedback no terminal e, se um task_obj for fornecido,
+    salva o progresso no banco de dados.
     """
     emojis = {
-        "info": "ℹ️",
-        "success": "✅",
-        "warning": "🟡",
-        "error": "❌",
-        "system": "⚙️",
-        "fetch": "🔎",
-        "save": "💾",
+        "info": "ℹ️", "success": "✅", "warning": "🟡", "error": "❌",
+        "system": "⚙️", "fetch": "🔎", "save": "💾", "process": "🔄"
     }
-    # O flush=True garante que a mensagem apareça imediatamente no terminal
-    print(f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}", flush=True)
+    
+    # Monta a mensagem para o terminal (continua igual)
+    terminal_message = f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}"
+    print(terminal_message, flush=True)
+    
+    # A MÁGICA PARA O FRONTEND ACONTECE AQUI:
+    if task_obj:
+        # Se a função recebeu um objeto de tarefa, ela atualiza
+        # o campo 'operation' com a mensagem limpa e salva no banco.
+        task_obj.operation = message 
+        task_obj.save(update_fields=["operation"])
 
 
 def create_or_update_user(user_id, user_data):
@@ -174,7 +180,7 @@ def make_question_serializable(question_data, stack_user, question_tags):
         'time_mined': question_data.get('time_mined'),
     }
 
-def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100):
+def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100, task_obj=None):
     """
     Fetch questions from Stack Overflow with user-friendly feedback.
     """
@@ -186,7 +192,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
     start_timestamp = int(datetime.combine(start_dt.date(), datetime.min.time()).timestamp())
     end_timestamp = int(datetime.combine(end_dt.date(), datetime.max.time()).timestamp())
     
-    log_progress(f"Iniciando coleta de {start_date} a {end_date}", "system")
+    log_progress(f"Iniciando coleta de {start_date} a {end_date}", "system", task_obj=task_obj )
     
     params = {
         'site': site,
@@ -212,32 +218,32 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
         try:
             params['page'] = page
 
-            log_progress(f"Buscando página {params['page']}...", "fetch")
+            log_progress(f"Buscando página {params['page']}...", "fetch", task_obj=task_obj )
             response = requests.get(base_url, params=params)
-            log_progress(f"API respondeu com status {response.status_code}", "info")
+            log_progress(f"API respondeu com status {response.status_code}", "info", task_obj=task_obj )
             
             response.raise_for_status()
             
             data = response.json()
             
             if 'error_id' in data:
-                log_progress(f"API retornou um erro: {data.get('error_message', 'Erro desconhecido')}", "error")
+                log_progress(f"API retornou um erro: {data.get('error_message', 'Erro desconhecido')}", "error", task_obj=task_obj )
                 break
                         # Pega o total de perguntas na PRIMEIRA chamada e o armazena
             if page == 1:
                 total_questions_api = data.get('total', 0)
                 if total_questions_api == 0:
-                    log_progress("Nenhuma pergunta encontrada para o período.", "warning")
+                    log_progress("Nenhuma pergunta encontrada para o período.", "warning", task_obj=task_obj )
                     return []
-                log_progress(f"Total de {total_questions_api} perguntas encontradas na API. Iniciando processamento...", "info")
+                log_progress(f"Total de {total_questions_api} perguntas encontradas na API. Iniciando processamento...", "info", task_obj=task_obj )
 
             items = data.get('items', [])
             if not items:
                 if params['page'] == 1: # Só avisa se não encontrar nada na primeira página
-                    log_progress("Nenhuma pergunta encontrada para o período.", "warning")
+                    log_progress("Nenhuma pergunta encontrada para o período.", "warning", task_obj=task_obj )
                 break
                 
-            log_progress(f"{len(items)} perguntas encontradas. Salvando no banco de dados...", "process")
+            log_progress(f"{len(items)} perguntas encontradas. Salvando no banco de dados...", "process", task_obj=task_obj )
             
             for item in items:
                 total_processed += 1
@@ -306,7 +312,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     tag_objs.append(tag_obj)
                 stack_question.tags.set(tag_objs)
                 titulo = item.get('title', 'Sem Título')[:60]
-                log_progress(f"[{total_processed}/{total_questions_api}] Processando: '{titulo}...'", "save")
+                log_progress(f"[{total_processed}/{total_questions_api}] Processando: '{titulo}...'", "save", task_obj=task_obj )
             
                 # --- Fim da sua lógica original ---
 
@@ -317,15 +323,15 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             has_more = data.get('has_more', False)
             if has_more:
                 page += 1
-                log_progress(f"Avançando para a próxima página...", "info")
+                log_progress(f"Avançando para a próxima página...", "info", task_obj=task_obj )
                 time.sleep(1)  # Pausa para respeitar a API
 
         except requests.exceptions.RequestException as e:
-            log_progress(f"Erro de conexão: {str(e)}", "error")
+            log_progress(f"Erro de conexão: {str(e)}", "error", task_obj=task_obj )
             break # Interrompe o loop
         except Exception as e:
-            log_progress(f"Um erro inesperado ocorreu: {str(e)}", "error")
+            log_progress(f"Um erro inesperado ocorreu: {str(e)}", "error", task_obj=task_obj )
             break
     
-    log_progress(f"Coleta finalizada. Total de {total_processed} perguntas processadas.", "success")
+    log_progress(f"Coleta finalizada. Total de {total_processed} perguntas processadas.", "success", task_obj=task_obj )
     return questions

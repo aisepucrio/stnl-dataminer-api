@@ -226,6 +226,11 @@ CELERY_MAX_MEMORY_PER_CHILD = 1024*1024*2
 # Defines the number of concurrent worker processes
 CELERY_CONCURRENCY = 4
 
+# Formato para logs gerais do worker (ex: "Connected to redis...")
+CELERY_WORKER_LOG_FORMAT = "[%(levelname)s] %(message)s"
+# Formato para logs de TAREFAS (o que nos interessa)
+CELERY_WORKER_TASK_LOG_FORMAT = "%(message)s"
+
 # Adicione esta linha para dizer ao Celery para procurar tarefas em outros apps
 CELERY_IMPORTS = ('jobs.tasks', 'stackoverflow.tasks')
 

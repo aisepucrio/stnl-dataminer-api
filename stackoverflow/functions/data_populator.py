@@ -11,30 +11,42 @@ from stackoverflow.models import (
     StackCollectiveUser, StackCollectiveTag, StackTag
 )
 from stackoverflow.functions.safe_api_call import safe_api_call
+from jobs.models import Task
 
 logger = logging.getLogger(__name__)
 
-def log_progress(message: str, level: str = "info"):
+def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
-    Exibe feedback formatado para o usuário no terminal.
+    Exibe feedback no terminal e, se um task_obj for fornecido,
+    salva o progresso no banco de dados.
     """
     emojis = {
         "info": "ℹ️", "success": "✅", "warning": "🟡", "error": "❌",
         "system": "⚙️", "fetch": "🔎", "save": "💾", "process": "🔄",
         "badge": "🎖️", "collective": "👥"
     }
-    print(f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}", flush=True)
+    
+    # Monta a mensagem para o terminal (continua igual)
+    terminal_message = f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}"
+    print(terminal_message, flush=True)
+    
+    # A MÁGICA PARA O FRONTEND ACONTECE AQUI:
+    if task_obj:
+        # Se a função recebeu um objeto de tarefa, ela atualiza
+        # o campo 'operation' com a mensagem limpa e salva no banco.
+        task_obj.operation = message 
+        task_obj.save(update_fields=["operation"])
 
-def check_required_config() -> None:
+def check_required_config(task_obj=None) -> None:
     """Verifica se as variáveis de ambiente essenciais estão configuradas."""
     required_env_vars = ["STACK_API_KEY", "STACK_ACCESS_TOKEN"]
 
     missing = [var for var in required_env_vars if not os.getenv(var)]
     if missing:
-        log_progress(f"Variáveis de ambiente obrigatórias ausentes: {', '.join(missing)}", "error")
+        log_progress(f"Variáveis de ambiente obrigatórias ausentes: {', '.join(missing)}", "error", task_obj=task_obj)
         raise ValueError("Variáveis de ambiente não configuradas corretamente no arquivo .env")
 
-def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
+def fetch_users_badges(user_ids: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
     Fetch all user badges with pagination and exponential backoff from Stack Exchange API
 
@@ -67,16 +79,16 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
         try:
             data = safe_api_call(base_url, params=params)
             if not data:
-                    log_progress("No data returned from API.", "warning")
+                    log_progress("No data returned from API.", "warning", task_obj=task_obj)
                     return []
             
             items = data.get("items", [])
             all_badges.extend(items)
 
             if 'quota_remaining' in data:
-                log_progress(f"API quota remaining: {data['quota_remaining']}", "system")
+                log_progress(f"API quota remaining: {data['quota_remaining']}", "system", task_obj=task_obj)
                 if data['quota_remaining'] < 50:
-                    log_progress(f"API quota is low: {data['quota_remaining']}", "warning")
+                    log_progress(f"API quota is low: {data['quota_remaining']}", "warning", task_obj=task_obj)
                     break
 
             if not data.get("has_more"):
@@ -84,29 +96,29 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str) -> list:
 
             page += 1
             base_sleep_time = 2  # reset if successful
-            log_progress(f"Fetching next page of badges ({page})...", "fetch")
+            log_progress(f"Fetching next page of badges ({page})...", "fetch", task_obj=task_obj)
             time.sleep(base_sleep_time)
 
         except requests.exceptions.RequestException as e:
             status_code = getattr(e.response, 'status_code', None)
             if status_code == 429:
-                log_progress(f"Rate limit hit. Pausing for {base_sleep_time} seconds...", "warning")
+                log_progress(f"Rate limit hit. Pausing for {base_sleep_time} seconds...", "warning", task_obj=task_obj)
                 time.sleep(base_sleep_time)
                 base_sleep_time = min(base_sleep_time * 2, max_sleep_time)
                 continue
             elif status_code == 400:
-                log_progress(f"API Error (Bad Request) while fetching badges: {e}", "error")
+                log_progress(f"API Error (Bad Request) while fetching badges: {e}", "error", task_obj=task_obj)
                 break
             else:
-                log_progress(f"An unexpected error occurred while fetching badges: {e}", "error")
+                log_progress(f"An unexpected error occurred while fetching badges: {e}", "error", task_obj=task_obj)
                 break
 
     if not all_badges:
-        log_progress("No badges were found for this batch of users.", "info")
+        log_progress("No badges were found for this batch of users.", "info", task_obj=task_obj)
     return all_badges
 
 
-def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
+def update_badges_data(users: list, api_key: str, access_token: str, task_obj=None) -> bool:
     """
     Update StackBadge and StackUserBadge based on badges fetched for users.
     """
@@ -115,12 +127,12 @@ def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
 
     user_ids = [user.user_id for user in users]
     # Trocado logger.info por log_progress
-    log_progress(f"-> Buscando badges para {len(user_ids)} usuários...", "badge")
+    log_progress(f"-> Buscando badges para {len(user_ids)} usuários...", "badge", task_obj=task_obj)
 
     badge_data = fetch_users_badges(user_ids, api_key, access_token)
     if not badge_data:
         # Trocado logger.warning por log_progress
-        log_progress("Nenhum dado de badge retornado pela API para este lote.", "warning")
+        log_progress("Nenhum dado de badge retornado pela API para este lote.", "warning", task_obj=task_obj)
         return False
 
     created_count = 0
@@ -154,16 +166,16 @@ def update_badges_data(users: list, api_key: str, access_token: str) -> bool:
                         created_count += 1
         except IntegrityError as e:
             # Trocado logger.error por log_progress
-            log_progress(f"Erro ao salvar badge {badge_id} para usuário {user_id}: {e}", "error")
+            log_progress(f"Erro ao salvar badge {badge_id} para usuário {user_id}: {e}", "error", task_obj=task_obj)
             continue
 
     # Trocado logger.info por log_progress
     if created_count > 0:
-        log_progress(f"-> {created_count} novas associações de badges salvas.", "save")
+        log_progress(f"-> {created_count} novas associações de badges salvas.", "save", task_obj=task_obj)
         
     return created_count > 0
 
-def get_users_to_update():
+def get_users_to_update(task_obj=None):
     """
     Get users that need to be updated based on time_mined field
     
@@ -180,7 +192,7 @@ def get_users_to_update():
     )
 
 
-def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list:
+def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
     Fetch collective data from Stack Exchange API with pagination and backoff
 
@@ -202,7 +214,7 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
         slugs_string = ';'.join(batch_slugs)
         page = 1
 
-        log_progress(f"-> Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective")
+        log_progress(f"-> Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective", task_obj=task_obj)
         
 
         while True:  # Pagination loop
@@ -220,14 +232,14 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
             try:
                 data = safe_api_call(base_url, params=params)
                 if not data:
-                    log_progress("No data returned from API.", "warning")
+                    log_progress("No data returned from API.", "warning", task_obj=task_obj)
                     return []
                 
                 items = data.get('items', [])
 
                 if items:
                     all_collectives_data.extend(items)
-                    log_progress(f"Found {len(items)} collectives on page {page}.", "info")
+                    log_progress(f"Found {len(items)} collectives on page {page}.", "info", task_obj=task_obj)
                     
                     for c in items:
                         try:
@@ -241,19 +253,19 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
                                 }
                             )
                         except IntegrityError as e:
-                            log_progress(f"Failed to save collective {c.get('slug')}: {e}", "error")
+                            log_progress(f"Failed to save collective {c.get('slug')}: {e}", "error", task_obj=task_obj)
                             continue
 
 
 
                         #TODO: StackCollectiveTag for all tags in tags field. 
                 else:
-                    log_progress(f"No collectives found on page {page}.", "warning")
+                    log_progress(f"No collectives found on page {page}.", "warning", task_obj=task_obj)
 
                 if 'quota_remaining' in data:
-                    log_progress(f"API quota remaining: {data['quota_remaining']}", "system")
+                    log_progress(f"API quota remaining: {data['quota_remaining']}", "system", task_obj=task_obj)
                     if data['quota_remaining'] < 100:
-                        log_progress(f"API quota is low: {data['quota_remaining']}", "warning")
+                        log_progress(f"API quota is low: {data['quota_remaining']}", "warning", task_obj=task_obj)
                         return all_collectives_data
 
                 if not data.get("has_more"):
@@ -266,20 +278,20 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str) -> list
             except requests.exceptions.RequestException as e:
                 status_code = getattr(e.response, 'status_code', None)
                 if status_code == 429:
-                    log_progress(f"Rate limit hit. Pausing for {base_sleep_time} seconds...", "warning")
+                    log_progress(f"Rate limit hit. Pausing for {base_sleep_time} seconds...", "warning", task_obj=task_obj)
                     time.sleep(base_sleep_time)
                     base_sleep_time = min(base_sleep_time * 2, max_sleep_time)
                     continue
                 elif status_code == 400:
-                    log_progress(f"API Error (Bad Request) while fetching collectives: {e}", "error")
+                    log_progress(f"API Error (Bad Request) while fetching collectives: {e}", "error", task_obj=task_obj)
                     break
                 else:
-                    log_progress(f"An unexpected error occurred while fetching collectives: {e}", "error")
+                    log_progress(f"An unexpected error occurred while fetching collectives: {e}", "error", task_obj=task_obj)
                     break
 
     return all_collectives_data
 
-def link_users_to_collectives(users: list, fallback_collectives_data: list = None):
+def link_users_to_collectives(users: list, fallback_collectives_data: list = None, task_obj=None):
     """
     For each user in the list, create StackCollectiveUser links
     based on their current user.collectives field.
@@ -335,14 +347,14 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                         }
                     )
                     slug_to_collective[slug] = collective  # Cache it
-                    log_progress(f"Created missing collective: {slug}", "save")
+                    log_progress(f"Created missing collective: {slug}", "save", task_obj=task_obj)
                 except IntegrityError as e:
-                    log_progress(f"Failed to create collective {slug}: {e}", "error")
+                    log_progress(f"Failed to create collective {slug}: {e}", "error", task_obj=task_obj)
             else:
-                log_progress(f"Data for collective '{slug}' not found to create it.", "warning")
+                log_progress(f"Data for collective '{slug}' not found to create it.", "warning", task_obj=task_obj)
 
         if not collective:
-            log_progress(f"Could not link user {user.user_id} to missing collective '{slug}'.", "warning")
+            log_progress(f"Could not link user {user.user_id} to missing collective '{slug}'.", "warning", task_obj=task_obj)
             continue
 
         try:
@@ -359,17 +371,17 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                 if created:
                     created_count += 1
         except IntegrityError as e:
-            log_progress(f"Failed to link user {user.user_id} to collective {collective.slug}: {e}", "error")
+            log_progress(f"Failed to link user {user.user_id} to collective {collective.slug}: {e}", "error", task_obj=task_obj)
 
 
-    log_progress(f"-> Created {created_count} new user-collective links.", "save")
+    log_progress(f"-> Created {created_count} new user-collective links.", "save", task_obj=task_obj)
 
-def sync_collective_tags(collectives_data: list):
+def sync_collective_tags(collectives_data: list, task_obj=None):
     from stackoverflow.models import StackTag, StackCollective, StackCollectiveTag
 
     if not collectives_data:
         # Trocado logger.warning por log_progress
-        log_progress("No collective data provided to sync tags.", "warning")
+        log_progress("No collective data provided to sync tags.", "warning", task_obj=task_obj)
         return
 
     tag_names = set()
@@ -392,7 +404,7 @@ def sync_collective_tags(collectives_data: list):
         tag_obj = StackTag.objects.create(name=tag_name)
         tag_objs[tag_name] = tag_obj
         # Trocado logger.info por log_progress
-        log_progress(f"Created missing Tag: {tag_name}", "save")
+        log_progress(f"Created missing Tag: {tag_name}", "save", task_obj=task_obj)
 
     collectives = {
         c.slug: c for c in StackCollective.objects.filter(slug__in=slug_to_tags.keys())
@@ -403,14 +415,14 @@ def sync_collective_tags(collectives_data: list):
         collective = collectives.get(slug)
         if not collective:
             # Trocado logger.warning por log_progress
-            log_progress(f"Collective '{slug}' not found in DB. Skipping tag link.", "warning")
+            log_progress(f"Collective '{slug}' not found in DB. Skipping tag link.", "warning", task_obj=task_obj)
             continue
 
         for tag_name in tag_list:
             tag = tag_objs.get(tag_name)
             if not tag:
                 # Trocado logger.warning por log_progress
-                log_progress(f"Tag '{tag_name}' not found. Skipping link.", "warning")
+                log_progress(f"Tag '{tag_name}' not found. Skipping link.", "warning", task_obj=task_obj)
                 continue
 
             try:
@@ -423,13 +435,13 @@ def sync_collective_tags(collectives_data: list):
                         created_count += 1
             except IntegrityError as e:
                 # Trocado logger.error por log_progress
-                log_progress(f"Failed to link tag '{tag}' to collective '{collective.slug}': {e}", "error")
+                log_progress(f"Failed to link tag '{tag}' to collective '{collective.slug}': {e}", "error", task_obj=task_obj)
 
     # Trocado logger.info por log_progress
     if created_count > 0:
-        log_progress(f"-> Created {created_count} new links between collectives and tags.", "save")
+        log_progress(f"-> Created {created_count} new links between collectives and tags.", "save", task_obj=task_obj)
 
-def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
+def fetch_users_data(user_ids: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
     Fetch complete user data from Stack Exchange API with user-friendly feedback.
     """
@@ -457,7 +469,7 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
             try:
                 data = safe_api_call(base_url, params=params)
                 if not data:
-                    log_progress("No user data returned from API for this batch.", "warning")
+                    log_progress("No user data returned from API for this batch.", "warning", task_obj=task_obj)
                     return []
                 
                 items = data.get('items', [])
@@ -465,7 +477,7 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
                     all_users_data.extend(items)
                 
                 if 'quota_remaining' in data and data['quota_remaining'] < 100:
-                    log_progress(f"API quota is low: {data['quota_remaining']}", "warning")
+                    log_progress(f"API quota is low: {data['quota_remaining']}", "warning", task_obj=task_obj)
 
                 if not data.get("has_more"):
                     break
@@ -476,17 +488,17 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str) -> list:
             except requests.exceptions.RequestException as e:
                 status_code = getattr(e.response, 'status_code', None)
                 if status_code == 429:
-                    log_progress("Rate limit hit. Pausing for a moment...", "warning")
+                    log_progress("Rate limit hit. Pausing for a moment...", "warning", task_obj=task_obj)
                     time.sleep(5) # Pausa curta para rate limit
                     continue
                 else:
-                    log_progress(f"API Error while fetching users: {e}", "error")
+                    log_progress(f"API Error while fetching users: {e}", "error", task_obj=task_obj)
                     break
     
     return all_users_data
 
 
-def update_users_data(users: list, api_key: str, access_token: str) -> set:
+def update_users_data(users: list, api_key: str, access_token: str, task_obj=None) -> set:
     """
     Update multiple users' data with complete information from Stack Exchange API
     
@@ -502,11 +514,11 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
         return False
         
     user_ids = [user.user_id for user in users]
-    log_progress(f"-> Buscando perfis completos para {len(user_ids)} usuários...", "fetch")
+    log_progress(f"-> Buscando perfis completos para {len(user_ids)} usuários...", "fetch", task_obj=task_obj)
     users_data = fetch_users_data(user_ids, api_key, access_token)
     
     if not users_data:
-        log_progress("Nenhum dado de perfil retornado pela API para este lote.", "warning")
+        log_progress("Nenhum dado de perfil retornado pela API para este lote.", "warning", task_obj=task_obj)
         return False
     
     # Create a dictionary for quick lookup
@@ -520,7 +532,7 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
     for user_data in users_data:
         user_id = user_data.get('user_id')
         if user_id not in users_dict:
-            log_progress(f"Usuário ID {user_id} da API não encontrado no lote do banco de dados.", "warning")
+            log_progress(f"Usuário ID {user_id} da API não encontrado no lote do banco de dados.", "warning", task_obj=task_obj)
             skipped_count += 1
             continue
             
@@ -566,21 +578,21 @@ def update_users_data(users: list, api_key: str, access_token: str) -> set:
         user.save()
         updated_count += 1
     
-    log_progress(f"-> {updated_count} perfis de usuários atualizados.", "save")
+    log_progress(f"-> {updated_count} perfis de usuários atualizados.", "save", task_obj=task_obj)
     if skipped_count > 0:
-        log_progress(f"{skipped_count} usuários foram ignorados (não encontrados no lote).", "warning")
+        log_progress(f"{skipped_count} usuários foram ignorados (não encontrados no lote).", "warning", task_obj=task_obj)
     return unique_slugs
 
 # Em stackoverflow/functions/data_populator.py
 
-def populate_missing_data(api_key: str, access_token: str):
+def populate_missing_data(api_key: str, access_token: str, task_obj=None):
     """
     Populate missing data for users that need updating
     """
     # Bloco 1: Verificação Inicial
     users_to_update = list(get_users_to_update())
     total_users = len(users_to_update)
-    log_progress(f"Encontrados {total_users} usuários para enriquecer os dados.", "info")
+    log_progress(f"Encontrados {total_users} usuários para enriquecer os dados.", "info", task_obj=task_obj)
     
     if total_users == 0:
         return
@@ -588,7 +600,7 @@ def populate_missing_data(api_key: str, access_token: str):
     # Bloco 2: Preparação dos Lotes
     batch_size = 100
     total_batches = (total_users + batch_size - 1) // batch_size
-    log_progress(f"O processo será dividido em {total_batches} lotes.", "system")
+    log_progress(f"O processo será dividido em {total_batches} lotes.", "system", task_obj=task_obj)
     
     # Suas variáveis de controle originais, mantidas
     all_unique_slugs = set()
@@ -599,33 +611,33 @@ def populate_missing_data(api_key: str, access_token: str):
     for i in range(0, total_users, batch_size):
         batch_num = i // batch_size + 1
         batch_users = users_to_update[i:i + batch_size]
-        log_progress(f"Processando lote {batch_num}/{total_batches} ({len(batch_users)} usuários)...", "process")
+        log_progress(f"Processando lote {batch_num}/{total_batches} ({len(batch_users)} usuários)...", "process", task_obj=task_obj)
         
         # Sua lógica original de update, intacta
-        batch_slugs = update_users_data(batch_users, api_key, access_token)
+        batch_slugs = update_users_data(batch_users, api_key, access_token, task_obj=task_obj)
         if batch_slugs:
             all_unique_slugs.update(batch_slugs)
         
-        if update_badges_data(batch_users, api_key, access_token):
+        if update_badges_data(batch_users, api_key, access_token, task_obj=task_obj):
             total_badges_updated += 1
             
         processed_user_ids.update([user.user_id for user in batch_users])
     
     # Bloco 4: Processamento de Coletivos
     if all_unique_slugs:
-        log_progress(f"Processando {len(all_unique_slugs)} coletivos (Collectives)...", "collective")
-        collectives = fetch_collectives_data(list(all_unique_slugs), api_key, access_token)
-        link_users_to_collectives(users_to_update, collectives)
+        log_progress(f"Processando {len(all_unique_slugs)} coletivos (Collectives)...", "collective", task_obj=task_obj)
+        collectives = fetch_collectives_data(list(all_unique_slugs), api_key, access_token, task_obj=task_obj)
+        link_users_to_collectives(users_to_update, collectives, task_obj=task_obj)
         sync_collective_tags(collectives)
     else:
-        log_progress("Nenhum coletivo para processar.", "info")
+        log_progress("Nenhum coletivo para processar.", "info", task_obj=task_obj)
     
     # Bloco 5: Verificação Final (lógica mantida)
     if len(processed_user_ids) != total_users:
-        log_progress(f"Nem todos os usuários foram processados! Esperado: {total_users}, Processado: {len(processed_user_ids)}", "warning")
+        log_progress(f"Nem todos os usuários foram processados! Esperado: {total_users}, Processado: {len(processed_user_ids)}", "warning", task_obj=task_obj)
     
     # Log de Sucesso Final
-    log_progress(f"Enriquecimento finalizado. {len(processed_user_ids)} usuários foram verificados/atualizados.", "success")
+    log_progress(f"Enriquecimento finalizado. {len(processed_user_ids)} usuários foram verificados/atualizados.", "success", task_obj=task_obj)
     
 def main():
     """

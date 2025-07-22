@@ -7,10 +7,9 @@ from datetime import datetime
 from django.conf import settings  # Adicionado para buscar chaves da API de forma segura
 
 # Importa a função que realmente faz o trabalho
-from .tasks import collect_questions_task
+from .tasks import collect_questions_task, repopulate_users_task
 # Mantemos este import para a outra função que não vamos mexer agora
-from .functions.data_populator import populate_missing_data 
-
+from jobs.models import Task
 # Mantemos os imports da documentação e de outros módulos
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiParameter
 import logging # Adicionado para registrar erros no terminal
@@ -193,69 +192,60 @@ class StackOverflowViewSet(viewsets.ViewSet):
     ViewSet for collecting Stack Overflow data.
     Provides endpoints for collecting questions and populating db with all necessary data.
     """
-    
-# --- TRECHO CORRIGIDO (Função collect_questions) ---
+        
     @action(detail=False, methods=['post'], url_path='collect-questions')
     def collect_questions(self, request):
-        """
-        Enfileira uma tarefa no Celery para coletar perguntas do Stack Overflow.
-        """
         try:
-            # Esta parte continua igual
             start_date = request.data.get('start_date')
             end_date = request.data.get('end_date')
 
             if not start_date or not end_date:
-                return Response({'error': 'start_date e end_date são obrigatórios'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'start_date e end_date são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Validação simples de data
             datetime.strptime(start_date, '%Y-%m-%d')
             datetime.strptime(end_date, '%Y-%m-%d')
             
-            # --- AQUI ESTÁ A MUDANÇA ---
-            # Em vez de chamar a função diretamente, usamos .delay() para
-            # colocar a tarefa na fila do Celery (Redis).
-            collect_questions_task.delay(start_date=start_date, end_date=end_date)
+            # Dispara a tarefa no Celery e pega o ID dela
+            task = collect_questions_task.delay(start_date=start_date, end_date=end_date)
             
-            # A resposta para o Bruno é imediata
-            return Response({
-                'message': f'Tarefa de coleta para o período de {start_date} a {end_date} foi enviada para a fila. Monitore o terminal do WORKER para ver o progresso.'
-            }, status=status.HTTP_202_ACCEPTED) # 202 Accepted é o status ideal para "Recebi, vou fazer".
+            # Cria o registro no banco de dados para o frontend acompanhar
+            Task.objects.create(
+                task_id=task.id, 
+                operation=f"Iniciando coleta de perguntas: {start_date} a {end_date}", 
+                repository="Stack Overflow"
+            )
+            
+            # Retorna uma resposta imediata para o Bruno
+            return Response(
+                {'task_id': task.id, 'status': 'Tarefa de coleta iniciada'}, 
+                status=status.HTTP_202_ACCEPTED
+            )
 
         except ValueError:
             return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Erro ao enfileirar a tarefa collect_questions: {e}", exc_info=True)
-            return Response({'error': f'Um erro inesperado ocorreu ao enviar a tarefa: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
-    # --- TRECHO CORRIGIDO ---
+            logger.error(f"Erro ao enfileirar a tarefa 'collect_questions': {e}", exc_info=True)
+            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)          
+        
     @action(detail=False, methods=['post'], url_path='re-populate-data')
     def re_populate_data(self, request):
-        """
-        Inicia o processo de enriquecimento dos dados de usuários já coletados.
-        """
         try:
-            print("▶️  API: Iniciando processo de re-população de dados.")
-            
-            # Pegando as chaves pelas configurações do Django para manter o padrão
-            api_key = settings.STACK_API_KEY
-            access_token = settings.STACK_ACCESS_TOKEN
-            
-            if not api_key or not access_token:
-                return Response({
-                    'error': 'STACK_API_KEY e STACK_ACCESS_TOKEN devem estar configurados.'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Dispara a tarefa no Celery e pega o ID
+            task = repopulate_users_task.delay()
 
-            # A chamada para a sua função continua a mesma
-            populate_missing_data(api_key, access_token)
+            # Cria o registro no banco de dados para o frontend acompanhar
+            Task.objects.create(
+                task_id=task.id, 
+                operation="Iniciando enriquecimento de dados de usuários", 
+                repository="Stack Overflow"
+            )
 
-            print("✅ API: Processo de re-população finalizado.")
+            # Retorna uma resposta imediata para o Bruno
+            return Response(
+                {'task_id': task.id, 'status': 'Tarefa de enriquecimento iniciada'}, 
+                status=status.HTTP_202_ACCEPTED
+            )
             
-            return Response({
-                'message': 'Processo de re-população de dados executado com sucesso.',
-                'status': 'completed'
-            }, status=status.HTTP_200_OK)
-
         except Exception as e:
-            logger.error(f"Erro inesperado em re_populate_data: {e}", exc_info=True)
+            logger.error(f"Erro ao enfileirar a tarefa 're_populate_data': {e}", exc_info=True)
             return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
