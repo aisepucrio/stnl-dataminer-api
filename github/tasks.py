@@ -1,5 +1,5 @@
 from celery import shared_task
-from .miner import GitHubMiner
+from .miners import GitHubMiner
 from jobs.models import Task
 from datetime import datetime
 
