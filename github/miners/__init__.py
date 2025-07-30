@@ -95,24 +95,24 @@ class GitHubMiner(BaseMiner):
     
     def get_commits(self, repo_name: str, start_date: Optional[str] = None, 
                    end_date: Optional[str] = None, clone_path: Optional[str] = None, 
-                   commit_sha: Optional[str] = None) -> List[Dict[str, Any]]:
+                   commit_sha: Optional[str] = None, task_obj=None) -> List[Dict[str, Any]]:
         """Extract commits from a GitHub repository"""
         self._sync_auth_state()
-        return self._commits_miner.get_commits(repo_name, start_date, end_date, clone_path, commit_sha)
+        return self._commits_miner.get_commits(repo_name, start_date, end_date, clone_path, commit_sha, task_obj)
     
     # Pull requests mining methods
     def get_pull_requests(self, repo_name: str, start_date: Optional[str] = None, 
-                         end_date: Optional[str] = None, depth: str = 'basic') -> List[Dict[str, Any]]:
+                         end_date: Optional[str] = None, depth: str = 'basic', task_obj=None) -> List[Dict[str, Any]]:
         """Extract pull requests from a GitHub repository"""
         self._sync_auth_state()
-        return self._pull_requests_miner.get_pull_requests(repo_name, start_date, end_date, depth)
+        return self._pull_requests_miner.get_pull_requests(repo_name, start_date, end_date, depth, task_obj)
     
     # Issues mining methods
     def get_issues(self, repo_name: str, start_date: Optional[str] = None, 
-                   end_date: Optional[str] = None, depth: str = 'basic') -> List[Dict[str, Any]]:
+                   end_date: Optional[str] = None, depth: str = 'basic', task_obj=None) -> List[Dict[str, Any]]:
         """Extract issues from a GitHub repository"""
         self._sync_auth_state()
-        return self._issues_miner.get_issues(repo_name, start_date, end_date, depth)
+        return self._issues_miner.get_issues(repo_name, start_date, end_date, depth, task_obj)
     
     # Metadata and branches mining methods
     def get_branches(self, repo_name: str) -> List[Dict[str, Any]]:

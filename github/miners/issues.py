@@ -13,7 +13,7 @@ class IssuesMiner(BaseMiner):
     """Specialized miner for GitHub issues extraction"""
 
     def get_issues(self, repo_name: str, start_date: Optional[str] = None, 
-                   end_date: Optional[str] = None, depth: str = 'basic') -> List[Dict[str, Any]]:
+                   end_date: Optional[str] = None, depth: str = 'basic', task_obj=None) -> List[Dict[str, Any]]:
         """
         Extract issues from a GitHub repository
         
@@ -22,24 +22,64 @@ class IssuesMiner(BaseMiner):
             start_date: Start date in ISO format (optional)
             end_date: End date in ISO format (optional)
             depth: Extraction depth ('basic' or 'complex')
+            task_obj: Task object for progress updates (optional)
             
         Returns:
             List of extracted issue data
         """
         all_issues = []
         metrics = APIMetrics()
+        total_issues_count = 0
+        processed_count = 0
         
-        print("\n" + "="*50)
-        print(f"🔍 STARTING ISSUE EXTRACTION: {repo_name}")
-        print(f"📅 Period: {start_date or 'start'} to {end_date or 'current'}")
-        print(f"🔎 Depth: {depth.upper()}")
-        print("="*50 + "\n")
+        def log_progress(message: str) -> None:
+            """Log progress message and update task if available"""
+            print(message, flush=True)
+            if task_obj:
+                task_obj.operation = message
+                task_obj.save(update_fields=["operation"])
+        
+        log_progress(f"🔍 STARTING ISSUE EXTRACTION: {repo_name}")
+        log_progress(f"📅 Period: {start_date or 'start'} to {end_date or 'current'}")
+        log_progress(f"🔎 Depth: {depth.upper()}")
 
         try:
+            log_progress("Verificando o total de issues a serem mineradas...")
+            
             for period_start, period_end in split_date_range(start_date, end_date):
-                print("\n" + "-"*40)
-                print(f"📊 Processing period: {period_start} to {period_end}")
-                print("-"*40)
+                query = f"repo:{repo_name} is:issue"
+                if period_start:
+                    query += f" created:{period_start}"
+                if period_end:
+                    query += f"..{period_end}"
+
+                params = {
+                    'q': query,
+                    'per_page': 1,  
+                    'page': 1
+                }
+
+                response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
+                metrics.total_requests += 1
+
+                if response.status_code == 403 and 'rate limit' in response.text.lower():
+                    if not self.handle_rate_limit(response, 'search'):
+                        log_progress("Failed to recover after rate limit during preflight check")
+                        continue
+                    response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    period_total = data.get('total_count', 0)
+                    total_issues_count += period_total
+                    log_progress(f"Período {period_start} a {period_end}: {period_total} issues encontradas")
+                else:
+                    log_progress(f"Erro na pré-verificação do período {period_start} a {period_end}: {response.status_code}")
+
+            log_progress(f"Total de {total_issues_count} issues encontradas. Iniciando a coleta.")
+
+            for period_start, period_end in split_date_range(start_date, end_date):
+                log_progress(f"📊 Processing period: {period_start} to {period_end}")
                 
                 page = 1
                 has_more_pages = True
@@ -63,7 +103,7 @@ class IssuesMiner(BaseMiner):
 
                     if response.status_code == 403 and 'rate limit' in response.text.lower():
                         if not self.handle_rate_limit(response, 'search'):
-                            print("Failed to recover after rate limit", flush=True)
+                            log_progress("Failed to recover after rate limit")
                             break
                         response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
 
@@ -73,18 +113,22 @@ class IssuesMiner(BaseMiner):
 
                     issues_in_page = len(data['items'])
                     period_issues_count += issues_in_page
-                    print(f"\n📝 Page {page}: Processing {issues_in_page} issues...")
+                    log_progress(f"📝 Page {page}: Processing {issues_in_page} issues...")
 
-                    for issue in data['items']:
+                    for index, issue in enumerate(data['items']):
                         current_timestamp = timezone.now()
+                        processed_count += 1
                         
-                        # Skip pull requests (they appear in issues search)
                         if 'pull_request' in issue:
                             continue
 
                         issue_number = issue['number']
                         
-                        # Get timeline events
+                        if total_issues_count > 0:
+                            log_progress(f"Mining issue {processed_count} of {total_issues_count}. Key: #{issue_number} - {issue['title']}")
+                        else:
+                            log_progress(f"Mining issue #{issue_number} - {issue['title']}")
+                        
                         timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
                         headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
                         timeline_response = requests.get(timeline_url, headers=headers)
@@ -93,7 +137,7 @@ class IssuesMiner(BaseMiner):
                         timeline_events = []
                         if timeline_response.status_code == 403 and 'rate limit' in timeline_response.text.lower():
                             if not self.handle_rate_limit(timeline_response, 'core'):
-                                print(f"[Issues] Failed to recover timeline #{issue_number} after rate limit", flush=True)
+                                log_progress(f"[Issues] Failed to recover timeline #{issue_number} after rate limit")
                                 continue
                             timeline_response = requests.get(timeline_url, headers=headers)
                         
@@ -106,7 +150,6 @@ class IssuesMiner(BaseMiner):
                                 'label': event.get('label', {}).get('name') if event.get('label') else None
                             } for event in timeline_response.json()]
 
-                        # Get comments only if complex mining
                         comments = []
                         if depth == 'complex':
                             comments_url = issue['comments_url']
@@ -115,7 +158,7 @@ class IssuesMiner(BaseMiner):
                             
                             if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
                                 if not self.handle_rate_limit(comments_response, 'core'):
-                                    print(f"[Issues] Failed to retrieve comments #{issue_number} after rate limit", flush=True)
+                                    log_progress(f"[Issues] Failed to retrieve comments #{issue_number} after rate limit")
                                     continue
                                 comments_response = requests.get(comments_url, headers=self.headers)
                             
@@ -129,8 +172,6 @@ class IssuesMiner(BaseMiner):
                                     'author_association': c['author_association'],
                                     'reactions': c.get('reactions', {})
                                 } for c in comments_response.json()]
-
-                        # Create object to save in the database
                         processed_issue = {
                             'id': issue['id'],
                             'number': issue['number'],
@@ -153,7 +194,6 @@ class IssuesMiner(BaseMiner):
                             'data_type': 'issue'
                         }
 
-                        # Preserve existing data if doing basic mining
                         existing_issue = None
                         if depth == 'basic':
                             existing_issue = GitHubIssue.objects.filter(issue_id=processed_issue['id']).first()
@@ -161,7 +201,6 @@ class IssuesMiner(BaseMiner):
                                 processed_issue['comments_data'] = existing_issue.comments
                                 processed_issue['timeline_events'] = existing_issue.timeline_events
 
-                        # Save to database using the unified model
                         GitHubIssuePullRequest.objects.update_or_create(
                             record_id=processed_issue['id'],
                             defaults={
@@ -189,7 +228,6 @@ class IssuesMiner(BaseMiner):
                         )
 
                         all_issues.append(processed_issue)
-                        print(f"✓ Issue #{issue_number} processed", end='\r')
 
                     if len(data['items']) < 100:
                         has_more_pages = False
@@ -198,15 +236,13 @@ class IssuesMiner(BaseMiner):
 
                     time.sleep(1)
 
-                print(f"\n✅ Period completed: {period_issues_count} issues collected in {page} pages")
+                log_progress(f"✅ Period completed: {period_issues_count} issues collected in {page} pages")
 
-            print("\n" + "="*50)
-            print(f"Extraction completed! Total issues collected: {len(all_issues)}")
-            print("="*50 + "\n")
+            log_progress(f"✅ Extraction completed! Total issues collected: {len(all_issues)}")
             return all_issues
 
         except Exception as e:
-            print(f"\n❌ Error during extraction: {str(e)}", flush=True)
+            log_progress(f"❌ Error during extraction: {str(e)}")
             raise RuntimeError(f"Issue extraction failed: {str(e)}") from e
         finally:
             self.verify_token() 

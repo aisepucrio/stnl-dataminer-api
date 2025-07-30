@@ -26,7 +26,7 @@ class CommitsMiner(BaseMiner):
     def clone_repo(self, repo_url: str, clone_path: str) -> bool:
         """Clone repository with retry logic"""
         max_retries = 3
-        retry_delay = 5  # seconds
+        retry_delay = 5  
         
         for attempt in range(max_retries):
             try:
@@ -88,7 +88,7 @@ class CommitsMiner(BaseMiner):
 
     def get_commits(self, repo_name: str, start_date: Optional[str] = None, 
                    end_date: Optional[str] = None, clone_path: Optional[str] = None, 
-                   commit_sha: Optional[str] = None) -> List[Dict[str, Any]]:
+                   commit_sha: Optional[str] = None, task_obj=None) -> List[Dict[str, Any]]:
         """
         Extract commits from a GitHub repository
         
@@ -98,19 +98,27 @@ class CommitsMiner(BaseMiner):
             end_date: End date in ISO format (optional)
             clone_path: Path to clone repository (optional)
             commit_sha: Specific commit SHA to extract (optional)
+            task_obj: Task object for progress updates (optional)
             
         Returns:
             List of extracted commit data
         """
+        
+        def log_progress(message: str) -> None:
+            """Log progress message and update task if available"""
+            print(message, flush=True)
+            if task_obj:
+                task_obj.operation = message
+                task_obj.save(update_fields=["operation"])
+        
         try:
-            print(f"[COMMITS] Starting commits extraction for {repo_name}", flush=True)
+            log_progress(f"🔍 STARTING COMMITS EXTRACTION: {repo_name}")
 
             if commit_sha:
-                print(f"[COMMITS] Extraction mode: Specific commit (SHA: {commit_sha})", flush=True)
+                log_progress(f"📋 Extraction mode: Specific commit (SHA: {commit_sha})")
             else:
-                print(f"[COMMITS] Extraction mode: Period from {start_date or 'beginning'} to {end_date or 'now'}", flush=True)
+                log_progress(f"📅 Period: {start_date or 'beginning'} to {end_date or 'now'}")
 
-            # Parse dates
             if start_date:
                 start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ')
             else:
@@ -121,35 +129,53 @@ class CommitsMiner(BaseMiner):
             else:
                 end_date = datetime.now()
 
-            # Setup repository path
             clone_path = clone_path if clone_path is not None else os.path.join(self.user_home_directory(), 'GitHubClones')
             repo_path = os.path.join(clone_path, repo_name.split('/')[1])
 
-            # Clone or update repository
             if not os.path.exists(repo_path):
                 repo_url = f'https://github.com/{repo_name}'
-                print(f"[COMMITS] Cloning repository: {repo_url}", flush=True)
+                log_progress(f"📥 Cloning repository: {repo_url}")
                 self.clone_repo(repo_url, repo_path)
             else:
-                print(f"[COMMITS] Repository already exists: {repo_path}", flush=True)
+                log_progress(f"📂 Repository already exists: {repo_path}")
                 self.update_repo(repo_path)
 
-            print("[COMMITS] Starting commits analysis...", flush=True)
+            log_progress("🔍 Starting commits analysis...")
 
-            # Initialize repository analyzer
             if commit_sha:
                 repo = Repository(repo_path, single=commit_sha).traverse_commits()
+                log_progress(f"🎯 Processing specific commit: {commit_sha}")
             else:
                 repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
+                log_progress("📊 Processing commits in date range...")
 
             essential_commits = []
             current_timestamp = django_timezone.now()
+            processed_count = 0
 
-            # Process each commit
-            for commit in repo:
-                print(f"[COMMITS] Processing commit: {commit.hash[:7]}", flush=True)
+            if not commit_sha:
+                log_progress("🔢 Counting total commits to process...")
+                total_commits = 0
+                for _ in repo:
+                    total_commits += 1
                 
-                # Create or get author and committer
+                log_progress(f"📈 Total commits to process: {total_commits}")
+                
+                if commit_sha:
+                    repo = Repository(repo_path, single=commit_sha).traverse_commits()
+                else:
+                    repo = Repository(repo_path, since=start_date, to=end_date).traverse_commits()
+            else:
+                total_commits = 1
+
+            for commit in repo:
+                processed_count += 1
+                
+                if total_commits > 0:
+                    log_progress(f"Mining commit {processed_count} of {total_commits}. SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
+                else:
+                    log_progress(f"Mining commit SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
+                
                 author, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.author.name, 
                     email=commit.author.email if commit.author else None
@@ -159,7 +185,6 @@ class CommitsMiner(BaseMiner):
                     email=commit.committer.email if commit.committer else None
                 )
 
-                # Create or update commit in the database
                 db_commit, created = GitHubCommit.objects.update_or_create(
                     sha=commit.hash,
                     defaults={
@@ -180,7 +205,6 @@ class CommitsMiner(BaseMiner):
                     }
                 )
 
-                # Prepare commit data for JSON response
                 commit_data = {
                     'sha': commit.hash,
                     'message': commit.msg,
@@ -206,7 +230,6 @@ class CommitsMiner(BaseMiner):
                     'modified_files': []
                 }
 
-                # Process modified files
                 for mod in commit.modified_files:
                     db_mod_file, _ = GitHubModifiedFile.objects.update_or_create(
                         commit=db_commit,
@@ -223,7 +246,6 @@ class CommitsMiner(BaseMiner):
                         }
                     )
 
-                    # Prepare modified file data
                     mod_data = {
                         'old_path': mod.old_path,
                         'new_path': mod.new_path,
@@ -236,7 +258,6 @@ class CommitsMiner(BaseMiner):
                         'methods': []
                     }
 
-                    # Process methods
                     for method in mod.methods:
                         GitHubMethod.objects.update_or_create(
                             modified_file=db_mod_file,
@@ -259,11 +280,11 @@ class CommitsMiner(BaseMiner):
 
                 essential_commits.append(commit_data)
 
-            print(f"[COMMITS] Total commits processed: {len(essential_commits)}", flush=True)
+            log_progress(f"✅ Extraction completed! Total commits processed: {len(essential_commits)}")
             return essential_commits
 
         except Exception as e:
-            print(f"[COMMITS] Error accessing repository: {e}", flush=True)
+            log_progress(f"❌ Error during commits extraction: {str(e)}")
             return []
         finally:
             self.verify_token() 

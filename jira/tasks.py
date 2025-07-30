@@ -1,5 +1,5 @@
 from celery import shared_task
-from github.miner import GitHubMiner
+from github.miners import GitHubMiner
 from jira.miner import JiraMiner
 from django.conf import settings
 from datetime import datetime
