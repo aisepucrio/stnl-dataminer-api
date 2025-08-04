@@ -182,3 +182,8 @@ class ExportDataSerializer(serializers.Serializer):
         default='json',
         help_text="Output format (only JSON is supported)"
     )
+    data_type = serializers.ChoiceField(
+        choices=['issue', 'pull_request'],
+        required=False,
+        help_text="Filter by data type (issue or pull_request) - only applies to githubissuepullrequest table"
+    )

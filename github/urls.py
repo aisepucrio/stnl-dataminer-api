@@ -28,4 +28,5 @@ urlpatterns = [
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('dashboard/graph/', views.GraphDashboardView.as_view(), name='graph-dashboard'),
     path('export/', views.ExportDataView.as_view(), name='export-data'),
+    path('users/', views.UserListView.as_view(), name='user-list'),
 ]
