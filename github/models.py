@@ -1,4 +1,5 @@
 from django.db import models
+from utils.models import Repository
 
 class GitHubAuthor(models.Model):
     name = models.CharField(max_length=255)
@@ -11,7 +12,7 @@ class GitHubAuthor(models.Model):
         return f"{self.name} <{self.email}>"
 
 class GitHubCommit(models.Model):
-    repository = models.CharField(max_length=255, db_index=True, default='')
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="commits")
     sha = models.CharField(max_length=40, unique=True)
     message = models.TextField()
     date = models.DateTimeField()
@@ -57,12 +58,12 @@ class GitHubMethod(models.Model):
         return f"Method {self.name} in File {self.modified_file.filename}"
 
 class GitHubIssue(models.Model):
-    repository = models.CharField(max_length=255, db_index=True, default='')
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="issues")
     issue_id = models.BigIntegerField()
     number = models.IntegerField(null=True)
     title = models.TextField()
     state = models.CharField(max_length=20)
-    creator = models.CharField(max_length=100)
+    creator = models.ForeignKey(GitHubAuthor, on_delete=models.SET_NULL, null=True, related_name="created_issues")
     assignees = models.JSONField(default=list)
     labels = models.JSONField(default=list)
     milestone = models.CharField(max_length=255, null=True, blank=True)
@@ -90,11 +91,11 @@ class GitHubIssue(models.Model):
 
 class GitHubPullRequest(models.Model):
     pr_id = models.BigIntegerField(primary_key=True)
-    repository = models.CharField(max_length=255)
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="pull_requests")
     number = models.IntegerField(null=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=50)
-    creator = models.CharField(max_length=255)
+    creator = models.ForeignKey(GitHubAuthor, on_delete=models.SET_NULL, null=True, related_name="created_pull_requests")
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
     closed_at = models.DateTimeField(null=True)
@@ -112,7 +113,7 @@ class GitHubPullRequest(models.Model):
         return f"Pull Request {self.pr_id} - {self.title}"
 
 class GitHubBranch(models.Model):
-    repository = models.CharField(max_length=255, db_index=True, default='')
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="branches")
     name = models.CharField(max_length=500)
     sha = models.CharField(max_length=40)
     time_mined = models.DateTimeField(null=True, help_text="Date and time of mining")
@@ -121,7 +122,7 @@ class GitHubBranch(models.Model):
         return f"Branch {self.name}"
 
 class GitHubMetadata(models.Model):
-    repository = models.CharField(max_length=255, db_index=True)
+    repository = models.OneToOneField(Repository, on_delete=models.CASCADE, related_name="github_metadata")
     owner = models.CharField(max_length=255)
     organization = models.CharField(max_length=255, null=True)
     stars_count = models.IntegerField(default=0)
@@ -151,18 +152,17 @@ class GitHubMetadata(models.Model):
             models.Index(fields=['created_at']),
             models.Index(fields=['updated_at'])
         ]
-        unique_together = ['repository', 'owner']
 
     def __str__(self):
         return f"Metadata for {self.repository}"
 
 class GitHubIssuePullRequest(models.Model):
-    repository = models.CharField(max_length=255, db_index=True, default='')
+    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="issues_and_prs")
     record_id = models.BigIntegerField(unique=True)
     number = models.IntegerField(null=True)
     title = models.TextField()
     state = models.CharField(max_length=20)
-    creator = models.CharField(max_length=100)
+    creator = models.ForeignKey(GitHubAuthor, on_delete=models.SET_NULL, null=True, related_name="created_issues_and_prs")
     assignees = models.JSONField(default=list)
     labels = models.JSONField(default=list)
     milestone = models.CharField(max_length=255, null=True, blank=True)

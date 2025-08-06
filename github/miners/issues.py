@@ -6,11 +6,39 @@ from django.utils import timezone
 
 from .base import BaseMiner
 from .utils import APIMetrics, split_date_range
-from ..models import GitHubIssuePullRequest, GitHubIssue
+from utils.models import Repository
+from ..models import GitHubIssuePullRequest, GitHubAuthor, GitHubIssue
 
 
 class IssuesMiner(BaseMiner):
     """Specialized miner for GitHub issues extraction"""
+
+    def get_or_create_repository(self, repo_name: str) -> Repository:
+        """
+        Busca ou cria um repositório GitHub com base no nome
+        
+        Args:
+            repo_name (str): Nome do repositório no formato 'owner/repo'
+        
+        Returns:
+            Repository: Instância do repositório
+        """
+        if '/' in repo_name:
+            owner, name = repo_name.split('/', 1)
+        else:
+            owner = ''
+            name = repo_name
+        
+        repository, created = Repository.objects.get_or_create(
+            full_name=repo_name,
+            defaults={
+                'owner': owner,
+                'name': name,
+                'platform': 'github',
+                'url': f'https://github.com/{repo_name}' if '/' in repo_name else '',
+            }
+        )
+        return repository
 
     def get_issues(self, repo_name: str, start_date: Optional[str] = None, 
                    end_date: Optional[str] = None, depth: str = 'basic', task_obj=None) -> List[Dict[str, Any]]:
@@ -201,14 +229,23 @@ class IssuesMiner(BaseMiner):
                                 processed_issue['comments_data'] = existing_issue.comments
                                 processed_issue['timeline_events'] = existing_issue.timeline_events
 
+                        repository = self.get_or_create_repository(repo_name)
+                        
+                        creator, _ = GitHubAuthor.objects.get_or_create(
+                            name=issue['user']['login'],
+                            defaults={
+                                'email': issue['user'].get('email', '')
+                            }
+                        )
+                        
                         GitHubIssuePullRequest.objects.update_or_create(
                             record_id=processed_issue['id'],
                             defaults={
-                                'repository': repo_name,
+                                'repository': repository,
                                 'number': processed_issue['number'],
                                 'title': processed_issue['title'],
                                 'state': processed_issue['state'],
-                                'creator': issue['user']['login'],
+                                'creator': creator,
                                 'assignees': processed_issue['assignees'],
                                 'labels': processed_issue['labels'],
                                 'milestone': processed_issue['milestone'],

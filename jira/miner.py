@@ -657,11 +657,23 @@ class JiraMiner:
     def save_comments(self, issue_key, issue_obj):
         comments = self.get_comments_for_issue(issue_key)
         for c in comments:
+            account_id = f"temp_{c['author'].replace(' ', '_')}"
+            author, _ = JiraUser.objects.get_or_create(
+                accountId=account_id,
+                defaults={
+                    'displayName': c['author'],
+                    'emailAddress': '',
+                    'active': True,
+                    'timeZone': 'UTC',
+                    'accountType': 'atlassian'
+                }
+            )
+            
             JiraComment.objects.update_or_create(
                 id=c['id'],
                 defaults={
                     'issue': issue_obj,
-                    'author': c['author'],
+                    'author': author,
                     'body': c['body'],
                     'created': parse_datetime(c['created']),
                     'updated': parse_datetime(c['updated'])
@@ -672,11 +684,23 @@ class JiraMiner:
     def save_history(self, issue_key, issue_obj):
         history_list = self.get_issue_history(issue_key)
         for h in history_list:
+            account_id = f"temp_{h['author'].replace(' ', '_')}"
+            author, _ = JiraUser.objects.get_or_create(
+                accountId=account_id,
+                defaults={
+                    'displayName': h['author'],
+                    'emailAddress': '',
+                    'active': True,
+                    'timeZone': 'UTC',
+                    'accountType': 'atlassian'
+                }
+            )
+            
             history_obj, _ = JiraHistory.objects.update_or_create(
                 id=h['id'],
                 defaults={
                     'issue': issue_obj,
-                    'author': h['author'],
+                    'author': author,
                     'created': parse_datetime(h['created'])
                 }
             )
@@ -697,11 +721,23 @@ class JiraMiner:
     def save_activity(self, issue_key, issue_obj):
         activities = self.get_activity_log(issue_key)
         for a in activities:
+            account_id = f"temp_{a['author'].replace(' ', '_')}"
+            author, _ = JiraUser.objects.get_or_create(
+                accountId=account_id,
+                defaults={
+                    'displayName': a['author'],
+                    'emailAddress': '',
+                    'active': True,
+                    'timeZone': 'UTC',
+                    'accountType': 'atlassian'
+                }
+            )
+            
             JiraActivityLog.objects.create(
                 issue=issue_obj,
                 to_value=a.get('to'),
                 from_value=a.get('from'),
-                author=a['author'],
+                author=author,
                 created=parse_datetime(a['created']),
                 description=a['description'][:300]
             )

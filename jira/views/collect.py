@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 
 from jobs.models import Task
 from jira.tasks import collect_jira_issues_task
+from utils.models import Repository
 
 
 logger = logging.getLogger(__name__)
@@ -98,10 +99,21 @@ class JiraIssueCollectView(APIView):
                     end_date
                 )
 
+                repository, _ = Repository.objects.get_or_create(
+                    full_name=f"{jira_domain}/{project_key}",
+                    defaults={
+                        'owner': jira_domain,
+                        'name': project_key,
+                        'platform': 'jira',
+                        'url': f'https://{jira_domain}'
+                    }
+                )
+
                 Task.objects.create(
                     task_id=task.id,
                     operation='collect_jira_issues',
-                    repository=f"{jira_domain}/{project_key}",
+                    repository=repository,
+                    repository_name=f"{jira_domain}/{project_key}",
                     status='PENDING'
                 )
 
