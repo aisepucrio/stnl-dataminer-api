@@ -6,11 +6,39 @@ from django.utils import timezone
 
 from .base import BaseMiner
 from .utils import APIMetrics, split_date_range
-from ..models import GitHubIssuePullRequest
+from utils.models import Repository
+from ..models import GitHubIssuePullRequest, GitHubAuthor
 
 
 class PullRequestsMiner(BaseMiner):
     """Specialized miner for GitHub pull requests extraction"""
+
+    def get_or_create_repository(self, repo_name: str) -> Repository:
+        """
+        Busca ou cria um repositório GitHub com base no nome
+        
+        Args:
+            repo_name (str): Nome do repositório no formato 'owner/repo'
+        
+        Returns:
+            Repository: Instância do repositório
+        """
+        if '/' in repo_name:
+            owner, name = repo_name.split('/', 1)
+        else:
+            owner = ''
+            name = repo_name
+        
+        repository, created = Repository.objects.get_or_create(
+            full_name=repo_name,
+            defaults={
+                'owner': owner,
+                'name': name,
+                'platform': 'github',
+                'url': f'https://github.com/{repo_name}' if '/' in repo_name else '',
+            }
+        )
+        return repository
 
     def get_pull_requests(self, repo_name: str, start_date: Optional[str] = None, 
                          end_date: Optional[str] = None, depth: str = 'basic', task_obj=None) -> List[Dict[str, Any]]:
@@ -236,14 +264,23 @@ class PullRequestsMiner(BaseMiner):
                             'commits_data': []  
                         }
 
+                        repository = self.get_or_create_repository(repo_name)
+                        
+                        creator, _ = GitHubAuthor.objects.get_or_create(
+                            name=pr['user']['login'],
+                            defaults={
+                                'email': pr['user'].get('email', '')
+                            }
+                        )
+                        
                         GitHubIssuePullRequest.objects.update_or_create(
                             record_id=processed_pr['id'],
                             defaults={
-                                'repository': repo_name,
+                                'repository': repository,
                                 'number': processed_pr['number'],
                                 'title': processed_pr['title'],
                                 'state': processed_pr['state'],
-                                'creator': pr['user']['login'],
+                                'creator': creator,
                                 'assignees': processed_pr['assignees'],
                                 'labels': processed_pr['labels'],
                                 'milestone': processed_pr['milestone'],

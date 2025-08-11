@@ -1,6 +1,7 @@
 from celery import shared_task
 from .miners import GitHubMiner
 from jobs.models import Task
+from utils.models import Repository
 from datetime import datetime
 
 def format_date_for_json(date_value):
@@ -12,13 +13,44 @@ def format_date_for_json(date_value):
         return date_value.isoformat()
     return str(date_value)
 
+def get_or_create_repository(repo_name):
+    """
+    Busca ou cria um repositório GitHub com base no nome
+    
+    Args:
+        repo_name (str): Nome do repositório no formato 'owner/repo'
+    
+    Returns:
+        Repository: Instância do repositório
+    """
+    if '/' in repo_name:
+        owner, name = repo_name.split('/', 1)
+    else:
+        owner = ''
+        name = repo_name
+    
+    repository, created = Repository.objects.get_or_create(
+        full_name=repo_name,
+        defaults={
+            'owner': owner,
+            'name': name,
+            'platform': 'github',
+            'url': f'https://github.com/{repo_name}' if '/' in repo_name else '',
+        }
+    )
+    return repository
+
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
+    # Busca ou cria o repositório
+    repository = get_or_create_repository(repo_name)
+    
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
             "operation": f"🔄 Starting GitHub commit collection: {repo_name}",
-            "repository": repo_name,
+            "repository": repository,
+            "repository_name": repo_name,
             "status": "STARTED",
         }
     )
@@ -143,11 +175,14 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
 
 @shared_task(bind=True)
 def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic'):
+    repository = get_or_create_repository(repo_name)
+    
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
             "operation": f"🔄 Starting GitHub issue collection: {repo_name}",
-            "repository": repo_name,
+            "repository": repository,
+            "repository_name": repo_name,
             "status": "STARTED",
         }
     )
@@ -264,11 +299,14 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
 
 @shared_task(bind=True)
 def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic'):
+    repository = get_or_create_repository(repo_name)
+    
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
             "operation": f"🔄 Starting GitHub pull request collection: {repo_name}",
-            "repository": repo_name,
+            "repository": repository,
+            "repository_name": repo_name,
             "status": "STARTED",
         }
     )
@@ -384,11 +422,14 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
 
 @shared_task(bind=True)
 def fetch_branches(self, repo_name):
+    repository = get_or_create_repository(repo_name)
+    
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
             "operation": f"🔄 Starting GitHub branches collection: {repo_name}",
-            "repository": repo_name,
+            "repository": repository,
+            "repository_name": repo_name,
             "status": "STARTED",
         }
     )
@@ -492,11 +533,14 @@ def fetch_branches(self, repo_name):
 
 @shared_task(bind=True)
 def fetch_metadata(self, repo_name):
+    repository = get_or_create_repository(repo_name)
+    
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
             "operation": f"🔄 Starting GitHub metadata collection: {repo_name}",
-            "repository": repo_name,
+            "repository": repository,
+            "repository_name": repo_name,
             "status": "STARTED",
         }
     )
@@ -547,7 +591,7 @@ def fetch_metadata(self, repo_name):
         metadata = miner.get_repository_metadata(repo_name)
         
         metadata_dict = {
-            'repository': metadata.repository,
+            'repository': metadata.repository.full_name,
             'owner': metadata.owner,
             'organization': metadata.organization,
             'stars_count': metadata.stars_count,
