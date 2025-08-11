@@ -10,7 +10,7 @@ from stackoverflow.models import (
     StackUser, StackBadge, StackCollective, StackUserBadge,
     StackCollectiveUser, StackCollectiveTag, StackTag
 )
-from stackoverflow.miners.safe_api_call import safe_api_call
+from stackoverflow.miner.safe_api_call import safe_api_call
 from jobs.models import Task
 
 logger = logging.getLogger(__name__)
