@@ -5,11 +5,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime
 from django.conf import settings  # Adicionado para buscar chaves da API de forma segura
-
 # Importa a função que realmente faz o trabalho
-from .tasks import collect_questions_task, repopulate_users_task
+from ..tasks import collect_questions_task, repopulate_users_task
 # Mantemos este import para a outra função que não vamos mexer agora
-from jobs.models import Task
+from jobs.models import Task, Repository
 # Mantemos os imports da documentação e de outros módulos
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiParameter
 import logging # Adicionado para registrar erros no terminal
@@ -193,6 +192,8 @@ class StackOverflowViewSet(viewsets.ViewSet):
     Provides endpoints for collecting questions and populating db with all necessary data.
     """
         
+# --- SUBSTITUA SUA FUNÇÃO collect_questions POR ESTA ---
+
     @action(detail=False, methods=['post'], url_path='collect-questions')
     def collect_questions(self, request):
         try:
@@ -205,17 +206,20 @@ class StackOverflowViewSet(viewsets.ViewSet):
             datetime.strptime(start_date, '%Y-%m-%d')
             datetime.strptime(end_date, '%Y-%m-%d')
             
-            # Dispara a tarefa no Celery e pega o ID dela
+            # --- MUDANÇA AQUI ---
+            # 1. Busca ou cria o objeto Repository
+            repo, _ = Repository.objects.get_or_create(name="Stack Overflow")
+            
+            # 2. Inicia a tarefa do Celery
             task = collect_questions_task.delay(start_date=start_date, end_date=end_date)
             
-            # Cria o registro no banco de dados para o frontend acompanhar
+            # 3. Cria o registro da Task, passando o objeto 'repo'
             Task.objects.create(
                 task_id=task.id, 
                 operation=f"Iniciando coleta de perguntas: {start_date} a {end_date}", 
-                repository="Stack Overflow"
+                repository=repo # Passa o objeto, não o texto
             )
             
-            # Retorna uma resposta imediata para o Bruno
             return Response(
                 {'task_id': task.id, 'status': 'Tarefa de coleta iniciada'}, 
                 status=status.HTTP_202_ACCEPTED
@@ -225,22 +229,27 @@ class StackOverflowViewSet(viewsets.ViewSet):
             return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Erro ao enfileirar a tarefa 'collect_questions': {e}", exc_info=True)
-            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)          
+            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
         
+    # --- SUBSTITUA SUA FUNÇÃO re_populate_data POR ESTA ---
+
     @action(detail=False, methods=['post'], url_path='re-populate-data')
     def re_populate_data(self, request):
         try:
-            # Dispara a tarefa no Celery e pega o ID
+            # --- MUDANÇA AQUI ---
+            # 1. Busca ou cria o objeto Repository
+            repo, _ = Repository.objects.get_or_create(name="Stack Overflow")
+            
+            # 2. Inicia a tarefa do Celery
             task = repopulate_users_task.delay()
 
-            # Cria o registro no banco de dados para o frontend acompanhar
+            # 3. Cria o registro da Task, passando o objeto 'repo'
             Task.objects.create(
                 task_id=task.id, 
                 operation="Iniciando enriquecimento de dados de usuários", 
-                repository="Stack Overflow"
+                repository=repo # Passa o objeto, não o texto
             )
 
-            # Retorna uma resposta imediata para o Bruno
             return Response(
                 {'task_id': task.id, 'status': 'Tarefa de enriquecimento iniciada'}, 
                 status=status.HTTP_202_ACCEPTED
