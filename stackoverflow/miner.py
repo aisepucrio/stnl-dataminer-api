@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 from django.utils import timezone
-from .functions.question_fetcher import fetch_questions
+from .miners.question_fetcher import fetch_questions
 from .models import StackAnswer, StackQuestion
 
 class StackOverflowMiner:

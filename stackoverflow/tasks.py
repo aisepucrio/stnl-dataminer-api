@@ -5,8 +5,8 @@ from django.conf import settings
 from jobs.models import Task  # Importa o modelo Task
 
 # Importa as suas funções de mineração originais
-from .functions.question_fetcher import fetch_questions
-from .functions.data_populator import populate_missing_data
+from .miners.question_fetcher import fetch_questions
+from .miners.data_populator import populate_missing_data
 
 @shared_task(bind=True)
 def collect_questions_task(self, start_date: str, end_date: str):
