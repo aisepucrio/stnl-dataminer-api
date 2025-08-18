@@ -180,7 +180,7 @@ def make_question_serializable(question_data, stack_user, question_tags):
         'time_mined': question_data.get('time_mined'),
     }
 
-def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100, task_obj=None):
+def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100, task_obj=None, tags=None):
     """
     Fetch questions from Stack Overflow with user-friendly feedback.
     """
@@ -207,6 +207,10 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
         'access_token': access_token
     }
     
+    if tags:
+        params['tagged'] = tags
+        log_progress(f"Filtrando pelas tags: {tags}", "info", task_obj=task_obj)
+
     questions = []
     total_questions_api = 0
     total_processed = 0

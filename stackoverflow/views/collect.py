@@ -197,8 +197,10 @@ class StackOverflowViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['post'], url_path='collect-questions')
     def collect_questions(self, request):
         try:
+            # --- PEQUENA MUDANÇA AQUI ---
             start_date = request.data.get('start_date')
             end_date = request.data.get('end_date')
+            tags = request.data.get('tags', None)  # Pega o novo parâmetro opcional 'tags'
 
             if not start_date or not end_date:
                 return Response({'error': 'start_date e end_date são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -206,18 +208,20 @@ class StackOverflowViewSet(viewsets.ViewSet):
             datetime.strptime(start_date, '%Y-%m-%d')
             datetime.strptime(end_date, '%Y-%m-%d')
             
-            # --- MUDANÇA AQUI ---
-            # 1. Busca ou cria o objeto Repository
+            # --- MUDANÇA NA CHAMADA DA TAREFA ---
+            # Passamos o novo parâmetro 'tags' para a tarefa do Celery
+            task = collect_questions_task.delay(start_date=start_date, end_date=end_date, tags=tags)
+            
+            # Atualiza a mensagem de log para incluir as tags, se existirem
+            operation_log = f"Iniciando coleta: {start_date} a {end_date}"
+            if tags:
+                operation_log += f" (Tags: {tags})"
+
             repo, _ = Repository.objects.get_or_create(name="Stack Overflow")
-            
-            # 2. Inicia a tarefa do Celery
-            task = collect_questions_task.delay(start_date=start_date, end_date=end_date)
-            
-            # 3. Cria o registro da Task, passando o objeto 'repo'
             Task.objects.create(
                 task_id=task.id, 
-                operation=f"Iniciando coleta de perguntas: {start_date} a {end_date}", 
-                repository=repo # Passa o objeto, não o texto
+                operation=operation_log, 
+                repository=repo
             )
             
             return Response(
@@ -229,8 +233,8 @@ class StackOverflowViewSet(viewsets.ViewSet):
             return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Erro ao enfileirar a tarefa 'collect_questions': {e}", exc_info=True)
-            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
-        
+            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
     # --- SUBSTITUA SUA FUNÇÃO re_populate_data POR ESTA ---
 
     @action(detail=False, methods=['post'], url_path='re-populate-data')
