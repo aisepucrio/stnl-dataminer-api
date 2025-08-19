@@ -42,10 +42,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_spectacular',
     'dataminer_api',
-    'utils',
     'github',
     'jira',
     'jobs',
+    'utils',
     'django_filters',
 ]
 

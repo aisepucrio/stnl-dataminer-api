@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils.timezone import now
-from utils.models import Repository
 
 
 class JiraIssue(models.Model):
@@ -27,6 +26,7 @@ class JiraIssue(models.Model):
     def __str__(self):
         return f"{self.issue_key} - {self.summary}"
 
+
 class JiraProject(models.Model):
     id = models.CharField(max_length=100, primary_key=True)
     key = models.CharField(max_length=100)
@@ -37,6 +37,7 @@ class JiraProject(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class JiraUser(models.Model):
     accountId = models.CharField(max_length=100, primary_key=True)
@@ -50,13 +51,15 @@ class JiraUser(models.Model):
     def __str__(self):
         return self.displayName
 
+
 class JiraComment(models.Model):
     issue = models.ForeignKey(JiraIssue, on_delete=models.CASCADE)
-    author = models.ForeignKey(JiraUser, on_delete=models.SET_NULL, null=True, related_name="comments")
+    author = models.ForeignKey('JiraUser', on_delete=models.SET_NULL, null=True, related_name='comments')
     body = models.TextField()
     created = models.DateTimeField()
     updated = models.DateTimeField()
     updated_at = models.DateTimeField(auto_now=True)
+
 
 class JiraChecklist(models.Model):
     issue = models.ForeignKey(JiraIssue, on_delete=models.CASCADE)
@@ -65,6 +68,7 @@ class JiraChecklist(models.Model):
     completed = models.BooleanField()
     updated_at = models.DateTimeField(auto_now=True)
 
+
 class JiraIssueType(models.Model):
     issue = models.OneToOneField(JiraIssue, on_delete=models.CASCADE)
     issuetype = models.CharField(max_length=100)
@@ -72,6 +76,7 @@ class JiraIssueType(models.Model):
     hierarchyLevel = models.IntegerField(default=0)
     subtask = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
+
 
 class JiraSprint(models.Model):
     id = models.BigIntegerField(primary_key=True)
@@ -85,6 +90,7 @@ class JiraSprint(models.Model):
     issues = models.ManyToManyField('JiraIssue', related_name='sprints')
     updated_at = models.DateTimeField(auto_now=True)
 
+
 class JiraIssueLink(models.Model):
     issue = models.ForeignKey(JiraIssue, related_name='issue_links', on_delete=models.CASCADE)
     linked_issue = models.ForeignKey(JiraIssue, related_name='linked_to', on_delete=models.CASCADE)
@@ -92,30 +98,35 @@ class JiraIssueLink(models.Model):
     link_direction = models.CharField(max_length=50)
     updated_at = models.DateTimeField(auto_now=True)
 
+
 class JiraCommit(models.Model):
     issue = models.ForeignKey(JiraIssue, on_delete=models.CASCADE)
     sha = models.CharField(max_length=40)
-    author = models.CharField(max_length=255)  # Mantido como CharField pois pode não estar no sistema de usuários
+    author = models.CharField(max_length=255)
     author_email = models.EmailField()
     message = models.TextField()
     timestamp = models.DateTimeField()
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="jira_commits", null=True, blank=True)
+    repository = models.ForeignKey('github.GitHubMetadata', on_delete=models.CASCADE, null=True, blank=True, related_name='jira_commits')
+    repository_name = models.CharField(max_length=255, help_text="Nome do repositório para consultas rápidas", null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+
 
 class JiraActivityLog(models.Model):
     issue = models.ForeignKey(JiraIssue, on_delete=models.CASCADE)
     to_value = models.CharField(max_length=100, null=True, blank=True)
-    from_value = models.CharField(max_length=100, null=True, blank=True)  
-    author = models.ForeignKey(JiraUser, on_delete=models.SET_NULL, null=True, related_name="activity_logs")
+    from_value = models.CharField(max_length=100, null=True, blank=True)
+    author = models.ForeignKey('JiraUser', on_delete=models.SET_NULL, null=True, related_name='activity_logs')
     created = models.DateTimeField()
     description = models.CharField(max_length=300)
     updated_at = models.DateTimeField(auto_now=True)
 
+
 class JiraHistory(models.Model):
     issue = models.ForeignKey(JiraIssue, on_delete=models.CASCADE)
-    author = models.ForeignKey(JiraUser, on_delete=models.SET_NULL, null=True, related_name="history_entries")
+    author = models.ForeignKey('JiraUser', on_delete=models.SET_NULL, null=True, related_name='history_entries')
     created = models.DateTimeField()
     updated_at = models.DateTimeField(auto_now=True)
+
 
 class JiraHistoryItem(models.Model):
     history = models.ForeignKey(JiraHistory, on_delete=models.CASCADE)
@@ -126,3 +137,4 @@ class JiraHistoryItem(models.Model):
     fromString = models.TextField(null=True, blank=True)
     toString = models.TextField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+

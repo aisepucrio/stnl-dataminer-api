@@ -7,41 +7,13 @@ from django.utils import timezone as django_timezone
 
 from .base import BaseMiner
 from .utils import convert_to_iso8601
-from utils.models import Repository as RepositoryModel
 from ..models import (
-    GitHubCommit, GitHubAuthor, GitHubModifiedFile, GitHubMethod
+    GitHubCommit, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
 )
 
 
 class CommitsMiner(BaseMiner):
     """Specialized miner for GitHub commits extraction"""
-
-    def get_or_create_repository(self, repo_name: str) -> RepositoryModel:
-        """
-        Busca ou cria um repositório GitHub com base no nome
-        
-        Args:
-            repo_name (str): Nome do repositório no formato 'owner/repo'
-        
-        Returns:
-            RepositoryModel: Instância do repositório
-        """
-        if '/' in repo_name:
-            owner, name = repo_name.split('/', 1)
-        else:
-            owner = ''
-            name = repo_name
-        
-        repository, created = RepositoryModel.objects.get_or_create(
-            full_name=repo_name,
-            defaults={
-                'owner': owner,
-                'name': name,
-                'platform': 'github',
-                'url': f'https://github.com/{repo_name}' if '/' in repo_name else '',
-            }
-        )
-        return repository
 
     def project_root_directory(self) -> str:
         """Returns the current working directory"""
@@ -196,6 +168,11 @@ class CommitsMiner(BaseMiner):
             else:
                 total_commits = 1
 
+            metadata_obj = GitHubMetadata.objects.filter(repository=repo_name).first()
+            if metadata_obj is None:
+                log_progress(f"[COMMITS] GitHubMetadata not found for {repo_name}. Ensure metadata task runs before commits.")
+                return []
+
             for commit in repo:
                 processed_count += 1
                 
@@ -204,24 +181,20 @@ class CommitsMiner(BaseMiner):
                 else:
                     log_progress(f"Mining commit SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
                 
-                author_email = commit.author.email if commit.author and commit.author.email else ''
                 author, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.author.name, 
-                    defaults={'email': author_email}
+                    email=commit.author.email if commit.author else None
                 )
-                
-                committer_email = commit.committer.email if commit.committer and commit.committer.email else ''
                 committer, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.committer.name, 
-                    defaults={'email': committer_email}
+                    email=commit.committer.email if commit.committer else None
                 )
 
-                repository = self.get_or_create_repository(repo_name)
-                
                 db_commit, created = GitHubCommit.objects.update_or_create(
                     sha=commit.hash,
                     defaults={
-                        'repository': repository,
+                        'repository': metadata_obj,
+                        'repository_name': repo_name,
                         'message': commit.msg,
                         'date': commit.author_date,
                         'author': author,

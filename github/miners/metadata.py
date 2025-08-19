@@ -6,38 +6,10 @@ from django.utils import timezone
 
 from .base import BaseMiner
 from ..models import GitHubBranch, GitHubMetadata
-from utils.models import Repository
 
 
 class MetadataMiner(BaseMiner):
     """Specialized miner for GitHub repository metadata and branches"""
-
-    def get_or_create_repository(self, repo_name: str) -> Repository:
-        """
-        Busca ou cria um repositório GitHub com base no nome
-        
-        Args:
-            repo_name (str): Nome do repositório no formato 'owner/repo'
-        
-        Returns:
-            Repository: Instância do repositório
-        """
-        if '/' in repo_name:
-            owner, name = repo_name.split('/', 1)
-        else:
-            owner = ''
-            name = repo_name
-        
-        repository, created = Repository.objects.get_or_create(
-            full_name=repo_name,
-            defaults={
-                'owner': owner,
-                'name': name,
-                'platform': 'github',
-                'url': f'https://github.com/{repo_name}' if '/' in repo_name else '',
-            }
-        )
-        return repository
 
     def get_branches(self, repo_name: str) -> List[Dict[str, Any]]:
         """
@@ -60,14 +32,13 @@ class MetadataMiner(BaseMiner):
             response.raise_for_status()
             branches = response.json()
 
-            repository = self.get_or_create_repository(repo_name)
-            
             for branch in branches:
                 current_timestamp = timezone.now()
                 GitHubBranch.objects.update_or_create(
                     name=branch['name'],
-                    repository=repository,
                     defaults={
+                        'repository': repo_name,
+                        'repository_name': repo_name,
                         'sha': branch['commit']['sha'],
                         'time_mined': current_timestamp
                     }
@@ -267,14 +238,10 @@ class MetadataMiner(BaseMiner):
             
             current_timestamp = timezone.now()
 
-            repository = self.get_or_create_repository(repo_name)
-            
             # Use update_or_create instead of create
             metadata, created = GitHubMetadata.objects.update_or_create(
-                # These fields are used to identify existing records
-                repository=repository,
+                repository=repo_name,
                 owner=data.get('owner', {}).get('login'),
-                # These fields will be updated if the record exists, or set if it's new
                 defaults={
                     'organization': data.get('organization', {}).get('login') if data.get('organization') else None,
                     'stars_count': data.get('stargazers_count', 0),

@@ -1,5 +1,5 @@
 from django.db import models
-from utils.models import Repository
+
 
 class GitHubAuthor(models.Model):
     name = models.CharField(max_length=255)
@@ -11,14 +11,16 @@ class GitHubAuthor(models.Model):
     def __str__(self):
         return f"{self.name} <{self.email}>"
 
+
 class GitHubCommit(models.Model):
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="commits")
+    repository = models.ForeignKey('GitHubMetadata', related_name="commits", on_delete=models.CASCADE)
+    repository_name = models.CharField(max_length=255, help_text="Nome do repositório para consultas rápidas", null=True, blank=True)
     sha = models.CharField(max_length=40, unique=True)
     message = models.TextField()
     date = models.DateTimeField()
     author = models.ForeignKey(GitHubAuthor, related_name="author_commits", on_delete=models.SET_NULL, null=True)
     committer = models.ForeignKey(GitHubAuthor, related_name="committer_commits", on_delete=models.SET_NULL, null=True)
-    insertions = models.IntegerField(default=0)  
+    insertions = models.IntegerField(default=0)
     deletions = models.IntegerField(default=0)
     files_changed = models.IntegerField(default=0)
     in_main_branch = models.BooleanField(default=False)
@@ -31,21 +33,22 @@ class GitHubCommit(models.Model):
     def __str__(self):
         return f"Commit {self.sha}"
 
+
 class GitHubModifiedFile(models.Model):
     commit = models.ForeignKey(GitHubCommit, related_name="modified_files", on_delete=models.CASCADE)
     old_path = models.TextField(null=True)
     new_path = models.TextField(null=True)
     filename = models.TextField()
     change_type = models.CharField(max_length=20)
-    diff = models.TextField(null=True)  
+    diff = models.TextField(null=True)
     added_lines = models.IntegerField()
     deleted_lines = models.IntegerField()
     complexity = models.IntegerField(null=True)
     time_mined = models.DateTimeField(null=True, help_text="Date and time of mining")
 
-
     def __str__(self):
         return f"File {self.filename} in Commit {self.commit.sha}"
+
 
 class GitHubMethod(models.Model):
     modified_file = models.ForeignKey(GitHubModifiedFile, related_name="methods", on_delete=models.CASCADE)
@@ -57,13 +60,15 @@ class GitHubMethod(models.Model):
     def __str__(self):
         return f"Method {self.name} in File {self.modified_file.filename}"
 
+
 class GitHubIssue(models.Model):
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="issues")
+    repository = models.ForeignKey('GitHubMetadata', related_name="issues", on_delete=models.CASCADE)
+    repository_name = models.CharField(max_length=255, help_text="Nome do repositório para consultas rápidas", null=True, blank=True)
     issue_id = models.BigIntegerField()
     number = models.IntegerField(null=True)
     title = models.TextField()
     state = models.CharField(max_length=20)
-    creator = models.ForeignKey(GitHubAuthor, on_delete=models.SET_NULL, null=True, related_name="created_issues")
+    creator = models.CharField(max_length=100)
     assignees = models.JSONField(default=list)
     labels = models.JSONField(default=list)
     milestone = models.CharField(max_length=255, null=True, blank=True)
@@ -89,13 +94,15 @@ class GitHubIssue(models.Model):
     def __str__(self):
         return f"Issue {self.issue_id} - {self.title}"
 
+
 class GitHubPullRequest(models.Model):
     pr_id = models.BigIntegerField(primary_key=True)
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="pull_requests")
+    repository = models.ForeignKey('GitHubMetadata', related_name="pull_requests", on_delete=models.CASCADE)
+    repository_name = models.CharField(max_length=255, help_text="Nome do repositório para consultas rápidas", null=True, blank=True)
     number = models.IntegerField(null=True)
     title = models.CharField(max_length=255)
     state = models.CharField(max_length=50)
-    creator = models.ForeignKey(GitHubAuthor, on_delete=models.SET_NULL, null=True, related_name="created_pull_requests")
+    creator = models.CharField(max_length=255)
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
     closed_at = models.DateTimeField(null=True)
@@ -112,8 +119,10 @@ class GitHubPullRequest(models.Model):
     def __str__(self):
         return f"Pull Request {self.pr_id} - {self.title}"
 
+
 class GitHubBranch(models.Model):
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="branches")
+    repository = models.ForeignKey('GitHubMetadata', related_name="branches", on_delete=models.CASCADE)
+    repository_name = models.CharField(max_length=255, help_text="Nome do repositório para consultas rápidas", null=True, blank=True)
     name = models.CharField(max_length=500)
     sha = models.CharField(max_length=40)
     time_mined = models.DateTimeField(null=True, help_text="Date and time of mining")
@@ -121,8 +130,9 @@ class GitHubBranch(models.Model):
     def __str__(self):
         return f"Branch {self.name}"
 
+
 class GitHubMetadata(models.Model):
-    repository = models.OneToOneField(Repository, on_delete=models.CASCADE, related_name="github_metadata")
+    repository = models.CharField(max_length=255, db_index=True)
     owner = models.CharField(max_length=255)
     organization = models.CharField(max_length=255, null=True)
     stars_count = models.IntegerField(default=0)
@@ -145,24 +155,27 @@ class GitHubMetadata(models.Model):
     used_by_count = models.IntegerField(default=0)
     releases_count = models.IntegerField(default=0)
     time_mined = models.DateTimeField(null=True, help_text="Date and time of mining")
-    
+
     class Meta:
         indexes = [
             models.Index(fields=['repository']),
             models.Index(fields=['created_at']),
             models.Index(fields=['updated_at'])
         ]
+        unique_together = ['repository', 'owner']
 
     def __str__(self):
         return f"Metadata for {self.repository}"
 
+
 class GitHubIssuePullRequest(models.Model):
-    repository = models.ForeignKey(Repository, on_delete=models.CASCADE, related_name="issues_and_prs")
+    repository = models.ForeignKey('GitHubMetadata', related_name="issues_and_prs", on_delete=models.CASCADE)
+    repository_name = models.CharField(max_length=255, help_text="Nome do repositório para consultas rápidas", null=True, blank=True)
     record_id = models.BigIntegerField(unique=True)
     number = models.IntegerField(null=True)
     title = models.TextField()
     state = models.CharField(max_length=20)
-    creator = models.ForeignKey(GitHubAuthor, on_delete=models.SET_NULL, null=True, related_name="created_issues_and_prs")
+    creator = models.CharField(max_length=100)
     assignees = models.JSONField(default=list)
     labels = models.JSONField(default=list)
     milestone = models.CharField(max_length=255, null=True, blank=True)
@@ -190,3 +203,4 @@ class GitHubIssuePullRequest(models.Model):
 
     def __str__(self):
         return f"{self.data_type.capitalize()} {self.record_id} - {self.title}"
+

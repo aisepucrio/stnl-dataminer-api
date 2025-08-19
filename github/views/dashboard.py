@@ -187,9 +187,9 @@ class DashboardView(APIView):
                 metadata = GitHubMetadata.objects.get(id=repository_id)
                 repository_name = metadata.repository
                 
-                issues_query = issues_query.filter(repository=repository_name)
-                prs_query = prs_query.filter(repository=repository_name)
-                commits_query = commits_query.filter(repository=repository_name)
+                issues_query = issues_query.filter(repository=metadata)
+                prs_query = prs_query.filter(repository=metadata)
+                commits_query = commits_query.filter(repository=metadata)
                 
                 response_data = {
                     "repository_id": repository_id,

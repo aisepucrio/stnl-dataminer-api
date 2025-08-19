@@ -6,39 +6,11 @@ from django.utils import timezone
 
 from .base import BaseMiner
 from .utils import APIMetrics, split_date_range
-from utils.models import Repository
-from ..models import GitHubIssuePullRequest, GitHubAuthor, GitHubIssue
+from ..models import GitHubIssuePullRequest, GitHubIssue, GitHubMetadata
 
 
 class IssuesMiner(BaseMiner):
     """Specialized miner for GitHub issues extraction"""
-
-    def get_or_create_repository(self, repo_name: str) -> Repository:
-        """
-        Busca ou cria um repositório GitHub com base no nome
-        
-        Args:
-            repo_name (str): Nome do repositório no formato 'owner/repo'
-        
-        Returns:
-            Repository: Instância do repositório
-        """
-        if '/' in repo_name:
-            owner, name = repo_name.split('/', 1)
-        else:
-            owner = ''
-            name = repo_name
-        
-        repository, created = Repository.objects.get_or_create(
-            full_name=repo_name,
-            defaults={
-                'owner': owner,
-                'name': name,
-                'platform': 'github',
-                'url': f'https://github.com/{repo_name}' if '/' in repo_name else '',
-            }
-        )
-        return repository
 
     def get_issues(self, repo_name: str, start_date: Optional[str] = None, 
                    end_date: Optional[str] = None, depth: str = 'basic', task_obj=None) -> List[Dict[str, Any]]:
@@ -229,23 +201,20 @@ class IssuesMiner(BaseMiner):
                                 processed_issue['comments_data'] = existing_issue.comments
                                 processed_issue['timeline_events'] = existing_issue.timeline_events
 
-                        repository = self.get_or_create_repository(repo_name)
-                        
-                        creator, _ = GitHubAuthor.objects.get_or_create(
-                            name=issue['user']['login'],
-                            defaults={
-                                'email': issue['user'].get('email', '')
-                            }
-                        )
-                        
+                        metadata_obj = GitHubMetadata.objects.filter(repository=repo_name).first()
+                        if metadata_obj is None:
+                            log_progress(f"[ISSUES] GitHubMetadata not found for {repo_name}. Skipping.")
+                            continue
+
                         GitHubIssuePullRequest.objects.update_or_create(
                             record_id=processed_issue['id'],
                             defaults={
-                                'repository': repository,
+                                'repository': metadata_obj,
+                                'repository_name': repo_name,
                                 'number': processed_issue['number'],
                                 'title': processed_issue['title'],
                                 'state': processed_issue['state'],
-                                'creator': creator,
+                                'creator': issue['user']['login'],
                                 'assignees': processed_issue['assignees'],
                                 'labels': processed_issue['labels'],
                                 'milestone': processed_issue['milestone'],

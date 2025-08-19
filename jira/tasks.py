@@ -6,28 +6,16 @@ from datetime import datetime
 import traceback
 
 from jobs.models import Task  # ⬅️ Imports the model that will save the progress
-from utils.models import Repository
 
 
 @shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None):
-    repository, created = Repository.objects.get_or_create(
-        full_name=f"{jira_domain}/{project_key}",
-        defaults={
-            'owner': jira_domain,
-            'name': project_key,
-            'platform': 'jira',
-            'url': f'https://{jira_domain}',
-        }
-    )
-    
     # ⬇️ Creates or updates the Task in the database
     task_obj, _ = Task.objects.get_or_create(
         task_id=self.request.id,
         defaults={
             "operation": f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}",
-            "repository": repository,
-            "repository_name": f"{jira_domain}/{project_key}",
+            "repository": jira_domain,
             "status": "STARTED",
         }
     )
