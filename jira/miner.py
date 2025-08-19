@@ -269,15 +269,24 @@ class JiraMiner:
 
 
     def get_commits_for_issue(self, issue_key):
-        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/1.0/issue/detail?issueIdOrKey={issue_key}&applicationType=git&dataType=repository"
+        # Buscar o id numérico da issue
+        issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?fields=id"
+        response = requests.get(issue_url, headers=self.headers, auth=self.auth)
+        if response.status_code != 200:
+            return []
+        issue_id = response.json().get('id')
+        if not issue_id:
+            return []
 
+        # Buscar os commits usando o id
+        jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/latest/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
             return []
-        
+
         details = response.json().get('detail', [])
         commits = []
-        
+
         for detail in details:
             repositories = detail.get('repositories', [])
             for repo in repositories:
