@@ -29,4 +29,5 @@ urlpatterns = [
     path('dashboard/graph/', views.GraphDashboardView.as_view(), name='graph-dashboard'),
     path('export/', views.ExportDataView.as_view(), name='export-data'),
     path('users/', views.UserListView.as_view(), name='user-list'),
+    path('date-range/', views.RepositoryDateRangeView.as_view(), name='github-date-range'),
 ]

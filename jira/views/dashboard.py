@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.db.models.functions import TruncDay, TruncMonth, TruncYear
+from django.db.models import Min, Max
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from rest_framework import status
@@ -396,3 +397,60 @@ class JiraGraphDashboardView(APIView):
                 {"error": f"An error occurred: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+@extend_schema(
+    tags=['Jira'],
+    summary="Project date range",
+    description="Returns the earliest (min_date) and latest (max_date) dates for issues in a given project_id.",
+    parameters=[
+        OpenApiParameter(
+                name='project_id',
+                description='Query parameter. ID of the project to get date range for.',
+                required=True,
+                type=int
+            )
+    ],
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "project_id": {"type": "integer"},
+                "min_date": {"type": "string", "format": "date-time", "nullable": True},
+                "max_date": {"type": "string", "format": "date-time", "nullable": True}
+            }
+        },
+        400: {"type": "object", "properties": {"error": {"type": "string"}}},
+        404: {"type": "object", "properties": {"error": {"type": "string"}}}
+    }
+)
+class JiraProjectDateRangeView(APIView):
+    def get(self, request):
+        # Accept project_id via query parameter only
+        project_id = request.query_params.get('project_id')
+
+        if project_id is None:
+            return Response({"error": "project_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            return Response({"error": "project_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            project = JiraProject.objects.get(id=project_id)
+        except JiraProject.DoesNotExist:
+            return Response({"error": f"Project with ID {project_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        date_agg = JiraIssue.objects.filter(project=project).aggregate(min_date=Min('created'), max_date=Max('created'))
+
+        min_date = date_agg.get('min_date')
+        max_date = date_agg.get('max_date')
+
+        response = {
+            "project_id": project_id,
+            "min_date": min_date.isoformat() if min_date else None,
+            "max_date": max_date.isoformat() if max_date else None,
+        }
+
+        return Response(response)

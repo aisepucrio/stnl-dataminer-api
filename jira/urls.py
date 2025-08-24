@@ -22,4 +22,5 @@ urlpatterns = [
     path('activity-logs/', JiraActivityLogListView.as_view(), name='jira-activitylog-list'),
     path('histories/', JiraHistoryListView.as_view(), name='jira-history-list'),
     path('history-items/', JiraHistoryItemListView.as_view(), name='jira-historyitem-list'),
+    path('date-range/', JiraProjectDateRangeView.as_view(), name='jira-date-range'),
 ]

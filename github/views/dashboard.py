@@ -1,6 +1,6 @@
 import logging
 
-from django.db.models import Count
+from django.db.models import Count, Min, Max
 from django.db.models.functions import TruncDay, TruncMonth, TruncYear
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, OpenApiResponse
@@ -360,9 +360,9 @@ class GraphDashboardView(APIView):
                 metadata = GitHubMetadata.objects.get(id=repository_id)
                 repository_name = metadata.repository
                 
-                issues_query = issues_query.filter(repository=repository_name)
-                prs_query = prs_query.filter(repository=repository_name)
-                commits_query = commits_query.filter(repository=repository_name)
+                issues_query = issues_query.filter(repository=metadata)
+                prs_query = prs_query.filter(repository=metadata)
+                commits_query = commits_query.filter(repository=metadata)
             except GitHubMetadata.DoesNotExist:
                 pass
 
@@ -450,3 +450,58 @@ class GraphDashboardView(APIView):
             response_data["repository_name"] = repository_name
         
         return Response(response_data) 
+
+
+@extend_schema(
+    tags=["GitHub"],
+    summary="Repository date range",
+    description="Returns the earliest (min_date) and latest (max_date) commit dates for a given repository_id.",
+    parameters=[
+        OpenApiParameter(
+            name="repository_id",
+                description="Query parameter. ID of the repository to get date range for.",
+            required=True,
+            type=int
+        ),
+    ],
+    responses={
+        200: OpenApiResponse(response={"type": "object", "properties": {"repository_id": {"type": "integer"}, "min_date": {"type": "string", "format": "date-time", "nullable": True}, "max_date": {"type": "string", "format": "date-time", "nullable": True}}}),
+        400: OpenApiResponse(response={"type": "object", "properties": {"error": {"type": "string"}}}),
+        404: OpenApiResponse(response={"type": "object", "properties": {"error": {"type": "string"}}})
+    }
+)
+class RepositoryDateRangeView(APIView):
+    def get(self, request):
+        # Accept repository_id via query parameter only
+        repository_id = request.query_params.get('repository_id')
+
+        if repository_id is None:
+            return Response({"error": "repository_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            repository_id = int(repository_id)
+        except (ValueError, TypeError):
+            return Response({"error": "repository_id must be an integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            metadata = GitHubMetadata.objects.get(id=repository_id)
+        except GitHubMetadata.DoesNotExist:
+            return Response({"error": f"Repository with ID {repository_id} not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Compute min and max dates from commits for this repository
+        commit_dates = GitHubCommit.objects.filter(repository=metadata).aggregate(
+            min_date=Min('date'),
+            max_date=Max('date')
+        )
+
+        # Format dates using DateTimeHandler if present
+        min_date = commit_dates.get('min_date')
+        max_date = commit_dates.get('max_date')
+
+        response = {
+            "repository_id": repository_id,
+            "min_date": DateTimeHandler.format_date(min_date) if min_date else None,
+            "max_date": DateTimeHandler.format_date(max_date) if max_date else None,
+        }
+
+        return Response(response)
