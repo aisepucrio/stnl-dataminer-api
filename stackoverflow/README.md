@@ -1,108 +1,103 @@
-# StackOverflow Django App
+  # Stack Overflow Django App
 
 ## Overview
-This Django app is responsible for mining, storing, and managing Stack Overflow user data, badges, collectives, and related metadata as part of the larger RAISE data mining platform. It integrates with the Stack Exchange API and keeps Stack Overflow-related data up to date in the local database. In order to use this part of RAISE follow the [usage section](#usage)
+This Django app is responsible for mining, storing, and managing Stack Overflow data as part of the larger RAISE data mining platform. It provides a robust, asynchronous API to collect questions, answers, users, and related metadata from the Stack Exchange API and allows for querying of the collected data.
 
 ## Features
-- Fetches and updates Stack Overflow user profiles
-- Fetches questions, comments and answers
-- Safe API calls with rate limit handling and logging
-- **Some intended but not implemented:**
-    - **Parallel Data Mining:** Uses Celery to process data mining tasks in parallel, improving efficiency and scalability
-    - **Saving data to the database:** Currently saving data locally.
+- **Asynchronous Data Mining**: Uses Celery to run long data collection tasks in the background, providing an immediate API response.
+- **Real-Time Progress Tracking**: Integrates with the `jobs` app to provide real-time status updates of ongoing tasks, visible to a frontend.
+- **Comprehensive Data Collection**: Fetches questions, answers, comments, users, tags, and badges.
+- **Advanced API Functionality**:
+    - **Collection Endpoints (`POST`)**: To initiate data mining tasks.
+    - **Query Endpoints (`GET`)**: To read and filter the collected data.
+    - **Filtering & Searching**: Supports powerful filtering by tags, full-text search, and ordering of results.
+- **Clean User Feedback**: Provides clear, formatted progress logs in the Celery worker terminal.
+- **Safe API Calls**: Includes rate-limit handling and exponential backoff.
+- **Pagination**: Automatically fetches all pages of results from the API, not just the first 100 items.
+
+---
 
 ## Code Structure
-Below is an overview of the main files and folders in this app:
+The app follows a standardized structure, separating concerns into logical modules.
 
-| File/Folder         | Description                                                                 |
-|---------------------|-----------------------------------------------------------------------------|
-| `models.py`         | Django models for Stack Overflow users, badges, collectives, etc.           |
-| `admin.py`          | Django admin customizations for managing Stack Overflow data                 |
-| `serializers.py`    | DRF serializers for API responses (if any)                                  |
-| `views.py`          | API endpoints and admin actions for Stack Overflow data                     |
-| `urls.py`           | URL routing for the StackOverflow app                                       |
-| `functions/`        | Core logic for data fetching, population, and safe API calls:               |
-| &nbsp;&nbsp;`data_populator.py` | Main script for updating/fetching data from Stack Exchange API         |
-| &nbsp;&nbsp;`safe_api_call.py`  | Handles API requests with error handling and backoff                  |
-| &nbsp;&nbsp;`question_fetcher.py`, `token_manager.py` | Additional helpers for API interaction and token management |
-| `management/commands/` | Custom Django management commands for data population                  |
-| `migrations/`       | Database migrations for this app                                            |
-| `guide/`            | Contains guides for generating API tokens and setup (see referenced docs)   |
+| File/Folder          | Description                                                                  |
+|----------------------|------------------------------------------------------------------------------|
+| `models.py`          | Django models for all Stack Overflow entities.                               |
+| `serializers.py`     | DRF serializers for API query (`GET`) responses.                             |
+| `tasks.py`           | Celery task definitions for asynchronous data mining.                        |
+| `urls.py`            | URL routing for the Stack Overflow app's API endpoints.                        |
+| `views/`             | Contains the API ViewSets, separated by concern:                             |
+| &nbsp;&nbsp;`collect.py` | `ViewSet` for initiating data collection tasks (`POST` requests).            |
+| &nbsp;&nbsp;`lookup.py`  | `ViewSet`s for querying stored data (`GET` requests).                        |
+| `miners/`            | Core logic for data fetching, population, and safe API calls.                |
+| &nbsp;&nbsp;`question_fetcher.py`    | Handles fetching of questions and their related data.              |
+| &nbsp;&nbsp;`get_additional_data.py` | Handles enrichment of user data (badges, collectives, etc.).     |
+| &nbsp;&nbsp;`safe_api_call.py`       | A robust, reusable function for making safe API requests.            |
+| `admin.py`           | Django admin customizations for managing the data.                           |
+| `guide/`             | Guides for generating API tokens.                                            |
 
-## Usage
+---
+
+## API Usage
+
+All interaction with the miner is now done via API endpoints, which can be called with clients like **Bruno** or Postman.
 
 ### 1. Environment Setup
 
-1. **Follow the main [README](../README.md)** to set up Docker, and your `.env` file.
-2. **Follow the guide [here](/guide/generateAccessToken.md)** to generate a Stack Exchange API token.
-3. **Add Stack Overflow credentials** to your `.env`:
+1.  Follow the main project `README.md` to set up Docker and your `.env` file.
+2.  Follow the guide in `stackoverflow/guide/` to generate your Stack Exchange API credentials.
+3.  Add your credentials to the `.env` file:
     ```
     STACK_API_KEY="your_api_key"
     STACK_ACCESS_TOKEN="your_token"
     ```
-4. **Start the application:**
+4.  Start the application:
     ```sh
     docker compose up --build
     ```
 
-> **Tip:** Use TablePlus (see main README) to inspect the database. This is a great tool for inspecting your database.
+---
+
+### 2. API Endpoints
+
+#### To Collect Data (`POST` requests)
+
+- **Collect Questions by Date and Tags:**
+  - **URL:** `POST http://localhost:8000/api/stackoverflow/collect/collect-questions/`
+  - **Body (JSON):**
+    ```json
+    {
+      "start_date": "YYYY-MM-DD",
+      "end_date": "YYYY-MM-DD",
+      "tags": "java;python"
+    }
+    ```
+    *(The `tags` field is optional.)*
+
+- **Enrich User Data (Repopulate):**
+  - **URL:** `POST http://localhost:8000/api/stackoverflow/collect/re-populate-data/`
+  - **Body:** No body required.
+
+#### To Query Data (`GET` requests)
+
+- **List, Filter, and Search Questions:**
+  - **URL:** `GET http://localhost:8000/api/stackoverflow/questions/`
+  - **Example Filters (as URL parameters):**
+    - `?search=celery`: Search for "celery" in the title and body.
+    - `?tags__name=python`: Get questions with the "python" tag.
+    - `?is_answered=true`: Get only answered questions.
+    - `?ordering=-score`: Order by score, highest first.
 
 ---
 
-### 2. Accessing the Admin Interface
-
-- Go to [http://localhost:8000/](http://localhost:8000/) in your browser.
-- Scroll to the **StackOverflow** section to find:
-  - **Collect-questions**
-  - **Re-populate-data**
+### 3. Troubleshooting
+- **Errors during startup:** Ensure all required variables are in your `.env` file and that you've run `docker compose up --build` after any changes to `docker-compose.yml` or `requirements.txt`.
+- **Task Failures:** Check the logs of the **`worker-1`** container for detailed error messages from the mining process. The `web-1` container will only show errors related to receiving the API request.
 
 ---
-
-### 3. Explanation of Functions
-
-- **Collect-questions**
-  - Fetches 100 questions at a time (pagination required for more).
-  - You can set the date range using the **start** and **end** fields in the admin interface.
-  - Click **Execute** to start. The function fetches questions, comments, answers, and users, and stores them in the database.
-
-- **Re-populate-data**
-  - Fills in missing user and relational data not provided in the initial API call.
-  - Triggered by clicking **Execute** in the admin interface.
-
----
-
-### 4. Notes
-
-- All data interaction is currently via the Django admin interface.
-- For troubleshooting, see the section below.
-
-## Having issues / Troubleshooting
-- **Missing API Key/Token:** Ensure `STACK_API_KEY` and `STACK_ACCESS_TOKEN` are set in your environment (`.env`) or Django settings.
-- **API Rate Limits:** The app handles rate limits, but if you see repeated warnings, consider increasing your quota or spacing out requests.
-- **Database Issues:** Run migrations and check your database connection settings. If you have to make the migrations, make sure to run them in the web container:
-  ```
-  docker compose exec web python manage.py makemigrations
-  ```
-  If you needed to make migrations in the web container, run them in the web container:
-  ```
-  docker compose exec web python manage.py migrate
-  ```
-- **Logging:** Check the console output for detailed logs and errors.
-
-## Known Limitations
-- Pagination is required, can not collect more than 100 objects each api call.
-- Data is currently saved locally, not directly to the main database like the GitHub and Jira apps.
-- Celery-based parallel data mining is not yet implemented (intended for future work).
-- The api will call backoff if the miner is requesting too much too fast. (Not known what waiting time should be used.)
 
 ## Future Work
-- Currently this part of RAISE saves locally. Should save the data to the database, like Github and Jira.
-- Add a more comprehensive mining script that fetches more data and updates more frequently. Currently, it only fetches 100 questions and the corresponding data. The other function is populating missing columns from the first call.
-- Parallelize data mining tasks. Using celery like the other two (Github and Jira). The current implementation is incomplete and would possibly need to use several access tokens in parallell to avoid rate limiting. 
-- Make tests for this part of the app.
-- Improve error handling and retry logic for unstable API responses
-- Expand coverage to additional Stack Exchange sites beyond Stack Overflow.  
-
----
-
-For general setup, installation, and environment configuration, please refer to the main project README at the root of the repository. 
+- Implement filtering for the data enrichment process (`re-populate-data`).
+- Integrate the `token_manager.py` to support multiple API tokens and avoid rate limiting more effectively.
+- Add more query endpoints (e.g., for users, tags, answers).
+- Create automated tests for the app.
