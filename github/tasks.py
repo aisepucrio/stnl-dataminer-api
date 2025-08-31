@@ -12,6 +12,47 @@ def format_date_for_json(date_value):
         return date_value.isoformat()
     return str(date_value)
 
+
+# Helper para validação de token
+def _verify_token_or_fail(self, miner, task_obj, operation, repo_name, extra_meta_return=None):
+    token_result = miner.verify_token()
+    if token_result.get('valid'):
+        return None  
+
+    error_msg = token_result.get('error', 'Unknown error in token validation')
+    error_type = 'TokenValidationError'
+
+    task_obj.status = 'FAILURE'
+    task_obj.error = error_msg
+    task_obj.error_type = error_type
+    task_obj.token_validation_error = True
+    task_obj.save()
+
+    extra_meta_return = extra_meta_return or {}
+    failure_meta = {
+        'operation': operation,
+        'repository': repo_name,
+        'error': error_msg,
+        'error_type': error_type,
+        'exc_type': error_type,
+        'exc_message': error_msg,
+        'exc_module': 'github.tasks',
+        **extra_meta_return
+    }
+
+    self.update_state(state='FAILURE', meta=failure_meta)
+
+    failure_return = {
+        'status': 'FAILURE',
+        'error': error_msg,
+        'error_type': error_type,
+        'operation': operation,
+        'repository': repo_name,
+        'token_validation_error': True,
+        **{k: v for k, v in extra_meta_return.items() if k not in ('error', 'error_type')}
+    }
+    return failure_return
+
 @shared_task(bind=True)
 def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
     task_obj, _ = Task.objects.get_or_create(
@@ -33,50 +74,27 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             'commit_sha': commit_sha
         }
     )
-    
+
     try:
         if isinstance(start_date, datetime):
             start_date = start_date.strftime('%Y-%m-%dT%H:%M:%SZ')
         if isinstance(end_date, datetime):
             end_date = end_date.strftime('%Y-%m-%dT%H:%M:%SZ')
-            
+
         miner = GitHubMiner()
-        
-        token_result = miner.verify_token()
-        if not token_result['valid']:
-            error_msg = token_result.get('error', 'Unknown error in token validation')
-            error_type = 'TokenValidationError'
-            
-            task_obj.status = 'FAILURE'
-            task_obj.error = error_msg
-            task_obj.error_type = error_type
-            task_obj.token_validation_error = True
-            task_obj.save()
-            
-            self.update_state(
-                state='FAILURE',
-                meta={
-                    'operation': 'fetch_commits',
-                    'repository': repo_name,
-                    'commit_sha': commit_sha,
-                    'error': error_msg,
-                    'error_type': error_type,
-                    'exc_type': error_type,
-                    'exc_message': error_msg,
-                    'exc_module': 'github.tasks'
-                }
-            )
-            
-            return {
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': error_type,
-                'operation': 'fetch_commits',
-                'repository': repo_name
-            }
-        
+
+        token_failure = _verify_token_or_fail(
+            self, miner, task_obj,
+            operation='fetch_commits',
+            repo_name=repo_name,               
+            extra_meta_return={'commit_sha': commit_sha}
+        )
+        if token_failure:
+            return token_failure
+
+
         commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha, task_obj=task_obj)
-        
+
         task_obj.status = 'SUCCESS'
         task_obj.result = {
             'operation': 'fetch_commits',
@@ -87,7 +105,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             'data': commits
         }
         task_obj.save()
-        
+
         self.update_state(
             state='SUCCESS',
             meta={
@@ -99,7 +117,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
                 'data': commits
             }
         )
-        
+
         return {
             'operation': 'fetch_commits',
             'repository': repo_name,
@@ -108,16 +126,16 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             'end_date': format_date_for_json(end_date),
             'data': commits
         }
-        
+
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        
+
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
         task_obj.save()
-        
+
         self.update_state(
             state='FAILURE',
             meta={
@@ -130,7 +148,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
                 'exc_module': e.__class__.__module__
             }
         )
-        
+
         return {
             'status': 'FAILURE',
             'error': error_msg,
@@ -163,43 +181,19 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
 
     try:
         miner = GitHubMiner()
-        
-        token_result = miner.verify_token()
-        if not token_result['valid']:
-            error_msg = token_result.get('error', 'Unknown error in token validation')
-            error_type = 'TokenValidationError'
-            
-            task_obj.status = 'FAILURE'
-            task_obj.error = error_msg
-            task_obj.error_type = error_type
-            task_obj.token_validation_error = True
-            task_obj.save()
-            
-            self.update_state(
-                state='FAILURE',
-                meta={
-                    'operation': 'fetch_issues',
-                    'repository': repo_name,
-                    'error': error_msg,
-                    'error_type': error_type,
-                    'exc_type': error_type,
-                    'exc_message': error_msg,
-                    'exc_module': 'github.tasks'
-                }
-            )
-            
-            return {
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': error_type,
-                'operation': 'fetch_issues',
-                'repository': repo_name,
-                'token_validation_error': True
-            }
+
+        token_failure = _verify_token_or_fail(
+            self, miner, task_obj,
+            operation='fetch_issues',
+            repo_name=repo_name,                    
+            extra_meta_return={'depth': depth}
+        )
+        if token_failure:
+            return token_failure
 
         miner.get_repository_metadata(repo_name)
         issues = miner.get_issues(repo_name, start_date, end_date, depth, task_obj)
-        
+
         task_obj.status = 'SUCCESS'
         task_obj.result = {
             'count': len(issues),
@@ -209,7 +203,7 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
             'depth': depth
         }
         task_obj.save()
-        
+
         self.update_state(
             state='SUCCESS',
             meta={
@@ -221,7 +215,7 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
                 'depth': depth
             }
         )
-        
+
         return {
             'status': 'SUCCESS',
             'count': len(issues),
@@ -234,12 +228,12 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        
+
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
         task_obj.save()
-        
+
         self.update_state(
             state='FAILURE',
             meta={
@@ -252,7 +246,7 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
                 'exc_module': e.__class__.__module__
             }
         )
-        
+
         return {
             'status': 'FAILURE',
             'error': error_msg,
@@ -284,43 +278,19 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
     )
     try:
         miner = GitHubMiner()
-        
-        token_result = miner.verify_token()
-        if not token_result['valid']:
-            error_msg = f"Invalid token: {token_result.get('error', 'Unknown error')}"
-            error_type = 'TokenValidationError'
-            
-            task_obj.status = 'FAILURE'
-            task_obj.error = error_msg
-            task_obj.error_type = error_type
-            task_obj.token_validation_error = True
-            task_obj.save()
-            
-            self.update_state(
-                state='FAILURE',
-                meta={
-                    'operation': 'fetch_pull_requests',
-                    'repository': repo_name,
-                    'error': error_msg,
-                    'error_type': error_type,
-                    'exc_type': error_type,
-                    'exc_message': error_msg,
-                    'exc_module': 'github.tasks'
-                }
-            )
-            
-            return {
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': error_type,
-                'operation': 'fetch_pull_requests',
-                'repository': repo_name,
-                'token_validation_error': True
-            }
+
+        token_failure = _verify_token_or_fail(
+            self, miner, task_obj,
+            operation='fetch_pull_requests',
+            repo_name=repo_name,                    
+            extra_meta_return={'depth': depth}
+        )
+        if token_failure:
+            return token_failure
 
         miner.get_repository_metadata(repo_name)
         pull_requests = miner.get_pull_requests(repo_name, start_date, end_date, depth, task_obj)
-        
+
         task_obj.status = 'SUCCESS'
         task_obj.result = {
             'count': len(pull_requests),
@@ -330,7 +300,7 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
             'depth': depth
         }
         task_obj.save()
-        
+
         self.update_state(
             state='SUCCESS',
             meta={
@@ -342,7 +312,7 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
                 'depth': depth
             }
         )
-        
+
         return {
             'status': 'SUCCESS',
             'count': len(pull_requests),
@@ -355,12 +325,12 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        
+
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
         task_obj.save()
-        
+
         self.update_state(
             state='FAILURE',
             meta={
@@ -373,7 +343,7 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
                 'exc_module': e.__class__.__module__
             }
         )
-        
+
         return {
             'status': 'FAILURE',
             'error': error_msg,
@@ -402,50 +372,26 @@ def fetch_branches(self, repo_name):
     )
     try:
         miner = GitHubMiner()
-        
-        token_result = miner.verify_token()
-        if not token_result['valid']:
-            error_msg = f"Invalid token: {token_result.get('error', 'Unknown error')}"
-            error_type = 'TokenValidationError'
-            
-            task_obj.status = 'FAILURE'
-            task_obj.error = error_msg
-            task_obj.error_type = error_type
-            task_obj.token_validation_error = True
-            task_obj.save()
-            
-            self.update_state(
-                state='FAILURE',
-                meta={
-                    'operation': 'fetch_branches',
-                    'repository': repo_name,
-                    'error': error_msg,
-                    'error_type': error_type,
-                    'exc_type': error_type,
-                    'exc_message': error_msg,
-                    'exc_module': 'github.tasks'
-                }
-            )
-            
-            return {
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': error_type,
-                'operation': 'fetch_branches',
-                'repository': repo_name,
-                'token_validation_error': True
-            }
+
+        token_failure = _verify_token_or_fail(
+            self, miner, task_obj,
+            operation='fetch_branches',
+            repo_name=repo_name,                    
+            extra_meta_return=None
+        )
+        if token_failure:
+            return token_failure
 
         miner.get_repository_metadata(repo_name)
         branches = miner.get_branches(repo_name)
-        
+
         task_obj.status = 'SUCCESS'
         task_obj.result = {
             'count': len(branches),
             'repository': repo_name
         }
         task_obj.save()
-        
+
         self.update_state(
             state='SUCCESS',
             meta={
@@ -454,7 +400,7 @@ def fetch_branches(self, repo_name):
                 'count': len(branches)
             }
         )
-        
+
         return {
             'status': 'SUCCESS',
             'count': len(branches),
@@ -464,12 +410,12 @@ def fetch_branches(self, repo_name):
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        
+
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
         task_obj.save()
-        
+
         self.update_state(
             state='FAILURE',
             meta={
@@ -482,7 +428,7 @@ def fetch_branches(self, repo_name):
                 'exc_module': e.__class__.__module__
             }
         )
-        
+
         return {
             'status': 'FAILURE',
             'error': error_msg,
@@ -511,42 +457,19 @@ def fetch_metadata(self, repo_name):
     )
     try:
         miner = GitHubMiner()
-        
-        token_result = miner.verify_token()
-        if not token_result['valid']:
-            error_msg = f"Invalid token: {token_result.get('error', 'Unknown error')}"
-            error_type = 'TokenValidationError'
-            
-            task_obj.status = 'FAILURE'
-            task_obj.error = error_msg
-            task_obj.error_type = error_type
-            task_obj.token_validation_error = True
-            task_obj.save()
-            
-            self.update_state(
-                state='FAILURE',
-                meta={
-                    'operation': 'fetch_metadata',
-                    'repository': repo_name,
-                    'error': error_msg,
-                    'error_type': error_type,
-                    'exc_type': error_type,
-                    'exc_message': error_msg,
-                    'exc_module': 'github.tasks'
-                }
-            )
-            
-            return {
-                'status': 'FAILURE',
-                'error': error_msg,
-                'error_type': error_type,
-                'operation': 'fetch_metadata',
-                'repository': repo_name,
-                'token_validation_error': True
-            }
 
-        metadata = miner.get_repository_metadata(repo_name,task_obj)
-        
+
+        token_failure = _verify_token_or_fail(
+            self, miner, task_obj,
+            operation='fetch_metadata',
+            repo_name=repo_name,            
+            extra_meta_return=None
+        )
+        if token_failure:
+            return token_failure
+
+        metadata = miner.get_repository_metadata(repo_name, task_obj)
+
         metadata_dict = {
             'repository': metadata.repository,
             'owner': metadata.owner,
@@ -571,14 +494,14 @@ def fetch_metadata(self, repo_name):
             'releases_count': metadata.releases_count,
             'time_mined': format_date_for_json(metadata.time_mined)
         }
-        
+
         task_obj.status = 'SUCCESS'
         task_obj.result = {
             'repository': repo_name,
             'metadata': metadata_dict
         }
         task_obj.save()
-        
+
         self.update_state(
             state='SUCCESS',
             meta={
@@ -587,7 +510,7 @@ def fetch_metadata(self, repo_name):
                 'metadata': metadata_dict
             }
         )
-        
+
         return {
             'status': 'SUCCESS',
             'repository': repo_name,
@@ -597,12 +520,12 @@ def fetch_metadata(self, repo_name):
     except Exception as e:
         error_msg = str(e)
         error_type = type(e).__name__
-        
+
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
         task_obj.save()
-        
+
         self.update_state(
             state='FAILURE',
             meta={
@@ -615,11 +538,11 @@ def fetch_metadata(self, repo_name):
                 'exc_module': e.__class__.__module__
             }
         )
-        
+
         return {
             'status': 'FAILURE',
             'error': error_msg,
             'error_type': error_type,
             'operation': 'fetch_metadata',
             'repository': repo_name
-        } 
+        }
