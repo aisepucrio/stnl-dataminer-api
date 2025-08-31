@@ -75,8 +75,6 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
                 'repository': repo_name
             }
         
-        metadata = miner.get_repository_metadata(repo_name)
-        
         commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha, task_obj=task_obj)
         
         task_obj.status = 'SUCCESS'
