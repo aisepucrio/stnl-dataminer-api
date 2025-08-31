@@ -547,7 +547,7 @@ def fetch_metadata(self, repo_name):
                 'token_validation_error': True
             }
 
-        metadata = miner.get_repository_metadata(repo_name)
+        metadata = miner.get_repository_metadata(repo_name,task_obj)
         
         metadata_dict = {
             'repository': metadata.repository,

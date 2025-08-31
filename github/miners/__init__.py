@@ -120,11 +120,11 @@ class GitHubMiner(BaseMiner):
         self._sync_auth_state()
         return self._metadata_miner.get_branches(repo_name)
     
-    def get_repository_metadata(self, repo_name: str):
+    def get_repository_metadata(self, repo_name: str, task_obj=None):
         """Fetches repository metadata from GitHub"""
         self._sync_auth_state()
-        return self._metadata_miner.get_repository_metadata(repo_name)
-    
+        return self._metadata_miner.get_repository_metadata(repo_name, task_obj)
+
     def get_watchers_from_html(self, owner: str, repo: str) -> int:
         """Fetches the number of watchers from the repository's HTML page"""
         return self._metadata_miner.get_watchers_from_html(owner, repo)
