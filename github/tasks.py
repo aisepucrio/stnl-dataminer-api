@@ -61,6 +61,9 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
             "operation": f"🔄 Starting GitHub commit collection: {repo_name}",
             "repository": repo_name,
             "status": "STARTED",
+            "date_init": start_date,
+            "date_end": end_date,
+            "type": "github_commits",
         }
     )
 
@@ -165,6 +168,9 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
             "operation": f"🔄 Starting GitHub issue collection: {repo_name}",
             "repository": repo_name,
             "status": "STARTED",
+            "date_init": start_date,
+            "date_end": end_date,
+            "type": "github_issues",
         }
     )
 
@@ -263,6 +269,9 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
             "operation": f"🔄 Starting GitHub pull request collection: {repo_name}",
             "repository": repo_name,
             "status": "STARTED",
+            "date_init": start_date,
+            "date_end": end_date,
+            "type": "github_pull_requests",
         }
     )
 
@@ -360,6 +369,7 @@ def fetch_branches(self, repo_name):
             "operation": f"🔄 Starting GitHub branches collection: {repo_name}",
             "repository": repo_name,
             "status": "STARTED",
+            "type": "github_branches",
         }
     )
 
@@ -445,6 +455,7 @@ def fetch_metadata(self, repo_name):
             "operation": f"🔄 Starting GitHub metadata collection: {repo_name}",
             "repository": repo_name,
             "status": "STARTED",
+            "type": "github_metadata",
         }
     )
 

@@ -3,6 +3,7 @@ from github.miners import GitHubMiner
 from jira.miner import JiraMiner
 from django.conf import settings
 from datetime import datetime
+
 import traceback
 
 from jobs.models import Task  # ⬅️ Imports the model that will save the progress
@@ -17,6 +18,9 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
             "operation": f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}",
             "repository": jira_domain,
             "status": "STARTED",
+            "date_init": start_date,
+            "date_end": end_date,
+            "type": "jira_issues",
         }
     )
 
