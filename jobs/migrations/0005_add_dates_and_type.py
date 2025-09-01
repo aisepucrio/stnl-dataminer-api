@@ -11,17 +11,17 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="task",
             name="date_init",
-            field=models.DateTimeField(),
+            field=models.DateTimeField(null=True, blank=True),
         ),
         migrations.AddField(
             model_name="task",
             name="date_end",
-            field=models.DateTimeField(),
+            field=models.DateTimeField(null=True, blank=True),
         ),
         migrations.AddField(
             model_name="task",
             name="date_last_update",
-            field=models.DateTimeField(),
+            field=models.DateTimeField(null=True, blank=True),
         ),
         migrations.AddField(
             model_name="task",
