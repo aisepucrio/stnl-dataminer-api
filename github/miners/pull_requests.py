@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from django.utils import timezone
 
 from .base import BaseMiner
-from .utils import APIMetrics, split_date_range
+from .utils import APIMetrics, split_date_range, update_task_progress_date
 from ..models import GitHubIssuePullRequest, GitHubMetadata
 
 
@@ -66,7 +66,7 @@ class PullRequestsMiner(BaseMiner):
         log_progress(f"🔎 Depth: {depth.upper()}")
 
         try:
-            log_progress("Verificando o total de pull requests a serem minerados...")
+            log_progress("🔎 Checking total pull requests to be mined...")
             
             for period_start, period_end in split_date_range(start_date, end_date):
                 query = f"repo:{repo_name} is:pr"
@@ -85,8 +85,8 @@ class PullRequestsMiner(BaseMiner):
                 metrics.total_requests += 1
                 
                 if response.status_code == 403 and 'rate limit' in response.text.lower():
-                    if not self.handle_rate_limit(response):
-                        log_progress("Failed to recover after rate limit during preflight check")
+                    if not self.handle_rate_limit(response,'search'):
+                        log_progress("🚫 Failed to recover after rate limit during preflight check")
                         continue
                     response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
 
@@ -94,11 +94,11 @@ class PullRequestsMiner(BaseMiner):
                     data = response.json()
                     period_total = data.get('total_count', 0)
                     total_prs_count += period_total
-                    log_progress(f"Período {period_start} a {period_end}: {period_total} pull requests encontrados")
+                    log_progress(f"📆 Period {period_start} to {period_end}: {period_total} pull requests found")
                 else:
-                    log_progress(f"Erro na pré-verificação do período {period_start} a {period_end}: {response.status_code}")
+                    log_progress(f"❗ Error in pre-check for period {period_start} to {period_end}: {response.status_code}")
 
-            log_progress(f"Total de {total_prs_count} pull requests encontrados. Iniciando a coleta.")
+            log_progress(f"📦 Total of {total_prs_count} pull requests found. Starting collection.")
 
             for period_start, period_end in split_date_range(start_date, end_date):
                 log_progress(f"📊 Processing period: {period_start} to {period_end}")
@@ -126,8 +126,8 @@ class PullRequestsMiner(BaseMiner):
                     metrics.total_requests += 1
                     
                     if response.status_code == 403 and 'rate limit' in response.text.lower():
-                        if not self.handle_rate_limit(response):
-                            log_progress("Failed to recover after rate limit")
+                        if not self.handle_rate_limit(response,'search'):
+                            log_progress("🚫 Failed to recover after rate limit")
                             break
                         response = requests.get(base_url, params=params, headers=self.headers)
 
@@ -135,7 +135,7 @@ class PullRequestsMiner(BaseMiner):
                     data = response.json()
 
                     if not data['items']:
-                        log_progress("No PRs found on this page.")
+                        log_progress("ℹ️ No PRs found on this page.")
                         break
 
                     prs_in_page = len(data['items'])
@@ -148,9 +148,9 @@ class PullRequestsMiner(BaseMiner):
                         pr_number = pr['number']
                         
                         if total_prs_count > 0:
-                            log_progress(f"Mining pull request {processed_count} of {total_prs_count}. Key: #{pr_number} - {pr['title']}")
+                            log_progress(f"⛏️ Mining pull request {processed_count} of {total_prs_count}. Key: #{pr_number} - {pr['title']}")
                         else:
-                            log_progress(f"Mining pull request #{pr_number} - {pr['title']}")
+                            log_progress(f"⛏️ Mining pull request #{pr_number} - {pr['title']}")
                         
                         pr_url = f"https://api.github.com/repos/{repo_name}/pulls/{pr_number}"
                         pr_response = requests.get(pr_url, headers=self.headers)
@@ -280,6 +280,12 @@ class PullRequestsMiner(BaseMiner):
                     time.sleep(1)
 
                 log_progress(f"✅ Period completed: {len(data['items'])} pull requests collected in {page} pages")
+                
+                # Update task progress 
+                if period_end and period_end != period_start:
+                    update_task_progress_date(task_obj, period_end)
+                elif period_start:
+                    update_task_progress_date(task_obj, period_start)
 
             log_progress(f"✅ Extraction completed! Total pull requests collected: {len(all_prs)}")
             return all_prs
