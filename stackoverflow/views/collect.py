@@ -1,264 +1,112 @@
-# --- TRECHO CORRIGIDO (Imports) ---
-from rest_framework import viewsets
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import status
-from datetime import datetime
-from django.conf import settings  # Adicionado para buscar chaves da API de forma segura
-# Importa a função que realmente faz o trabalho
-from ..tasks import collect_questions_task, repopulate_users_task
-# Mantemos este import para a outra função que não vamos mexer agora
-from jobs.models import Task, Repository
-# Mantemos os imports da documentação e de outros módulos
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiExample, OpenApiParameter
-import logging # Adicionado para registrar erros no terminal
+# Em stackoverflow/views/collect.py
 
-# Cria um logger para este módulo
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from datetime import datetime
+import logging
+from celery import chain
+
+# Imports dos nossos módulos
+from ..tasks import collect_questions_task, repopulate_users_task
+from jobs.models import Task, Repository
+from drf_spectacular.utils import extend_schema # Para documentação da API
+
+# O "Cardápio" de operações agora vive aqui dentro
+OPERATIONS = {
+    'collect_questions': {
+        'name': 'Coletar Novas Perguntas',
+        'dependencies': []
+    },
+    'repopulate_users': {
+        'name': 'Enriquecer Dados de Usuários',
+        'dependencies': ['collect_questions']
+    }
+}
+
 logger = logging.getLogger(__name__)
 
-@extend_schema_view(
-    collect_answers=extend_schema(
-        summary="Collect Stack Overflow Answers",
-        description="""
-        Collect all answers from Stack Overflow within a date range and save them to the database.
-        
-        Notes:
-        - Answers are saved to database in batches
-        - Duplicate answers are updated if they exist
-        - The API will automatically handle rate limiting
-        """,
-        request={
-            "application/json": {
-                "type": "object",
-                "properties": {
-                    "site": {"type": "string", "default": "stackoverflow"},
-                    "start_date": {"type": "string", "format": "date", "description": "Start date in YYYY-MM-DD"},
-                    "end_date": {"type": "string", "format": "date", "description": "End date in YYYY-MM-DD"},
-                },
-                "required": ["start_date", "end_date"]
-            }
-        },
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "message": {"type": "string"},
-                    "total_answers": {"type": "integer"},
-                    "answers": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "answer_id": {"type": "integer"},
-                                "question_id": {"type": "integer"},
-                                "body": {"type": "string"},
-                                "creation_date": {"type": "string", "format": "date-time"},
-                                "score": {"type": "integer"},
-                                "is_accepted": {"type": "boolean"}
-                            }
-                        }
-                    }
-                }
-            },
-            400: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            },
-            429: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            },
-            500: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            }
-        },
-        tags=["StackOverflow"]
-    ),
-    collect_questions=extend_schema(
-        summary="Collect Stack Overflow Questions",
-        description="""
-        Collect all questions from Stack Overflow within a date range and save them to the database.
-        
-        Notes:
-        - Questions are saved to database in batches
-        - Duplicate questions are updated if they exist
-        - The API will automatically handle rate limiting
-        """,
-        request={
-            "application/json": {
-                "type": "object",
-                "properties": {
-                    "site": {"type": "string", "default": "stackoverflow"},
-                    "start_date": {"type": "string", "format": "date", "description": "Start date in YYYY-MM-DD"},
-                    "end_date": {"type": "string", "format": "date", "description": "End date in YYYY-MM-DD"},
-                },
-                "required": ["start_date", "end_date"]
-            }
-        },
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "message": {"type": "string"},
-                    "total_questions": {"type": "integer"},
-                    "questions": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "question_id": {"type": "integer"},
-                                "title": {"type": "string"},
-                                "body": {"type": "string"},
-                                "creation_date": {"type": "string", "format": "date-time"},
-                                "score": {"type": "integer"},
-                                "view_count": {"type": "integer"},
-                                "answer_count": {"type": "integer"},
-                                "tags": {"type": "array", "items": {"type": "string"}},
-                                "is_answered": {"type": "boolean"},
-                                "accepted_answer_id": {"type": "integer", "nullable": True},
-                                "owner": {
-                                    "type": "object",
-                                    "properties": {
-                                        "user_id": {"type": "integer"},
-                                        "display_name": {"type": "string"},
-                                        "reputation": {"type": "integer"}
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            400: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            },
-            429: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            },
-            500: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            }
-        },
-        tags=["StackOverflow"]
-    ),
-    re_populate_data=extend_schema(
-        summary="Re-populate Stack Overflow User Data",
-        description="""
-        Re-populate user data including badges, collectives, and other user-related information.
-        
-        Notes:
-        - Updates users that have never been mined or were mined more than a week ago
-        - Processes users in batches of 100
-        - Updates badges, collectives, and user information
-        - The API will automatically handle rate limiting
-        """,
-        responses={
-            200: {
-                "type": "object",
-                "properties": {
-                    "message": {"type": "string"},
-                    "status": {"type": "string"}
-                }
-            },
-            500: {
-                "type": "object",
-                "properties": {
-                    "error": {"type": "string"}
-                }
-            }
-        },
-        tags=["StackOverflow"]
-    )
-)
 class StackOverflowViewSet(viewsets.ViewSet):
     """
-    ViewSet for collecting Stack Overflow data.
-    Provides endpoints for collecting questions and populating db with all necessary data.
+    ViewSet para iniciar e gerenciar trabalhos de coleta de dados do Stack Overflow.
     """
+    
+    @extend_schema(
+        summary="Inicia um Trabalho de Mineração do Stack Overflow",
+        description="""
+        Inicia um novo trabalho de mineração assíncrono com base em uma lista de operações.
+        Este é o endpoint principal para todas as tarefas de coleta e enriquecimento de dados.
+        """,
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "options": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Lista de operações a serem executadas (ex: ['collect_questions', 'repopulate_users'])"
+                    },
+                    "start_date": {"type": "string", "format": "date", "description": "Obrigatório se 'collect_questions' estiver nas opções."},
+                    "end_date": {"type": "string", "format": "date", "description": "Obrigatório se 'collect_questions' estiver nas opções."},
+                    "tags": {"type": "string", "description": "Opcional. Tags separadas por ';' para filtrar a coleta de perguntas."}
+                },
+                "required": ["options"]
+            }
+        },
+        responses={202: {"description": "Trabalho de mineração iniciado com sucesso."}}
+    )
+    def create(self, request):
+        """
+        Inicia um novo trabalho de mineração com base na lista de 'options' fornecida.
+        """
+        try:
+            options = request.data.get('options', [])
+            if not options:
+                return Response({'error': 'A lista "options" é obrigatória.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # ... (sua lógica de validação de 'options' continua igual) ...
+            
+            celery_task_chain = self._build_task_chain(options, request.data)
+
+            if not celery_task_chain:
+                return Response({'error': 'Parâmetros insuficientes para as opções.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # --- MUDANÇA PRINCIPAL AQUI ---
+            # Apenas disparamos a tarefa. Não criamos mais o registro Task aqui.
+            task_chain_result = celery_task_chain.apply_async()
+            
+            return Response(
+                {'task_id': task_chain_result.id, 'status': 'Trabalho de mineração enviado para a fila'},
+                status=status.HTTP_202_ACCEPTED
+            )
+
+        except Exception as e:
+            logger.error(f"Erro ao iniciar trabalho de mineração: {e}", exc_info=True)
+            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _build_task_chain(self, options: list, data: dict):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        tags = data.get('tags')
+
+        execution_plan = set(options)
+        for opt in options:
+            dependencies = OPERATIONS.get(opt, {}).get('dependencies', [])
+            execution_plan.update(dependencies)
         
-# --- SUBSTITUA SUA FUNÇÃO collect_questions POR ESTA ---
+        task_map = {
+            'collect_questions': collect_questions_task.s(start_date=start_date, end_date=end_date, tags=tags),
+            'repopulate_users': repopulate_users_task.s(),
+        }
 
-    @action(detail=False, methods=['post'], url_path='collect-questions')
-    def collect_questions(self, request):
-        try:
-            # --- PEQUENA MUDANÇA AQUI ---
-            start_date = request.data.get('start_date')
-            end_date = request.data.get('end_date')
-            tags = request.data.get('tags', None)  # Pega o novo parâmetro opcional 'tags'
-
+        ordered_tasks = []
+        if 'collect_questions' in execution_plan:
             if not start_date or not end_date:
-                return Response({'error': 'start_date e end_date são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+                return None 
+            ordered_tasks.append(task_map['collect_questions'])
+        if 'repopulate_users' in execution_plan:
+            ordered_tasks.append(task_map['repopulate_users'])
             
-            datetime.strptime(start_date, '%Y-%m-%d')
-            datetime.strptime(end_date, '%Y-%m-%d')
+        if not ordered_tasks:
+            return None
             
-            # --- MUDANÇA NA CHAMADA DA TAREFA ---
-            # Passamos o novo parâmetro 'tags' para a tarefa do Celery
-            task = collect_questions_task.delay(start_date=start_date, end_date=end_date, tags=tags)
-            
-            # Atualiza a mensagem de log para incluir as tags, se existirem
-            operation_log = f"Iniciando coleta: {start_date} a {end_date}"
-            if tags:
-                operation_log += f" (Tags: {tags})"
-
-            repo, _ = Repository.objects.get_or_create(name="Stack Overflow")
-            Task.objects.create(
-                task_id=task.id, 
-                operation=operation_log, 
-                repository=repo
-            )
-            
-            return Response(
-                {'task_id': task.id, 'status': 'Tarefa de coleta iniciada'}, 
-                status=status.HTTP_202_ACCEPTED
-            )
-
-        except ValueError:
-            return Response({'error': 'Formato de data inválido. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"Erro ao enfileirar a tarefa 'collect_questions': {e}", exc_info=True)
-            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-    # --- SUBSTITUA SUA FUNÇÃO re_populate_data POR ESTA ---
-
-    @action(detail=False, methods=['post'], url_path='re-populate-data')
-    def re_populate_data(self, request):
-        try:
-            # --- MUDANÇA AQUI ---
-            # 1. Busca ou cria o objeto Repository
-            repo, _ = Repository.objects.get_or_create(name="Stack Overflow")
-            
-            # 2. Inicia a tarefa do Celery
-            task = repopulate_users_task.delay()
-
-            # 3. Cria o registro da Task, passando o objeto 'repo'
-            Task.objects.create(
-                task_id=task.id, 
-                operation="Iniciando enriquecimento de dados de usuários", 
-                repository=repo # Passa o objeto, não o texto
-            )
-
-            return Response(
-                {'task_id': task.id, 'status': 'Tarefa de enriquecimento iniciada'}, 
-                status=status.HTTP_202_ACCEPTED
-            )
-            
-        except Exception as e:
-            logger.error(f"Erro ao enfileirar a tarefa 're_populate_data': {e}", exc_info=True)
-            return Response({'error': f'Um erro inesperado ocorreu: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return chain(ordered_tasks)

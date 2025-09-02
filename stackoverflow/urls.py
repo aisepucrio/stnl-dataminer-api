@@ -2,15 +2,14 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-# Importa os módulos 'collect' e 'lookup' da nossa nova pasta 'views'
-from .views import collect, lookup 
+from .views import collect, lookup
 
 router = DefaultRouter()
 
-# Rota para as tarefas de COLETA (ex: /api/stackoverflow/collect/collect-questions/)
+# Rota para as tarefas de COLETA (ex: POST /api/stackoverflow/collect/)
 router.register(r'collect', collect.StackOverflowViewSet, basename='stackoverflow-collect')
 
-# Rota NOVA para a CONSULTA de perguntas (ex: /api/stackoverflow/questions/)
+# Rota para a CONSULTA de perguntas (ex: GET /api/stackoverflow/questions/)
 router.register(r'questions', lookup.QuestionViewSet, basename='stackoverflow-question')
 
 urlpatterns = [

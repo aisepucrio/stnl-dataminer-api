@@ -2,24 +2,29 @@
 
 from celery import shared_task
 from django.conf import settings
-from jobs.models import Task  # Importa o modelo Task
+from jobs.models import Task, Repository  # Importa Task e Repository
 
 # Importa as suas funções de mineração originais
 from .miner.question_fetcher import fetch_questions
 from .miner.get_additional_data import populate_missing_data
-
-# Em stackoverflow/tasks.py
-
 @shared_task(bind=True)
-def collect_questions_task(self, start_date: str, end_date: str, tags=None): # <-- MUDANÇA 1: Recebe 'tags'
+def collect_questions_task(self, start_date: str, end_date: str, tags=None):
     """
     Tarefa Celery que executa a coleta de perguntas e atualiza o status.
     """
     task_obj = None
     try:
-        task_obj = Task.objects.get(task_id=self.request.id)
+        repo, _ = Repository.objects.get_or_create(name="Stack Overflow", defaults={'platform': 'stackoverflow', 'owner': 'community'})
+        operation_log = f"Iniciando coleta: {start_date} a {end_date}"
+        if tags:
+            operation_log += f" (Tags: {tags})"
+
+        task_obj = Task.objects.create(
+            task_id=self.request.id, 
+            operation=operation_log, 
+            repository=repo
+        )
         
-        # Passamos o task_obj e também as tags para a sua função de mineração
         fetch_questions(
             site='stackoverflow',
             start_date=start_date,
@@ -27,7 +32,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None): # <
             api_key=settings.STACK_API_KEY,
             access_token=settings.STACK_ACCESS_TOKEN,
             task_obj=task_obj,
-            tags=tags  # <-- MUDANÇA 2: Passa 'tags' para a função
+            tags=tags
         )
         
         task_obj.status = 'COMPLETED'
@@ -43,19 +48,25 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None): # <
             task_obj.save(update_fields=['status', 'error'])
         raise e
     
-@shared_task(bind=True)
-def repopulate_users_task(self):
+@shared_task(bind=True, ignore_result=True)
+def repopulate_users_task(self, previous_task_result=None):
     """
     Tarefa Celery que executa o enriquecimento de dados e atualiza o status.
     """
     task_obj = None
     try:
-        task_obj = Task.objects.get(task_id=self.request.id)
+        # Lógica para criar a Task, que também estava faltando
+        repo, _ = Repository.objects.get_or_create(name="Stack Overflow", defaults={'platform': 'stackoverflow', 'owner': 'community'})
+        task_obj = Task.objects.create(
+            task_id=self.request.id, 
+            operation="Iniciando enriquecimento de dados de usuários", 
+            repository=repo
+        )
         
         populate_missing_data(
             api_key=settings.STACK_API_KEY,
             access_token=settings.STACK_ACCESS_TOKEN,
-            task_obj=task_obj # <<-- O NOVO PARÂMETRO EM AÇÃO
+            task_obj=task_obj
         )
 
         task_obj.status = 'COMPLETED'
