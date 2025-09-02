@@ -1,7 +1,8 @@
 from celery import shared_task
 from .miners import GitHubMiner
 from jobs.models import Task
-from datetime import datetime
+from datetime import datetime, timedelta
+from django.utils import timezone as dj_tz
 
 def format_date_for_json(date_value):
     if date_value is None:
@@ -13,7 +14,7 @@ def format_date_for_json(date_value):
     return str(date_value)
 
 
-# Helper para validação de token
+# Helper to validate token
 def _verify_token_or_fail(self, miner, task_obj, operation, repo_name, extra_meta_return=None):
     token_result = miner.verify_token()
     if token_result.get('valid'):
@@ -53,19 +54,29 @@ def _verify_token_or_fail(self, miner, task_obj, operation, repo_name, extra_met
     }
     return failure_return
 
+# Helper to reuse or create tasks
+def _reuse_or_create_task(self, *, defaults, task_pk=None):
+    if task_pk:
+        update_data = {**defaults, "task_id": self.request.id}
+        update_data.pop("date_init", None)
+        updated = Task.objects.filter(pk=task_pk).update(**update_data)
+        if updated:
+            return Task.objects.get(pk=task_pk), False
+    return Task.objects.get_or_create(task_id=self.request.id, defaults=defaults)
+
+
 @shared_task(bind=True)
-def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None):
-    task_obj, _ = Task.objects.get_or_create(
-        task_id=self.request.id,
-        defaults={
-            "operation": f"🔄 Starting GitHub commit collection: {repo_name}",
-            "repository": repo_name,
-            "status": "STARTED",
-            "date_init": start_date,
-            "date_end": end_date,
-            "type": "github_commits",
-        }
-    )
+def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=None, task_pk=None):
+    defaults = {
+        "operation": f"🔄 Starting GitHub commit collection: {repo_name}",
+        "repository": repo_name,
+        "status": "STARTED",
+        "error": None,
+        "date_init": start_date,
+        "date_end": end_date,
+        "type": f"github_commits_{commit_sha}" if commit_sha else "github_commits",
+    }
+    task_obj, created = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     self.update_state(
         state='STARTED',
@@ -161,24 +172,23 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         }
 
 @shared_task(bind=True)
-def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic'):
-    task_obj, _ = Task.objects.get_or_create(
-        task_id=self.request.id,
-        defaults={
-            "operation": f"🔄 Starting GitHub issue collection: {repo_name}",
-            "repository": repo_name,
-            "status": "STARTED",
-            "date_init": start_date,
-            "date_end": end_date,
-            "type": "github_issues",
-        }
-    )
+def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic', task_pk=None):
+    defaults = {
+        "operation": f"🔄 Starting GitHub issue collection: {repo_name}",
+        "repository": repo_name,
+        "status": "STARTED",
+        "date_init": start_date,
+        "date_end": end_date,
+        "type": f"github_issues_{depth}",
+    }
+    task_obj, created = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     self.update_state(
         state='STARTED',
         meta={
             'operation': 'fetch_issues',
             'repository': repo_name,
+            'error': None,
             'start_date': format_date_for_json(start_date),
             'end_date': format_date_for_json(end_date),
             'depth': depth
@@ -262,18 +272,17 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic')
         }
 
 @shared_task(bind=True)
-def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic'):
-    task_obj, _ = Task.objects.get_or_create(
-        task_id=self.request.id,
-        defaults={
-            "operation": f"🔄 Starting GitHub pull request collection: {repo_name}",
-            "repository": repo_name,
-            "status": "STARTED",
-            "date_init": start_date,
-            "date_end": end_date,
-            "type": "github_pull_requests",
-        }
-    )
+def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='basic', task_pk=None):
+    defaults = {
+        "operation": f"🔄 Starting GitHub pull request collection: {repo_name} ",
+        "repository": repo_name,
+        "status": "STARTED",
+        "error": None,
+        "date_init": start_date,
+        "date_end": end_date,
+        "type": f"github_pull_requests_{depth}",
+    }
+    task_obj, created = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     self.update_state(
         state='STARTED',
@@ -362,16 +371,15 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
         }
 
 @shared_task(bind=True)
-def fetch_branches(self, repo_name):
-    task_obj, _ = Task.objects.get_or_create(
-        task_id=self.request.id,
-        defaults={
-            "operation": f"🔄 Starting GitHub branches collection: {repo_name}",
-            "repository": repo_name,
-            "status": "STARTED",
-            "type": "github_branches",
-        }
-    )
+def fetch_branches(self, repo_name, task_pk=None):
+    defaults = {
+        "operation": f"🔄 Starting GitHub branches collection: {repo_name}",
+        "repository": repo_name,
+        "error": None,
+        "status": "STARTED",
+        "type": "github_branches",
+    }
+    task_obj, created = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     self.update_state(
         state='STARTED',
@@ -448,16 +456,15 @@ def fetch_branches(self, repo_name):
         }
 
 @shared_task(bind=True)
-def fetch_metadata(self, repo_name):
-    task_obj, _ = Task.objects.get_or_create(
-        task_id=self.request.id,
-        defaults={
-            "operation": f"🔄 Starting GitHub metadata collection: {repo_name}",
-            "repository": repo_name,
-            "status": "STARTED",
-            "type": "github_metadata",
-        }
-    )
+def fetch_metadata(self, repo_name, task_pk=None):
+    defaults = {
+        "operation": f"🔄 Starting GitHub metadata collection: {repo_name}",
+        "repository": repo_name,
+        "error": None,
+        "status": "STARTED",
+        "type": "github_metadata",
+    }
+    task_obj, created = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     self.update_state(
         state='STARTED',
@@ -557,3 +564,57 @@ def fetch_metadata(self, repo_name):
             'operation': 'fetch_metadata',
             'repository': repo_name
         }
+
+@shared_task(bind=True, name="github.restart_collection")
+def restart_collection(self, task_pk: str):
+    task_obj = Task.objects.get(pk=task_pk)
+
+    repo_name = task_obj.repository or ""
+    collect_type = (task_obj.type or "").strip().lower()
+    end_date = task_obj.date_end
+
+    extra = None
+    if "_" in collect_type:
+        extra = collect_type.rsplit("_", 1)[1] or None
+
+    base = task_obj.date_last_update or getattr(task_obj, "date_init", None)
+    start_date = (base + timedelta(days=1)) if base else None
+    if isinstance(start_date, datetime) and dj_tz.is_naive(start_date):
+        start_date = dj_tz.make_aware(start_date, dj_tz.get_current_timezone())
+
+    def _dispatch_issues():
+        depth = extra
+        return fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth, task_pk]).id
+
+    def _dispatch_prs():
+        depth = extra
+        return fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth, task_pk]).id
+
+    def _dispatch_commits():
+        commit_sha = None
+        if extra != 'commits':
+            commit_sha = extra
+        return fetch_commits.apply_async(args=[repo_name, start_date, end_date, commit_sha, task_pk]).id
+
+    def _dispatch_branches():
+        return fetch_branches.apply_async(args=[repo_name, task_pk]).id
+
+    def _dispatch_metadata():
+        return fetch_metadata.apply_async(args=[repo_name, task_pk]).id
+
+    if collect_type.startswith("github_issues"):
+        new_id = _dispatch_issues()
+    elif collect_type.startswith("github_pull_requests") or collect_type.startswith("github_pr"):
+        new_id = _dispatch_prs()
+    elif collect_type.startswith("github_commits"):
+        new_id = _dispatch_commits()
+    elif collect_type.startswith("github_branches"):
+        new_id = _dispatch_branches()
+    elif collect_type.startswith("github_metadata"):
+        new_id = _dispatch_metadata()
+    else:
+        self.update_state(state="FAILURE", meta={"error": f"Tipo desconhecido: {collect_type}"})
+        return {"status": "FAILURE", "error": f"Tipo desconhecido: {collect_type}"}
+
+    self.update_state(state="SUCCESS", meta={"spawned_task_pk": new_id, "type": collect_type})
+    return {"status": "SUCCESS", "spawned_task_pk": new_id, "type": collect_type}

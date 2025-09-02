@@ -8,7 +8,7 @@ from .models import Task
 from .serializers import TaskSerializer
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
 
 # Log configuration
@@ -214,7 +214,7 @@ class TaskStatusView(APIView):
                 
                 return Response({
                     "task_id": task_id,
-                    "status": "Task canceled and marked as failed"
+                    "status": "Task canceled"
                 }, status=status.HTTP_200_OK)
             
             elif task_result.state == "SUCCESS":
@@ -249,3 +249,101 @@ class TaskStatusView(APIView):
                 "task_id": task_id,
                 "details": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RestartCollectionView(APIView):
+    """
+    Generic view to restart collection tasks.
+    Routes to GitHub or Jira restart handlers based on task type.
+    """
+    
+    @extend_schema(
+        summary="Restart collection from last progress + 1 day",
+        tags=["Jobs"],
+        parameters=[
+            OpenApiParameter(
+                name='task_id',
+                type=str,
+                location=OpenApiParameter.PATH,
+                description='Task ID to restart'
+            )
+        ],
+        responses={
+            202: OpenApiResponse(description="Restart scheduled successfully"),
+            404: OpenApiResponse(description="Task not found"),
+            409: OpenApiResponse(description="Task already finished - restart denied")
+        }
+    )
+    def post(self, request, task_id):
+        logger.info(f"RestartCollectionView: attempting restart for task_id={task_id}")
+        
+        try:
+            task_obj = Task.objects.get(task_id=task_id)
+            logger.info(f"Found task: type={task_obj.type}, status={task_obj.status}")
+        except Task.DoesNotExist:
+            logger.error(f"Task not found: {task_id}")
+            return Response({"error": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if task can be restarted
+        current_status = (getattr(task_obj, "status", "") or "").upper()
+        if current_status == "SUCCESS":
+            return Response(
+                {"error": "Task already finished. Restart denied."},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        # Calculate resume_from = date_last_update + 1 day; fallback to date_init
+        resume_from = getattr(task_obj, "date_last_update", None)
+        if resume_from:
+            resume_from = (resume_from + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            resume_from = getattr(task_obj, "date_init", None)
+
+        # Route to appropriate restart handler based on task type
+        task_type = getattr(task_obj, "type", "")
+        logger.info(f"Task type: '{task_type}'")
+        
+        if task_type.startswith('github_'):
+            # GitHub task 
+            logger.info("Routing to GitHub restart handler")
+            try:
+                from github.tasks import restart_collection
+                async_result = restart_collection.apply_async(kwargs={
+                    "task_pk": task_obj.id
+                })
+                logger.info(f"GitHub restart task dispatched: {async_result.id}")
+            except Exception as e:
+                logger.error(f"Error dispatching GitHub restart: {str(e)}")
+                return Response({
+                    "error": f"Error dispatching restart: {str(e)}",
+                    "task_id": task_id
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        elif task_type.startswith('jira_'):
+            # Jira task 
+            logger.info("Routing to Jira restart handler")
+            try:
+                from jira.tasks import restart_collection as jira_restart_collection
+                async_result = jira_restart_collection.apply_async(kwargs={
+                    "task_pk": task_obj.id
+                })
+                logger.info(f"Jira restart task dispatched: {async_result.id}")
+            except Exception as e:
+                logger.error(f"Error dispatching Jira restart: {str(e)}")
+                return Response({
+                    "error": f"Error dispatching restart: {str(e)}",
+                    "task_id": task_id
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            logger.error(f"Unknown task type: '{task_type}'")
+            return Response({
+                "error": f"Unknown task type: {task_type}",
+                "task_id": task_id
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "message": "Restart scheduled",
+            "celery_task_id": async_result.id,
+            "resume_from": resume_from.isoformat() if resume_from else None,
+            "status_endpoint": request.build_absolute_uri(f"/api/jobs/tasks/{task_obj.task_id}/"),
+            "db_task_pk": task_obj.id
+        }, status=status.HTTP_202_ACCEPTED)

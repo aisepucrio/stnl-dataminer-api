@@ -24,6 +24,7 @@ from .models import (
     JiraIssueType
 )
 
+from jira.utils import update_task_progress_date, split_date_range
 
 class JiraMiner:
     class NoValidJiraTokenError(Exception):
@@ -119,7 +120,6 @@ class JiraMiner:
 
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
-        max_results, start_at, total_collected = 100, 0, 0
         custom_fields_mapping = self.get_custom_fields_mapping()
         self.log_progress(f"Colecting project issues {project_key}...")
 
@@ -130,140 +130,178 @@ class JiraMiner:
                 sprint_field_key = field_id
                 break
 
-
         self.log_progress(f"Token {self.current_token_index + 1} is valid")
 
-
-        jql_query = f'project="{project_key}"'
-
+        # Build the static part of JQL
+        base_jql = f'project="{project_key}"'
         if issuetypes:
             issuetypes_jql = " OR ".join([f'issuetype="{issuetype}"' for issuetype in issuetypes])
-            jql_query += f' AND ({issuetypes_jql})'
+            base_jql += f' AND ({issuetypes_jql})'
 
-        if start_date:
-            start_date_parsed = self.validate_and_parse_date(start_date)
-            jql_query += f' AND created >= "{start_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
+        # Helper to run a single JQL (paged) and return collected count
+        def run_paged_collection(jql_where: str, total_hint: int | None = None) -> int:
+            max_results, start_at, collected = 100, 0, 0
 
-        if end_date:
-            end_date_parsed = self.validate_and_parse_date(end_date)
-            jql_query += f' AND created <= "{end_date_parsed.strftime("%Y-%m-%d %H:%M")}"'
+            # Preflight to get total if not provided
+            if total_hint is None:
+                pref_jql = quote(f"{base_jql} {jql_where}")
+                self.log_progress("Verificando o total de issues a serem mineradas...")
+                preflight_url = f"https://{self.jira_domain}/rest/api/3/search?jql={pref_jql}&maxResults=0"
+                try:
+                    preflight_response = requests.get(preflight_url, headers=self.headers, auth=self.auth)
+                    if preflight_response.status_code != 200:
+                        raise Exception(
+                            f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}"
+                        )
+                    total_hint = preflight_response.json().get('total', 0)
+                    self.log_progress(f"Total de {total_hint} issues encontradas. Iniciando a coleta.")
+                except Exception as e:
+                    self.log_progress(f"Falha no preflight: {e}")
+                    return 0
 
-        encoded_jql = quote(jql_query)
-
-
-        self.log_progress("Verificando o total de issues a serem mineradas...")
-        preflight_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&maxResults=0"
-        try:
-            preflight_response = requests.get(preflight_url, headers=self.headers, auth=self.auth)
-            if preflight_response.status_code != 200:
-
-                raise Exception(f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}")
-
- 
-            total_issues_count = preflight_response.json().get('total', 0)
-            self.log_progress(f"Total de {total_issues_count} issues encontradas. Iniciando a coleta.")
-
-        except Exception as e:
-
-            return {"error": f"Não foi possível obter a contagem total de issues: {e}"}
-
-
-        while True:
-            jira_url = f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}&startAt={start_at}&maxResults={max_results}&expand=changelog"
-            response = requests.get(jira_url, headers=self.headers, auth=self.auth)
-
-            if self.handle_rate_limit(response):
-                continue
-
-            if response.status_code != 200:
-                return {"error": f"Failed to collect issues: {response.status_code} - {response.text}"}
-
-            issues = response.json().get('issues', [])
-            if not issues:
-                break
-
-            for index, issue_data in enumerate(issues):
-                issue_count = total_collected + index + 1
-                fields = issue_data["fields"]
-                issue_id = issue_data["id"]
-                issue_key = issue_data["key"]
-                current_timestamp = timezone.now()
-                description = self.extract_words_from_description(fields.get("description"))
-
-                # Injects the sprint field readable
-                if sprint_field_key:
-                    fields["sprint"] = fields.get(sprint_field_key)
-
-
-                # Ensure related objects
-                project_obj, _ = JiraProject.objects.get_or_create(
-                    id=fields['project']['id'],
-                    defaults={
-                        'key': fields['project']['key'],
-                        'name': fields['project']['name'],
-                        'simplified': fields['project'].get('simplified', False),
-                        'projectTypeKey': fields['project']['projectTypeKey']
-                    }
+            while True:
+                encoded_jql = quote(f"{base_jql} {jql_where}")
+                jira_url = (
+                    f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}"
+                    f"&startAt={start_at}&maxResults={max_results}&expand=changelog"
                 )
+                response = requests.get(jira_url, headers=self.headers, auth=self.auth)
 
-                creator_obj = self.ensure_user(fields["creator"])
-                assignee_obj = self.ensure_user(fields.get("assignee"))
-                reporter_obj = self.ensure_user(fields.get("reporter"))
+                if self.handle_rate_limit(response):
+                    continue
 
-                parent_issue_id = fields.get('parent', {}).get('id')
-                parent_issue_obj = None
-                if parent_issue_id:
-                    parent_issue_obj = JiraIssue.objects.filter(issue_id=parent_issue_id).first()
+                if response.status_code != 200:
+                    self.log_progress(
+                        f"Failed to collect issues page: {response.status_code} - {response.text}"
+                    )
+                    break
 
-                issue_obj, _ = JiraIssue.objects.update_or_create(
-                    issue_id=issue_id,
-                    defaults={
-                        "issue_key": issue_key,
-                        "project": project_obj,
-                        "created": parse_datetime(fields["created"]),
-                        "updated": parse_datetime(fields["updated"]),
-                        "status": fields["status"]["name"],
-                        "priority": fields["priority"]["name"] if fields.get("priority") else None,
-                        "assignee": assignee_obj,
-                        "creator": creator_obj,
-                        "reporter": reporter_obj,
-                        "summary": fields["summary"],
-                        "description": description,
-                        "duedate": parse_datetime(fields["duedate"]) if fields.get("duedate") else None,
-                        "timeoriginalestimate": fields.get("timeoriginalestimate"),
-                        "timeestimate": fields.get("timeestimate"),
-                        "timespent": fields.get("timespent"),
-                        "time_mined": current_timestamp,
-                        "parent_issue": parent_issue_obj
-                    }
-                )
+                issues = response.json().get('issues', [])
+                if not issues:
+                    break
 
-                JiraIssueType.objects.update_or_create(
-                    issue=issue_obj,
-                    defaults={
-                        'issuetype': fields['issuetype']['name'],
-                        'issuetype_description': fields['issuetype'].get('description', ''),
-                        'hierarchyLevel': fields['issuetype'].get('hierarchyLevel', 0),
-                        'subtask': fields['issuetype'].get('subtask', False)
-                    }
-                )
+                for index, issue_data in enumerate(issues):
+                    issue_count = collected + index + 1
+                    fields = issue_data["fields"]
+                    issue_id = issue_data["id"]
+                    issue_key = issue_data["key"]
+                    current_timestamp = timezone.now()
+                    description = self.extract_words_from_description(fields.get("description"))
 
-                self.log_progress(f"Mining issue {issue_count} of {total_issues_count}. Key: {issue_key} - {fields['summary']}")
+                    # Injects the sprint field readable
+                    if sprint_field_key:
+                        fields["sprint"] = fields.get(sprint_field_key)
 
+                    # Ensure related objects
+                    project_obj, _ = JiraProject.objects.get_or_create(
+                        id=fields['project']['id'],
+                        defaults={
+                            'key': fields['project']['key'],
+                            'name': fields['project']['name'],
+                            'simplified': fields['project'].get('simplified', False),
+                            'projectTypeKey': fields['project']['projectTypeKey']
+                        }
+                    )
 
+                    creator_obj = self.ensure_user(fields["creator"])
+                    assignee_obj = self.ensure_user(fields.get("assignee"))
+                    reporter_obj = self.ensure_user(fields.get("reporter"))
 
-                # Sub-tables
-                self.save_comments(issue_key, issue_obj)
-                self.save_history(issue_key, issue_obj)
-                self.save_activity(issue_key, issue_obj)
-                self.save_checklist(issue_key, issue_obj)
-                self.save_commits(issue_key, issue_obj)
-                self.save_sprints(fields, issue_obj)
+                    parent_issue_id = fields.get('parent', {}).get('id')
+                    parent_issue_obj = None
+                    if parent_issue_id:
+                        parent_issue_obj = JiraIssue.objects.filter(issue_id=parent_issue_id).first()
 
-            total_collected += len(issues)
-            start_at += max_results
-            if len(issues) < max_results:
-                break
+                    issue_obj, _ = JiraIssue.objects.update_or_create(
+                        issue_id=issue_id,
+                        defaults={
+                            "issue_key": issue_key,
+                            "project": project_obj,
+                            "created": parse_datetime(fields["created"]),
+                            "updated": parse_datetime(fields["updated"]),
+                            "status": fields["status"]["name"],
+                            "priority": fields["priority"]["name"] if fields.get("priority") else None,
+                            "assignee": assignee_obj,
+                            "creator": creator_obj,
+                            "reporter": reporter_obj,
+                            "summary": fields["summary"],
+                            "description": description,
+                            "duedate": parse_datetime(fields["duedate"]) if fields.get("duedate") else None,
+                            "timeoriginalestimate": fields.get("timeoriginalestimate"),
+                            "timeestimate": fields.get("timeestimate"),
+                            "timespent": fields.get("timespent"),
+                            "time_mined": current_timestamp,
+                            "parent_issue": parent_issue_obj
+                        }
+                    )
+
+                    JiraIssueType.objects.update_or_create(
+                        issue=issue_obj,
+                        defaults={
+                            'issuetype': fields['issuetype']['name'],
+                            'issuetype_description': fields['issuetype'].get('description', ''),
+                            'hierarchyLevel': fields['issuetype'].get('hierarchyLevel', 0),
+                            'subtask': fields['issuetype'].get('subtask', False)
+                        }
+                    )
+
+                    self.log_progress(
+                        f"Mining issue {issue_count} of {total_hint}. Key: {issue_key} - {fields['summary']}"
+                    )
+
+                    # Sub-tables
+                    self.save_comments(issue_key, issue_obj)
+                    self.save_history(issue_key, issue_obj)
+                    self.save_activity(issue_key, issue_obj)
+                    self.save_checklist(issue_key, issue_obj)
+                    self.save_commits(issue_key, issue_obj)
+                    self.save_sprints(fields, issue_obj)
+
+                collected += len(issues)
+                start_at += max_results
+                if len(issues) < max_results:
+                    break
+
+            return collected
+
+        total_collected = 0
+
+        # If both dates are provided, process day by day and update progress
+        if start_date and end_date and self.task_obj:
+            # Normalize dates for daily windows: expect strings 'YYYY-MM-DD' via utils
+            try:
+                day_windows = list(split_date_range(start_date, end_date, interval_days=1))
+            except Exception:
+                # Fallback: treat as single window
+                day_windows = [(None, None)]
+
+            for (day_start, day_end) in day_windows:
+                # Build daily WHERE using 00:00..23:59 bounds
+                if day_start and day_end:
+                    jql_where = (
+                        f"AND created >= \"{day_start} 00:00\" AND created <= \"{day_end} 23:59\""
+                    )
+                else:
+                    jql_where = ""
+
+                collected = run_paged_collection(jql_where)
+                total_collected += collected
+
+                # Update task progress per completed day
+                if day_start:
+                    update_task_progress_date(self.task_obj, day_start)
+                    self.log_progress(f"✅ Completed day {day_start}: {collected} issues")
+
+        else:
+            # Single run without per-day tracking
+            jql_where = ""
+            if start_date:
+                start_dt = self.validate_and_parse_date(start_date)
+                jql_where += f" AND created >= \"{start_dt.strftime('%Y-%m-%d %H:%M')}\""
+            if end_date:
+                end_dt = self.validate_and_parse_date(end_date)
+                jql_where += f" AND created <= \"{end_dt.strftime('%Y-%m-%d %H:%M')}\""
+            total_collected = run_paged_collection(jql_where)
 
         return {"status": f"Collected {total_collected} issues successfully.", "total_issues": total_collected}
 
@@ -799,6 +837,3 @@ class JiraMiner:
 
             except Exception as e:
                 self.log_progress(f"Problem on saving sprint for {issue_obj.issue_key}: {e}")
-
-
-
