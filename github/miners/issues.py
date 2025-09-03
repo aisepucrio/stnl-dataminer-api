@@ -113,7 +113,6 @@ class IssuesMiner(BaseMiner):
 
                     issues_in_page = len(data['items'])
                     period_issues_count += issues_in_page
-                    log_progress(f"📝 Page {page}: Processing {issues_in_page} issues...")
 
                     for index, issue in enumerate(data['items']):
                         current_timestamp = timezone.now()
@@ -257,6 +256,6 @@ class IssuesMiner(BaseMiner):
 
         except Exception as e:
             log_progress(f"❌ Error during extraction: {str(e)}")
-            raise RuntimeError(f"Issue extraction failed: {str(e)}") from e
+            raise RuntimeError(f"❌ Issue extraction failed: {str(e)}") from e
         finally:
             self.verify_token() 

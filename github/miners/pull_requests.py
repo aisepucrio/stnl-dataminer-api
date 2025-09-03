@@ -120,8 +120,6 @@ class PullRequestsMiner(BaseMiner):
                         'page': page
                     }
 
-                    log_progress(f"📝 Page {page}: Starting search...")
-
                     response = requests.get(base_url, params=params, headers=self.headers)
                     metrics.total_requests += 1
                     
@@ -139,7 +137,6 @@ class PullRequestsMiner(BaseMiner):
                         break
 
                     prs_in_page = len(data['items'])
-                    log_progress(f"📝 Page {page}: Processing {prs_in_page} pull requests...")
 
                     for index, pr in enumerate(data['items']):
                         current_timestamp = timezone.now()

@@ -140,7 +140,6 @@ class CommitsMiner(BaseMiner):
                 log_progress(f"📂 Repository already exists: {repo_path}")
                 self.update_repo(repo_path)
 
-            log_progress("🔍 Starting commits analysis...")
 
             if commit_sha:
                 repo = Repository(repo_path, single=commit_sha).traverse_commits()
@@ -313,6 +312,6 @@ class CommitsMiner(BaseMiner):
 
         except Exception as e:
             log_progress(f"❌ Error during commits extraction: {str(e)}")
-            return []
+            raise RuntimeError(f"❌ Commits extraction failed: {str(e)}") from e
         finally:
             self.verify_token() 
