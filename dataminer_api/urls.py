@@ -16,5 +16,8 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/github/', include('github.urls', namespace='github')),
     path('api/jira/', include('jira.urls')),
-    path('api/jobs/', include('jobs.urls'))
+    path('api/stackoverflow/', include('stackoverflow.urls')),
+    path('api/jobs/', include('jobs.urls')),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
