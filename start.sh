@@ -20,6 +20,8 @@ echo "Collecting static files..."
 python manage.py collectstatic --no-input
 echo "Static files collected successfully."
 
+python manage.py reset_orphaned_tasks
+
 # Create superuser
 echo "Checking for superuser..."
 python manage.py shell -c "

@@ -194,7 +194,7 @@ class MetadataMiner(BaseMiner):
         
         return len(total_labels)
 
-    def get_repository_metadata(self, repo_name: str) -> Optional[GitHubMetadata]:
+    def get_repository_metadata(self, repo_name: str, task_obj=None) -> Optional[GitHubMetadata]:
         """
         Fetches repository metadata from GitHub
         
@@ -205,6 +205,12 @@ class MetadataMiner(BaseMiner):
             GitHubMetadata object or None if extraction fails
         """
         print(f"[METADATA] Starting metadata extraction for {repo_name}", flush=True)
+        def log_progress(message: str) -> None:
+            """Log progress message and update task if available"""
+            print(message, flush=True)
+            if task_obj:
+                task_obj.operation = message
+                task_obj.save(update_fields=["operation"])
         
         try:
             owner, repo = repo_name.split('/')
@@ -267,9 +273,9 @@ class MetadataMiner(BaseMiner):
             )
             
             action = 'created' if created else 'updated'
-            print(f"[METADATA] Metadata {action} successfully", flush=True)
+            log_progress(f"✅ Extraction completed! Metadata was extracted with success")
             return metadata
 
         except Exception as e:
-            print(f"[METADATA] Error during extraction: {str(e)}", flush=True)
+            log_progress(f"❌ Error during metadata extraction: {str(e)}")
             return None 

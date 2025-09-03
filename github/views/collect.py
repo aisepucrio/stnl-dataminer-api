@@ -68,13 +68,6 @@ class GitHubCommitViewSet(viewsets.ViewSet):
 
         task = fetch_commits.apply_async(args=[repo_name, start_date, end_date, commit_sha])
         
-        # Task.objects.create(
-        #     task_id=task.id,
-        #     operation='fetch_commits',
-        #     repository=repo_name,
-        #     status='PENDING'
-        # )
-
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
@@ -131,13 +124,6 @@ class GitHubIssueViewSet(viewsets.ViewSet):
 
         task = fetch_issues.apply_async(args=[repo_name, start_date, end_date, depth])
         
-        # Task.objects.create(
-        #     task_id=task.id,
-        #     operation='fetch_issues',
-        #     repository=repo_name,
-        #     status='PENDING'
-        # )
-
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
@@ -194,13 +180,6 @@ class GitHubPullRequestViewSet(viewsets.ViewSet):
 
         task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth])
         
-        # Task.objects.create(
-        #     task_id=task.id,
-        #     operation='fetch_pull_requests',
-        #     repository=repo_name,
-        #     status='PENDING'
-        # )
-
         return Response({
             "task_id": task.id,
             "message": "Task successfully initiated",
@@ -238,7 +217,7 @@ class GitHubBranchViewSet(viewsets.ViewSet):
 
         task = fetch_branches.apply_async(args=[repo_name])
         
-        # Task.objects.create(
+        # objects.create(
         #     task_id=task.id,
         #     operation='fetch_branches',
         #     repository=repo_name,
@@ -281,13 +260,6 @@ class GitHubMetadataViewSet(viewsets.ViewSet):
             )
 
         task = fetch_metadata.apply_async(args=[repo_name])
-        
-        # Task.objects.create(
-        #     task_id=task.id,
-        #     operation='fetch_metadata',
-        #     repository=repo_name,
-        #     status='PENDING'
-        # )
 
         return Response({
             "task_id": task.id,
@@ -337,13 +309,6 @@ class GitHubIssuePullRequestViewSet(viewsets.ViewSet):
         else:
             task = fetch_pull_requests.apply_async(args=[repo_name, start_date, end_date, depth])
 
-        # Save the task in the database
-        Task.objects.create(
-            task_id=task.id,
-            operation=f'fetch_{data_type}s',
-            repository=repo_name,
-            status='PENDING'
-        )
 
         return Response({
             "task_id": task.id,
@@ -383,13 +348,6 @@ class GitHubCommitByShaViewSet(viewsets.ViewSet):
             )
 
         task = fetch_commits.apply_async(args=[repo_name, None, None, commit_sha])
-        
-        # Task.objects.create(
-        #     task_id=task.id,
-        #     operation='fetch_commits_by_sha',
-        #     repository=repo_name,
-        #     status='PENDING'
-        # )
 
         return Response({
             "task_id": task.id,

@@ -98,13 +98,6 @@ class JiraIssueCollectView(APIView):
                     end_date
                 )
 
-                Task.objects.create(
-                    task_id=task.id,
-                    operation='collect_jira_issues',
-                    repository=f"{jira_domain}/{project_key}",
-                    status='PENDING'
-                )
-
                 tasks.append({
                     "task_id": task.id,
                     "repository": f"{jira_domain}/{project_key}"
