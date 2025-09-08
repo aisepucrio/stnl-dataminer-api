@@ -1,8 +1,8 @@
-# Em stackoverflow/tasks.py
-
 from celery import shared_task
 from django.conf import settings
-from jobs.models import Task, Repository  # Importa Task e Repository
+from django.utils import timezone
+from jobs.models import Task
+from github.models import GitHubMetadata
 
 # Importa as suas funções de mineração originais
 from .miner.question_fetcher import fetch_questions
@@ -14,7 +14,21 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None):
     """
     task_obj = None
     try:
-        repo, _ = Repository.objects.get_or_create(name="Stack Overflow", defaults={'platform': 'stackoverflow', 'owner': 'community'})
+        repo, _ = GitHubMetadata.objects.get_or_create(
+            repository="Stack Overflow", 
+            owner="community",
+            defaults={
+                'organization': 'community',
+                'stars_count': 0,
+                'watchers_count': 0,
+                'forks_count': 0,
+                'open_issues_count': 0,
+                'default_branch': 'main',
+                'html_url': 'https://stackoverflow.com',
+                'created_at': timezone.now(),
+                'updated_at': timezone.now() # CORREÇÃO: Campo obrigatório adicionado.
+            }
+        )
         operation_log = f"Iniciando coleta: {start_date} a {end_date}"
         if tags:
             operation_log += f" (Tags: {tags})"
@@ -22,7 +36,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None):
         task_obj = Task.objects.create(
             task_id=self.request.id, 
             operation=operation_log, 
-            repository=repo
+            repository=repo.repository
         )
         
         fetch_questions(
@@ -56,11 +70,25 @@ def repopulate_users_task(self, previous_task_result=None):
     task_obj = None
     try:
         # Lógica para criar a Task, que também estava faltando
-        repo, _ = Repository.objects.get_or_create(name="Stack Overflow", defaults={'platform': 'stackoverflow', 'owner': 'community'})
+        repo, _ = GitHubMetadata.objects.get_or_create(
+            repository="Stack Overflow", 
+            owner="community",
+            defaults={
+                'organization': 'community',
+                'stars_count': 0,
+                'watchers_count': 0,
+                'forks_count': 0,
+                'open_issues_count': 0,
+                'default_branch': 'main',
+                'html_url': 'https://stackoverflow.com',
+                'created_at': timezone.now(), # CORREÇÃO: Nome do campo ajustado.
+                'updated_at': timezone.now()  # CORREÇÃO: Campo obrigatório adicionado.
+            }
+        )
         task_obj = Task.objects.create(
             task_id=self.request.id, 
             operation="Iniciando enriquecimento de dados de usuários", 
-            repository=repo
+            repository=repo.repository
         )
         
         populate_missing_data(

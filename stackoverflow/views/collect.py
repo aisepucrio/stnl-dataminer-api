@@ -8,7 +8,7 @@ from celery import chain
 
 # Imports dos nossos módulos
 from ..tasks import collect_questions_task, repopulate_users_task
-from jobs.models import Task, Repository
+from jobs.models import Task
 from drf_spectacular.utils import extend_schema # Para documentação da API
 
 # O "Cardápio" de operações agora vive aqui dentro
