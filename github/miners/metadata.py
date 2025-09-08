@@ -258,7 +258,7 @@ class MetadataMiner(BaseMiner):
                     'languages': languages,
                     'readme': readme,
                     'labels_count': labels_count,
-                    'created_at': data.get('created_at'),
+                    'github_created_at': data.get('created_at'),
                     'updated_at': data.get('updated_at'),
                     'is_archived': data.get('archived', False),
                     'is_template': data.get('is_template', False),

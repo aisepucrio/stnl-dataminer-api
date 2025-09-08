@@ -8,7 +8,6 @@ from datetime import timedelta
 # --- IMPORTS CORRIGIDOS ---
 # Importa os modelos com os nomes corretos
 from github.models import GitHubMetadata, GitHubAuthor, GitHubCommit, GitHubIssue
-from utils.models import Repository
 
 class Command(BaseCommand):
     help = 'Populates the database with sample GitHub data'
@@ -22,27 +21,22 @@ class Command(BaseCommand):
         GitHubIssue.objects.all().delete()
         GitHubMetadata.objects.all().delete()
         GitHubAuthor.objects.all().delete()
-        Repository.objects.filter(platform='github').delete()
-        # 1. Criar um Repositório de Amostra
-        # Primeiro, o registro genérico em 'utils.Repository'
-        base_repo = Repository.objects.create(
-            name='sample-github-repo',
+        
+        # 1. Criar um Repositório de Amostra usando GitHubMetadata
+        base_repo = GitHubMetadata.objects.create(
+            repository='sample-github-repo',
             owner='test-owner',
-            platform='github' # <-- Correção para 'platform'
-        )
-                
-        # Depois, os metadados específicos do GitHub (usando GitHubMetadata)
-        GitHubMetadata.objects.create(
-            repository=base_repo,
-            owner='test-owner',
+            organization='test-owner',
             stars_count=random.randint(100, 5000),
+            watchers_count=random.randint(50, 1000),
             forks_count=random.randint(10, 500),
             open_issues_count=random.randint(5, 50),
-            html_url=f'https://github.com/test-owner/sample-github-repo',
-            created_at=timezone.now() - timedelta(days=365),
+            default_branch='main',
+            html_url='https://github.com/test-owner/sample-github-repo',
+            github_created_at=timezone.now() - timedelta(days=365),
             updated_at=timezone.now(),
         )
-        self.stdout.write(f'Sample repository "{base_repo.name}" created.')
+        self.stdout.write(f'Sample repository "{base_repo.repository}" created.')
 
         # 2. Criar Autores (Usuários) de Amostra
         authors = []
@@ -77,7 +71,7 @@ class Command(BaseCommand):
                 title=f'Bug when clicking button #{i}',
                 state=random.choice(['open', 'closed']),
                 creator=random.choice(authors),
-                created_at=timezone.now() - timedelta(days=10-i),
+                github_created_at=timezone.now() - timedelta(days=10-i),
                 updated_at=timezone.now()
             )
         self.stdout.write('10 sample issues created.')

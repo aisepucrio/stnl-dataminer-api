@@ -5,9 +5,8 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
 
-# Importa os modelos necessários do Jira e também o modelo Repository
+# Importa os modelos necessários do Jira
 from jira.models import JiraProject, JiraUser, JiraIssue
-from utils.models import Repository
 
 class Command(BaseCommand):
     help = 'Populates the database with sample Jira data'
@@ -20,21 +19,8 @@ class Command(BaseCommand):
         JiraIssue.objects.all().delete()
         JiraProject.objects.all().delete()
         JiraUser.objects.all().delete()
-        Repository.objects.filter(platform='jira').delete()
 
-        # 1. Criar um Repositório de Amostra associado ao Jira
-        # (Jira não tem repositórios, mas o modelo Task pode precisar de um)
-        base_repo_jira, _ = Repository.objects.get_or_create(
-            name='Jira Global',
-            defaults={
-                'owner': 'System',
-                'platform': 'jira',
-                'full_name': 'Jira/Global' # Adiciona um valor único para o campo obrigatório
-            }
-        )
-        self.stdout.write(f'Generic repository "{base_repo_jira.name}" for Jira tasks created.')
-
-        # 2. Criar um Projeto de Amostra
+        # 1. Criar um Projeto de Amostra
         project = JiraProject.objects.create(
             id='10001',
             key='PROJ',
@@ -44,7 +30,7 @@ class Command(BaseCommand):
         )
         self.stdout.write(f'Sample project "{project.name}" created.')
 
-        # 3. Criar Usuários de Amostra
+        # 2. Criar Usuários de Amostra
         users = []
         for i in range(5):
             user = JiraUser.objects.create(
@@ -58,7 +44,7 @@ class Command(BaseCommand):
             users.append(user)
         self.stdout.write(f'{len(users)} sample Jira users created.')
         
-        # 4. Criar Issues de Amostra
+        # 3. Criar Issues de Amostra
         for i in range(20): # Vamos criar 20 issues
             JiraIssue.objects.create(
                 issue_id=f'2000{i}',

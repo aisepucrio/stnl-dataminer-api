@@ -37,7 +37,7 @@ class GitHubIssueSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return DateTimeHandler.format_date(obj.created_at)
+        return DateTimeHandler.format_date(obj.github_created_at)
 
     def get_updated_at_formatted(self, obj):
         return DateTimeHandler.format_date(obj.updated_at)
@@ -52,7 +52,7 @@ class GitHubPullRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return DateTimeHandler.format_date(obj.created_at)
+        return DateTimeHandler.format_date(obj.github_created_at)
 
     def get_updated_at_formatted(self, obj):
         return DateTimeHandler.format_date(obj.updated_at)
@@ -84,7 +84,7 @@ class GitHubMetadataSerializer(serializers.ModelSerializer):
             'languages',
             'readme',
             'labels_count',
-            'created_at',
+            'github_created_at',
             'updated_at',
             'is_archived',
             'is_template'
@@ -101,7 +101,7 @@ class GitHubIssuePullRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_created_at_formatted(self, obj):
-        return DateTimeHandler.format_date(obj.created_at)
+        return DateTimeHandler.format_date(obj.github_created_at)
 
     def get_updated_at_formatted(self, obj):
         return DateTimeHandler.format_date(obj.updated_at)
