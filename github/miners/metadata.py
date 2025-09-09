@@ -259,7 +259,7 @@ class MetadataMiner(BaseMiner):
                     'readme': readme,
                     'labels_count': labels_count,
                     'github_created_at': data.get('created_at'),
-                    'updated_at': data.get('updated_at'),
+                    'github_updated_at': data.get('updated_at'),
                     'is_archived': data.get('archived', False),
                     'is_template': data.get('is_template', False),
                     'time_mined': current_timestamp

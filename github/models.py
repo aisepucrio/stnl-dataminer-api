@@ -74,7 +74,7 @@ class GitHubIssue(models.Model):
     milestone = models.CharField(max_length=255, null=True, blank=True)
     locked = models.BooleanField(default=False)
     github_created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    github_updated_at = models.DateTimeField()
     closed_at = models.DateTimeField(null=True, blank=True)
     body = models.TextField(null=True, blank=True)
     comments = models.JSONField(default=list)
@@ -88,7 +88,7 @@ class GitHubIssue(models.Model):
         indexes = [
             models.Index(fields=['repository', 'issue_id']),
             models.Index(fields=['github_created_at']),
-            models.Index(fields=['updated_at'])
+            models.Index(fields=['github_updated_at'])
         ]
 
     def __str__(self):
@@ -104,7 +104,7 @@ class GitHubPullRequest(models.Model):
     state = models.CharField(max_length=50)
     creator = models.CharField(max_length=255)
     github_created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    github_updated_at = models.DateTimeField()
     closed_at = models.DateTimeField(null=True)
     merged_at = models.DateTimeField(null=True)
     labels = models.JSONField(default=list)
@@ -148,7 +148,7 @@ class GitHubMetadata(models.Model):
     readme = models.TextField(null=True)
     labels_count = models.IntegerField(null=True)
     github_created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    github_updated_at = models.DateTimeField()
     last_sync = models.DateTimeField(auto_now=True)
     is_archived = models.BooleanField(default=False)
     is_template = models.BooleanField(default=False)
@@ -160,7 +160,7 @@ class GitHubMetadata(models.Model):
         indexes = [
             models.Index(fields=['repository']),
             models.Index(fields=['github_created_at']),
-            models.Index(fields=['updated_at'])
+            models.Index(fields=['github_updated_at'])
         ]
         unique_together = ['repository', 'owner']
 
@@ -181,7 +181,7 @@ class GitHubIssuePullRequest(models.Model):
     milestone = models.CharField(max_length=255, null=True, blank=True)
     locked = models.BooleanField(default=False)
     github_created_at = models.DateTimeField()
-    updated_at = models.DateTimeField()
+    github_updated_at = models.DateTimeField()
     closed_at = models.DateTimeField(null=True, blank=True)
     body = models.TextField(null=True, blank=True)
     comments = models.JSONField(default=list)
@@ -198,7 +198,7 @@ class GitHubIssuePullRequest(models.Model):
         indexes = [
             models.Index(fields=['repository', 'record_id']),
             models.Index(fields=['github_created_at']),
-            models.Index(fields=['updated_at'])
+            models.Index(fields=['github_updated_at'])
         ]
 
     def __str__(self):
