@@ -145,6 +145,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         error_msg = str(e)
         error_type = type(e).__name__
 
+        task_obj.operation = error_msg
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
@@ -245,6 +246,7 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic',
         error_msg = str(e)
         error_type = type(e).__name__
 
+        task_obj.operation = error_msg
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
@@ -344,6 +346,7 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
         error_msg = str(e)
         error_type = type(e).__name__
 
+        task_obj.operation = error_msg
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
@@ -429,6 +432,7 @@ def fetch_branches(self, repo_name, task_pk=None):
         error_msg = str(e)
         error_type = type(e).__name__
 
+        task_obj.operation = error_msg
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
@@ -539,6 +543,7 @@ def fetch_metadata(self, repo_name, task_pk=None):
         error_msg = str(e)
         error_type = type(e).__name__
 
+        task_obj.operation = error_msg
         task_obj.status = 'FAILURE'
         task_obj.error = error_msg
         task_obj.error_type = error_type
