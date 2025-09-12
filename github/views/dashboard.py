@@ -169,13 +169,13 @@ class DashboardView(APIView):
         commit_filters = {}
         
         if start_date:
-            issue_filters['created_at__gte'] = start_date
-            pr_filters['created_at__gte'] = start_date
+            issue_filters['github_created_at__gte'] = start_date
+            pr_filters['github_created_at__gte'] = start_date
             commit_filters['date__gte'] = start_date
             
         if end_date:
-            issue_filters['created_at__lte'] = end_date
-            pr_filters['created_at__lte'] = end_date
+            issue_filters['github_created_at__lte'] = end_date
+            pr_filters['github_created_at__lte'] = end_date
             commit_filters['date__lte'] = end_date
         
         issues_query = GitHubIssuePullRequest.objects.filter(**issue_filters)
@@ -368,17 +368,17 @@ class GraphDashboardView(APIView):
 
         # Get all data up to end_date for cumulative counts
         if end_date:
-            issues_query = issues_query.filter(created_at__lte=end_date)
-            prs_query = prs_query.filter(created_at__lte=end_date)
+            issues_query = issues_query.filter(github_created_at__lte=end_date)
+            prs_query = prs_query.filter(github_created_at__lte=end_date)
             commits_query = commits_query.filter(date__lte=end_date)
         
         # Group data by date interval and calculate cumulative counts
         issues_by_date = issues_query.annotate(
-            interval=trunc_func('created_at')
+            interval=trunc_func('github_created_at')
         ).values('interval').annotate(count=Count('id')).order_by('interval')
         
         prs_by_date = prs_query.annotate(
-            interval=trunc_func('created_at')
+            interval=trunc_func('github_created_at')
         ).values('interval').annotate(count=Count('id')).order_by('interval')
         
         commits_by_date = commits_query.annotate(
