@@ -508,7 +508,7 @@ def fetch_metadata(self, repo_name, task_pk=None):
             'languages': metadata.languages,
             'readme': metadata.readme,
             'labels_count': metadata.labels_count,
-            'created_at': format_date_for_json(metadata.created_at),
+            'github_created_at': format_date_for_json(metadata.github_created_at),
             'github_updated_at': format_date_for_json(metadata.github_updated_at),
             'is_archived': metadata.is_archived,
             'is_template': metadata.is_template,
