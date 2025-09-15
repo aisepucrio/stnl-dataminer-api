@@ -566,7 +566,7 @@ def fetch_metadata(self, repo_name):
             'readme': metadata.readme,
             'labels_count': metadata.labels_count,
             'created_at': format_date_for_json(metadata.created_at),
-            'updated_at': format_date_for_json(metadata.updated_at),
+            'github_updated_at': format_date_for_json(metadata.github_updated_at),
             'is_archived': metadata.is_archived,
             'is_template': metadata.is_template,
             'used_by_count': metadata.used_by_count,
