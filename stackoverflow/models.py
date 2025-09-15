@@ -178,14 +178,3 @@ class StackTagSynonym(models.Model):
     class Meta:
         db_table = 'stack_tag_synonym'
         unique_together = ('tag', 'synonym')
-
-class StackProject(models.Model):
-    name = models.CharField(max_length=255, primary_key=True)
-    description = models.TextField(null=True, blank=True, default="Mineração de dados da plataforma Stack Overflow.")
-    last_sync = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = 'stack_project'

@@ -2,7 +2,6 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from jobs.models import Task
-from .models import StackProject
 
 from .miner.question_fetcher import fetch_questions
 from .miner.get_additional_data import populate_missing_data
@@ -13,17 +12,15 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None):
     """
     task_obj = None
     try:
-        project, _ = StackProject.objects.get_or_create(
-            name="Stack Overflow"
-        )
         operation_log = f"Iniciando coleta: {start_date} a {end_date}"
         if tags:
             operation_log += f" (Tags: {tags})"
 
+
         task_obj = Task.objects.create(
             task_id=self.request.id, 
             operation=operation_log, 
-            repository=project.name
+            repository="Stack Overflow" #Here I changed for a simple string instead of creating a Project object
         )
         
         fetch_questions(
@@ -56,13 +53,10 @@ def repopulate_users_task(self, previous_task_result=None):
     """
     task_obj = None
     try:
-        project, _ = StackProject.objects.get_or_create(
-            name="Stack Overflow"
-        )
         task_obj = Task.objects.create(
             task_id=self.request.id, 
             operation="Iniciando enriquecimento de dados de usuários", 
-            repository=project.name
+            repository="Stack Overflow" #String used directly instead of Project object
         )
         
         populate_missing_data(
