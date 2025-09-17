@@ -20,7 +20,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None):
         task_obj = Task.objects.create(
             task_id=self.request.id, 
             operation=operation_log, 
-            repository="Stack Overflow" #Here I changed for a simple string instead of creating a Project object
+            repository="Stack Overflow"
         )
         
         fetch_questions(
@@ -56,7 +56,7 @@ def repopulate_users_task(self, previous_task_result=None):
         task_obj = Task.objects.create(
             task_id=self.request.id, 
             operation="Iniciando enriquecimento de dados de usuários", 
-            repository="Stack Overflow" #String used directly instead of Project object
+            repository="Stack Overflow"
         )
         
         populate_missing_data(
