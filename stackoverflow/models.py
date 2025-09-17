@@ -177,4 +177,4 @@ class StackTagSynonym(models.Model):
 
     class Meta:
         db_table = 'stack_tag_synonym'
-        unique_together = ('tag', 'synonym') 
+        unique_together = ('tag', 'synonym')
