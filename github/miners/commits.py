@@ -6,7 +6,7 @@ from pydriller import Repository
 from django.utils import timezone as django_timezone
 
 from .base import BaseMiner
-from .utils import convert_to_iso8601
+from .utils import convert_to_iso8601, update_task_progress_date
 from ..models import (
     GitHubCommit, GitHubAuthor, GitHubModifiedFile, GitHubMethod, GitHubMetadata
 )
@@ -140,7 +140,6 @@ class CommitsMiner(BaseMiner):
                 log_progress(f"📂 Repository already exists: {repo_path}")
                 self.update_repo(repo_path)
 
-            log_progress("🔍 Starting commits analysis...")
 
             if commit_sha:
                 repo = Repository(repo_path, single=commit_sha).traverse_commits()
@@ -152,6 +151,8 @@ class CommitsMiner(BaseMiner):
             essential_commits = []
             current_timestamp = django_timezone.now()
             processed_count = 0
+            last_processed_date = None
+            commits_by_date = {}  # Track commits by date for progress updates
 
             if not commit_sha:
                 log_progress("🔢 Counting total commits to process...")
@@ -176,10 +177,18 @@ class CommitsMiner(BaseMiner):
             for commit in repo:
                 processed_count += 1
                 
+                # Track commit date for progress updates
+                commit_date = commit.author_date.date().strftime("%Y-%m-%d")
+                
                 if total_commits > 0:
-                    log_progress(f"Mining commit {processed_count} of {total_commits}. SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
+                    log_progress(f"⛏️ Mining commit {processed_count} of {total_commits}. SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
                 else:
-                    log_progress(f"Mining commit SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
+                    log_progress(f"⛏️ Mining commit SHA: {commit.hash[:7]} - {commit.msg[:50]}...")
+                
+                # Group commits by date
+                if commit_date not in commits_by_date:
+                    commits_by_date[commit_date] = 0
+                commits_by_date[commit_date] += 1
                 
                 author, _ = GitHubAuthor.objects.get_or_create(
                     name=commit.author.name, 
@@ -285,12 +294,24 @@ class CommitsMiner(BaseMiner):
                     commit_data['modified_files'].append(mod_data)
 
                 essential_commits.append(commit_data)
+                
+                # Update progress when we finish processing all commits for a date
+                if last_processed_date and last_processed_date != commit_date:
+                    # We've moved to a new date, so the previous date is complete
+                    update_task_progress_date(task_obj, last_processed_date)
+                
+                last_processed_date = commit_date
 
             log_progress(f"✅ Extraction completed! Total commits processed: {len(essential_commits)}")
+            
+            # Update progress for the last processed date
+            if last_processed_date:
+                update_task_progress_date(task_obj, last_processed_date)
+            
             return essential_commits
 
         except Exception as e:
             log_progress(f"❌ Error during commits extraction: {str(e)}")
-            return []
+            raise RuntimeError(f"❌ Commits extraction failed: {str(e)}") from e
         finally:
             self.verify_token() 

@@ -145,4 +145,27 @@ def calculate_period_days(start_date: Optional[str], end_date: Optional[str]) ->
 
 def convert_to_iso8601(date: datetime) -> str:
     """Convert datetime to ISO8601 format"""
-    return date.isoformat() 
+    return date.isoformat()
+
+
+def update_task_progress_date(task_obj, completed_date: str) -> None:
+    """
+    Updates the task's date_last_update field to track scraping progress
+    
+    Args:
+        task_obj: Task object to update
+        completed_date: Date string in YYYY-MM-DD format that was completely processed
+    """
+    if task_obj:
+        try:
+            # Convert string date to datetime
+            completed_datetime = datetime.strptime(completed_date, "%Y-%m-%d")
+            completed_datetime = completed_datetime.replace(tzinfo=timezone.utc)
+            
+            # Update the task's progress date
+            task_obj.date_last_update = completed_datetime
+            task_obj.save(update_fields=["date_last_update"])
+            
+            print(f"📅 Progress tracked: Completed scraping for {completed_date}", flush=True)
+        except Exception as e:
+            print(f"⚠️ Warning: Could not update progress date: {str(e)}", flush=True) 
