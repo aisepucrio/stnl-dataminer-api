@@ -48,52 +48,43 @@ class JiraIssueCollectView(APIView):
         try:
             projects = request.data.get('projects', [])
         
+            if not isinstance(projects, list):
+                return Response({"error": "'projects' must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
             if not projects:
                 return Response({"error": "No project provided."}, status=400)
 
             for project_info in projects:
+                if not isinstance(project_info, dict):
+                    return Response({"error": "Items in 'projects' list must be objects."}, status=status.HTTP_400_BAD_REQUEST)
+                
                 jira_domain = project_info.get('jira_domain')
                 project_key = project_info.get('project_key')
 
                 if not jira_domain or not project_key:
                     return Response({"error": "Each project must contain 'jira_domain' and 'project'."}, status=400)
 
-            issuetypes = request.data.get('issuetypes', [])  
+            issuetypes = request.data.get('issuetypes', [])
+            
+            # CORREÇÃO APLICADA AQUI:
+            # Adiciona uma verificação para garantir que 'issuetypes', se fornecido, é uma lista.
+            # Isso impede que a API aceite tipos de dados inválidos.
+            if 'issuetypes' in request.data and not isinstance(issuetypes, list):
+                return Response({"error": "'issuetypes' must be a list."}, status=status.HTTP_400_BAD_REQUEST)
+
             start_date = request.data.get('start_date', None)
             end_date = request.data.get('end_date', None)
 
-            # Get variables from .env
-            jira_email = settings.JIRA_EMAIL
-            jira_api_token = settings.JIRA_API_TOKEN
-
-            # Debug: Check if JIRA credentials were loaded correctly
-            logger.info(f"JIRA Email: {jira_email}")
-            logger.info(f"JIRA API Token: {jira_api_token[:5]}*****")  # Hides part of the token for security
-
-            # Validation of required fields
-            if not all([jira_domain, project_key]):
-                return Response(
-                    {"error": "Missing required fields: jira_domain, project_key, jira_email, jira_api_token"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Start Celery task (Removed jira_email and jira_api_token from the call)
             tasks = []
 
             for project_info in projects:
                 jira_domain = project_info.get('jira_domain')
                 project_key = project_info.get('project_key')
 
-                if not jira_domain or not project_key:
-                    return Response(
-                        {"error": "Each project must contain 'jira_domain' and 'project'."},
-                        status=400
-                    )
-
                 task = collect_jira_issues_task.delay(
                     jira_domain,
                     project_key,
-                    issuetypes if issuetypes else [], 
+                    issuetypes, 
                     start_date,
                     end_date
                 )
@@ -110,12 +101,10 @@ class JiraIssueCollectView(APIView):
                     "repository": f"{jira_domain}/{project_key}"
                 })
 
-
             return Response(
                 {
-                    "task_id": task.id,
-                    "message": "Task successfully initiated",
-                    "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
+                    "tasks": tasks,
+                    "message": "Tasks successfully initiated",
                 },
                 status=status.HTTP_202_ACCEPTED
             )
@@ -126,3 +115,4 @@ class JiraIssueCollectView(APIView):
                 {"error": "Internal Server Error", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+

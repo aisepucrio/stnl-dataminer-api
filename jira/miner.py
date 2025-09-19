@@ -26,6 +26,9 @@ from .models import (
 
 
 class JiraMiner:
+    # A CORREÇÃO ESTÁ AQUI:
+    # A classe de exceção agora herda de 'Exception', tornando-a uma
+    # exceção válida que pode ser capturada em um bloco try/except.
     class NoValidJiraTokenError(Exception):
         """Invalid token or all tokens have expired."""
         pass
@@ -159,7 +162,7 @@ class JiraMiner:
 
                 raise Exception(f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}")
 
- 
+    
             total_issues_count = preflight_response.json().get('total', 0)
             self.log_progress(f"Total de {total_issues_count} issues encontradas. Iniciando a coleta.")
 
@@ -770,8 +773,8 @@ class JiraMiner:
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
             )
-                
-                
+            
+            
     def save_sprints(self, fields, issue_obj):      
         sprints_data = fields.get("sprint")
         if not sprints_data:
@@ -799,6 +802,3 @@ class JiraMiner:
 
             except Exception as e:
                 self.log_progress(f"Problem on saving sprint for {issue_obj.issue_key}: {e}")
-
-
-
