@@ -32,12 +32,22 @@ class MetadataMiner(BaseMiner):
             response.raise_for_status()
             branches = response.json()
 
+            metadata_obj, _ = GitHubMetadata.objects.get_or_create(
+                repository=repo_name,
+                defaults={
+                    'owner': repo_name.split('/')[0],
+                    'html_url': f'https://github.com/{repo_name}',
+                    'github_created_at': timezone.now(),
+                    'github_updated_at': timezone.now(),
+                }
+            )
+            
             for branch in branches:
                 current_timestamp = timezone.now()
                 GitHubBranch.objects.update_or_create(
                     name=branch['name'],
+                    repository=metadata_obj,
                     defaults={
-                        'repository': repo_name,
                         'repository_name': repo_name,
                         'sha': branch['commit']['sha'],
                         'time_mined': current_timestamp

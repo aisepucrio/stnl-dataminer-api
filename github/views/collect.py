@@ -444,26 +444,30 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                             })
 
                     if 'issues' in collect_types:
+                        issues_depth = 'complex' if 'comments' in collect_types else depth
                         response = client.post(
                             reverse('github:issue-collect-list'),
-                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': depth},
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': issues_depth},
                             format='json'
                         )
                         if response.status_code == 202:
+                            task_type = 'issues_with_comments' if 'comments' in collect_types else 'issues'
                             repo_results['tasks'].append({
-                                'type': 'issues',
+                                'type': task_type,
                                 'task_id': response.json().get('task_id')
                             })
 
                     if 'pull_requests' in collect_types:
+                        pr_depth = 'complex' if 'comments' in collect_types else depth
                         response = client.post(
                             reverse('github:pullrequest-collect-list'),
-                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': depth},
+                            {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': pr_depth},
                             format='json'
                         )
                         if response.status_code == 202:
+                            task_type = 'pull_requests_with_comments' if 'comments' in collect_types else 'pull_requests'
                             repo_results['tasks'].append({
-                                'type': 'pull_requests',
+                                'type': task_type,
                                 'task_id': response.json().get('task_id')
                             })
 
@@ -491,7 +495,7 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                                 'task_id': response.json().get('task_id')
                             })
 
-                    if 'comments' in collect_types:
+                    if 'comments' in collect_types and 'issues' not in collect_types:
                         response = client.post(
                             reverse('github:issue-collect-list'),
                             {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': 'complex'},
@@ -503,6 +507,7 @@ class GitHubCollectAllViewSet(viewsets.ViewSet):
                                 'task_id': response.json().get('task_id')
                             })
 
+                    if 'comments' in collect_types and 'pull_requests' not in collect_types:
                         response = client.post(
                             reverse('github:pullrequest-collect-list'),
                             {'repo_name': repo_name, 'start_date': start_date, 'end_date': end_date, 'depth': 'complex'},
