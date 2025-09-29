@@ -178,12 +178,33 @@ class ExportDataSerializer(serializers.Serializer):
         help_text="List of IDs to export (optional)"
     )
     format = serializers.ChoiceField(
-        choices=['json'],
+        choices=['json', 'csv'],
         default='json',
-        help_text="Output format (only JSON is supported)"
+        help_text="Output format"
     )
     data_type = serializers.ChoiceField(
         choices=['issue', 'pull_request'],
         required=False,
         help_text="Filter by data type (issue or pull_request) - only applies to githubissuepullrequest table"
     )
+    fields = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Optional: limit CSV columns to this list of field names"
+    )
+
+    # Novos campos para filtro no BODY
+    date = serializers.DateField(required=False, help_text="Single day filter (UTC date)")
+    start_date = serializers.DateTimeField(required=False, help_text="Start datetime (inclusive, UTC)")
+    end_date = serializers.DateTimeField(required=False, help_text="End datetime (inclusive, UTC)")
+
+    # 🔥 Novos filtros extras
+    repository = serializers.CharField(required=False, help_text="Filter by repository name")
+    state = serializers.CharField(required=False, help_text="Filter by issue/PR state (e.g. open, closed)")
+    creator = serializers.CharField(required=False, help_text="Filter by creator username")
+
+    def validate(self, data):
+        if data.get("date") and (data.get("start_date") or data.get("end_date")):
+            raise serializers.ValidationError("Use apenas 'date' OU 'start_date'/'end_date'.")
+        return data
+    
