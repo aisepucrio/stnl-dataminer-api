@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 import time
 import logging
 from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment# Import StackQuestion and StackUser models
@@ -8,6 +8,18 @@ from django.db import transaction
 from jobs.models import Task
 
 logger = logging.getLogger(__name__)
+
+# >>> ADIÇÃO: helper para converter epoch -> datetime (UTC)
+def epoch_to_dt(value):
+    """Converte epoch (int/str) para datetime c/ tz=UTC. Retorna None se inválido."""
+    if value in (None, "", 0):
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=dt_timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return None
+# <<< FIM ADIÇÃO
+
 
 def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
@@ -43,9 +55,11 @@ def create_or_update_user(user_id, user_data):
             'profile_image': user_data.get('profile_image'),
             'user_type': user_data.get('user_type'),
             'is_employee': user_data.get('is_employee', False),
-            'creation_date': user_data.get('creation_date'),
-            'last_access_date': user_data.get('last_access_date'),
-            'last_modified_date': user_data.get('last_modified_date'),
+            # >>> CORREÇÃO: converter epochs para datetime
+            'creation_date': epoch_to_dt(user_data.get('creation_date')),
+            'last_access_date': epoch_to_dt(user_data.get('last_access_date')),
+            'last_modified_date': epoch_to_dt(user_data.get('last_modified_date')),
+            # <<< FIM CORREÇÃO
             'link': user_data.get('link'),
             'accept_rate': user_data.get('accept_rate'),
             'about_me': user_data.get('about_me'),
@@ -74,9 +88,11 @@ def create_or_update_user(user_id, user_data):
             stack_user.profile_image = user_data.get('profile_image', stack_user.profile_image)
             stack_user.user_type = user_data.get('user_type', stack_user.user_type)
             stack_user.is_employee = user_data.get('is_employee', stack_user.is_employee)
-            stack_user.creation_date = user_data.get('creation_date', stack_user.creation_date)
-            stack_user.last_access_date = user_data.get('last_access_date', stack_user.last_access_date)
-            stack_user.last_modified_date = user_data.get('last_modified_date', stack_user.last_modified_date)
+            # >>> CORREÇÃO: converter epochs para datetime
+            stack_user.creation_date = epoch_to_dt(user_data.get('creation_date')) or stack_user.creation_date
+            stack_user.last_access_date = epoch_to_dt(user_data.get('last_access_date')) or stack_user.last_access_date
+            stack_user.last_modified_date = epoch_to_dt(user_data.get('last_modified_date')) or stack_user.last_modified_date
+            # <<< FIM CORREÇÃO
             stack_user.link = user_data.get('link', stack_user.link)
             stack_user.accept_rate = user_data.get('accept_rate', stack_user.accept_rate)
             stack_user.about_me = user_data.get('about_me', stack_user.about_me)
@@ -112,15 +128,19 @@ def create_answer(answer_data, question, owner):
             'up_vote_count': answer_data.get('up_vote_count', 0),
             'down_vote_count': answer_data.get('down_vote_count', 0),
             'is_accepted': answer_data.get('is_accepted', False),
-            'creation_date': answer_data.get('creation_date'),
+            # >>> CORREÇÃO: converter epochs para datetime
+            'creation_date': epoch_to_dt(answer_data.get('creation_date')),
             'content_license': answer_data.get('content_license'),
-            'last_activity_date': answer_data.get('last_activity_date'),
+            'last_activity_date': epoch_to_dt(answer_data.get('last_activity_date')),
+            # <<< FIM CORREÇÃO
             'owner': owner,
             'share_link': answer_data.get('share_link'),
             'body_markdown': answer_data.get('body_markdown'),
             'link': answer_data.get('link'),
             'title': answer_data.get('title'),
-            'time_mined': int(time.time()),
+            # >>> CORREÇÃO: time_mined como datetime
+            'time_mined': timezone.now(),
+            # <<< FIM CORREÇÃO
         }
     )
     return answer
@@ -137,13 +157,17 @@ def create_comment(comment_data, parent, owner):
             'post_id':         comment_data.get('post_id'),
             'body':            comment_data.get('body'),
             'score':           comment_data.get('score', 0),
-            'creation_date':   comment_data.get('creation_date'),
+            # >>> CORREÇÃO: converter epoch para datetime
+            'creation_date':   epoch_to_dt(comment_data.get('creation_date')),
+            # <<< FIM CORREÇÃO
             'content_license': comment_data.get('content_license'),
             'edited':          comment_data.get('edited', False),
             'owner':           owner,
             'body_markdown':   comment_data.get('body_markdown'),
             'link':            comment_data.get('link'),
-            'time_mined':      int(time.time()),
+            # >>> CORREÇÃO: time_mined como datetime
+            'time_mined':      timezone.now(),
+            # <<< FIM CORREÇÃO
             'question':        question_obj,
             'answer':          answer_obj,
         }
@@ -260,18 +284,21 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
 
                 question_tags = item.get('tags', [])
 
+                # >>> CORREÇÃO: converter datas e usar datetime para time_mined
                 question_dict_for_saving = {
                     'question_id': item['question_id'], 'title': item.get('title'), 'body': item.get('body'),
-                    'creation_date': item.get('creation_date'), 'score': item.get('score', 0),
+                    'creation_date': epoch_to_dt(item.get('creation_date')), 'score': item.get('score', 0),
                     'view_count': item.get('view_count', 0), 'answer_count': item.get('answer_count', 0),
                     'comment_count': item.get('comment_count', 0), 'up_vote_count': item.get('up_vote_count', 0),
                     'down_vote_count': item.get('down_vote_count', 0), 'is_answered': item.get('is_answered', False),
                     'accepted_answer_id': item.get('accepted_answer_id'), 'owner': stack_user,
                     'share_link': item.get('share_link'), 'body_markdown': item.get('body_markdown'),
                     'link': item.get('link'), 'favorite_count': item.get('favorite_count', 0),
-                    'content_license': item.get('content_license', None), 'last_activity_date': item.get('last_activity_date'),
-                    'time_mined': int(time.time()),
+                    'content_license': item.get('content_license', None), 'last_activity_date': epoch_to_dt(item.get('last_activity_date')),
+                    'time_mined': timezone.now(),
                 }
+                # <<< FIM CORREÇÃO
+
                 stack_question, created = StackQuestion.objects.get_or_create(
                     question_id=question_dict_for_saving['question_id'],
                     defaults=question_dict_for_saving
@@ -320,7 +347,6 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
             
                 # --- Fim da sua lógica original ---
 
-            
 
             
             # ATIVANDO A PAGINAÇÃO (MUDANÇA IMPORTANTE!)

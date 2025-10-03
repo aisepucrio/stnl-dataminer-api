@@ -12,8 +12,18 @@ from stackoverflow.models import (
 )
 from stackoverflow.miner.safe_api_call import safe_api_call
 from jobs.models import Task
-
+from datetime import timedelta, datetime, timezone as dt_timezone
 logger = logging.getLogger(__name__)
+
+def epoch_to_dt(value):
+    """Converte epoch (int/str) para datetime c/ tz=UTC. Retorna None se inválido."""
+    if value in (None, "", 0):
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=dt_timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return None
+
 
 def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
@@ -176,21 +186,13 @@ def update_badges_data(users: list, api_key: str, access_token: str, task_obj=No
     return created_count > 0
 
 def get_users_to_update(task_obj=None):
-    """
-    Get users that need to be updated based on time_mined field
-    
-    Returns:
-        QuerySet: Users that need updating
-    """
-    check_required_config()
-    current_time = int(timezone.now().timestamp())
-    time_for_recheck = 7 * 24 * 60 * 60  # 7 days in seconds
-    
-    return StackUser.objects.filter(
-        Q(time_mined__isnull=True) |  # Never mined
-        Q(time_mined__lt=current_time - time_for_recheck)  # Mined longer ago than the set time for recheck
-    )
+    check_required_config(task_obj=task_obj)  # <- passa o task_obj
+    cutoff = timezone.now() - timedelta(days=7)
 
+    return StackUser.objects.filter(
+        Q(time_mined__isnull=True) |
+        Q(time_mined__lt=cutoff)
+    )
 
 def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
@@ -215,7 +217,6 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
         page = 1
 
         log_progress(f"-> Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective", task_obj=task_obj)
-        
 
         while True:  # Pagination loop
             params = {
@@ -234,31 +235,29 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
                 if not data:
                     log_progress("No data returned from API.", "warning", task_obj=task_obj)
                     return []
-                
+
                 items = data.get('items', [])
 
                 if items:
                     all_collectives_data.extend(items)
                     log_progress(f"Found {len(items)} collectives on page {page}.", "info", task_obj=task_obj)
-                    
+
                     for c in items:
                         try:
-                            collective_obj, _ = StackCollective.objects.get_or_create(
+                            StackCollective.objects.get_or_create(
                                 slug=c.get("slug"),
                                 defaults={
                                     "name": c.get("name"),
                                     "description": c.get("description"),
                                     "link": c.get("link"),
-                                    "last_sync": int(timezone.now().timestamp())
+                                    "last_sync": timezone.now(),  # ✅ corrigido: DateTimeField
                                 }
                             )
                         except IntegrityError as e:
                             log_progress(f"Failed to save collective {c.get('slug')}: {e}", "error", task_obj=task_obj)
                             continue
 
-
-
-                        #TODO: StackCollectiveTag for all tags in tags field. 
+                    # TODO: StackCollectiveTag for all tags in tags field.
                 else:
                     log_progress(f"No collectives found on page {page}.", "warning", task_obj=task_obj)
 
@@ -290,6 +289,7 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
                     break
 
     return all_collectives_data
+
 
 def link_users_to_collectives(users: list, fallback_collectives_data: list = None, task_obj=None):
     """
@@ -332,7 +332,7 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
     for user, slug, role in link_triples:
         collective = slug_to_collective.get(slug)
 
-       # If not found, try to create from fallback data
+        # If not found, try to create from fallback data
         if not collective and fallback_collectives_data:
             fallback = fallback_collectives_data.get(slug)
             if fallback:
@@ -343,7 +343,7 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                             "name": fallback.get("name"),
                             "description": fallback.get("description", ""),
                             "link": fallback.get("link") or "",
-                            "last_sync": int(timezone.now().timestamp())
+                            "last_sync": timezone.now(),  # ✅ corrigido: DateTimeField
                         }
                     )
                     slug_to_collective[slug] = collective  # Cache it
@@ -372,8 +372,6 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                     created_count += 1
         except IntegrityError as e:
             log_progress(f"Failed to link user {user.user_id} to collective {collective.slug}: {e}", "error", task_obj=task_obj)
-
-
     log_progress(f"-> Created {created_count} new user-collective links.", "save", task_obj=task_obj)
 
 def sync_collective_tags(collectives_data: list, task_obj=None):
@@ -508,10 +506,10 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         access_token (str): Stack Exchange access token
         
     Returns:
-        bool: True if any updates were successful, False otherwise
+        set: Unique slugs of collectives found while updating
     """
     if not users:
-        return False
+        return set()
         
     user_ids = [user.user_id for user in users]
     log_progress(f"-> Buscando perfis completos para {len(user_ids)} usuários...", "fetch", task_obj=task_obj)
@@ -519,16 +517,15 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
     
     if not users_data:
         log_progress("Nenhum dado de perfil retornado pela API para este lote.", "warning", task_obj=task_obj)
-        return False
+        return set()
     
     # Create a dictionary for quick lookup
     users_dict = {user.user_id: user for user in users}
-    current_time = int(timezone.now().timestamp())
     updated_count = 0
     skipped_count = 0    
     unique_slugs = set()
+    now = timezone.now()   # datetime com tz
 
-    
     for user_data in users_data:
         user_id = user_data.get('user_id')
         if user_id not in users_dict:
@@ -538,7 +535,7 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
             
         user = users_dict[user_id]
 
-           # Collective slugs
+        # Coletar slugs de collectives
         collectives = user_data.get('collectives', [])
         user.collectives = collectives
         for col in collectives:
@@ -546,15 +543,18 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
             if slug:
                 unique_slugs.add(slug)
         
-        # Update user fields
+        # Atualizar campos do usuário
         user.display_name = user_data.get('display_name', user.display_name)
         user.reputation = user_data.get('reputation', user.reputation)
         user.profile_image = user_data.get('profile_image', user.profile_image)
         user.user_type = user_data.get('user_type', user.user_type)
         user.is_employee = user_data.get('is_employee', user.is_employee)
-        user.creation_date = user_data.get('creation_date', user.creation_date)
-        user.last_access_date = user_data.get('last_access_date', user.last_access_date)
-        user.last_modified_date = user_data.get('last_modified_date', user.last_modified_date)
+
+        # Converter epoch -> datetime (UTC)
+        user.creation_date      = epoch_to_dt(user_data.get('creation_date'))      or user.creation_date
+        user.last_access_date   = epoch_to_dt(user_data.get('last_access_date'))   or user.last_access_date
+        user.last_modified_date = epoch_to_dt(user_data.get('last_modified_date')) or user.last_modified_date
+
         user.link = user_data.get('link', user.link)
         user.accept_rate = user_data.get('accept_rate', user.accept_rate)
         user.about_me = user_data.get('about_me', user.about_me)
@@ -562,7 +562,6 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         user.website_url = user_data.get('website_url', user.website_url)
         user.account_id = user_data.get('account_id', user.account_id)
         user.badge_counts = user_data.get('badge_counts', user.badge_counts)
-        user.collectives = user_data.get('collectives', user.collectives)
         user.view_count = user_data.get('view_count', user.view_count)
         user.down_vote_count = user_data.get('down_vote_count', user.down_vote_count)
         user.up_vote_count = user_data.get('up_vote_count', user.up_vote_count)
@@ -573,7 +572,9 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         user.reputation_change_month = user_data.get('reputation_change_month', user.reputation_change_month)
         user.reputation_change_week = user_data.get('reputation_change_week', user.reputation_change_week)
         user.reputation_change_day = user_data.get('reputation_change_day', user.reputation_change_day)
-        user.time_mined = current_time
+
+        # time_mined como datetime
+        user.time_mined = now
         
         user.save()
         updated_count += 1
@@ -581,6 +582,7 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
     log_progress(f"-> {updated_count} perfis de usuários atualizados.", "save", task_obj=task_obj)
     if skipped_count > 0:
         log_progress(f"{skipped_count} usuários foram ignorados (não encontrados no lote).", "warning", task_obj=task_obj)
+
     return unique_slugs
 
 # Em stackoverflow/functions/data_populator.py
