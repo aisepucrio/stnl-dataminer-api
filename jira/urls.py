@@ -3,6 +3,7 @@ from django.urls import path
 from .views import *
 
 
+
 urlpatterns = [
     # Collect Endpoints
     path('issues/collect/', JiraIssueCollectView.as_view(), name='collect-jira-issues'),
@@ -23,4 +24,6 @@ urlpatterns = [
     path('histories/', JiraHistoryListView.as_view(), name='jira-history-list'),
     path('history-items/', JiraHistoryItemListView.as_view(), name='jira-historyitem-list'),
     path('date-range/', JiraProjectDateRangeView.as_view(), name='jira-date-range'),
+    path("export/", JiraExportDataView.as_view(), name="jira-export"),
+
 ]
