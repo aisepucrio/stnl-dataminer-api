@@ -13,52 +13,37 @@ from stackoverflow.models import (
 from stackoverflow.miner.safe_api_call import safe_api_call
 from jobs.models import Task
 from datetime import timedelta, datetime, timezone as dt_timezone
+from stackoverflow.utils import epoch_to_dt
+
 logger = logging.getLogger(__name__)
-
-def epoch_to_dt(value):
-    """Converte epoch (int/str) para datetime c/ tz=UTC. Retorna None se inválido."""
-    if value in (None, "", 0):
-        return None
-    try:
-        return datetime.fromtimestamp(int(value), tz=dt_timezone.utc)
-    except (TypeError, ValueError, OSError):
-        return None
-
 
 def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
-    Exibe feedback no terminal e, se um task_obj for fornecido,
-    salva o progresso no banco de dados.
+    Show feedback in the terminal and, if a task_obj is provided,
+    persist the progress message to the database for the frontend.
     """
     emojis = {
         "info": "ℹ️", "success": "✅", "warning": "🟡", "error": "❌",
         "system": "⚙️", "fetch": "🔎", "save": "💾", "process": "🔄",
         "badge": "🎖️", "collective": "👥"
     }
-    
-    # Monta a mensagem para o terminal (continua igual)
     terminal_message = f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}"
     print(terminal_message, flush=True)
-    
-    # A MÁGICA PARA O FRONTEND ACONTECE AQUI:
     if task_obj:
-        # Se a função recebeu um objeto de tarefa, ela atualiza
-        # o campo 'operation' com a mensagem limpa e salva no banco.
-        task_obj.operation = message 
+        task_obj.operation = message
         task_obj.save(update_fields=["operation"])
 
 def check_required_config(task_obj=None) -> None:
-    """Verifica se as variáveis de ambiente essenciais estão configuradas."""
+    """Ensure required environment variables are configured."""
     required_env_vars = ["STACK_API_KEY", "STACK_ACCESS_TOKEN"]
-
     missing = [var for var in required_env_vars if not os.getenv(var)]
     if missing:
-        log_progress(f"Variáveis de ambiente obrigatórias ausentes: {', '.join(missing)}", "error", task_obj=task_obj)
-        raise ValueError("Variáveis de ambiente não configuradas corretamente no arquivo .env")
+        log_progress(f"Missing required environment variables: {', '.join(missing)}", "error", task_obj=task_obj)
+        raise ValueError("Environment variables are not correctly configured in the .env file")
 
 def fetch_users_badges(user_ids: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
-    Fetch all user badges with pagination and exponential backoff from Stack Exchange API
+    Fetch all user badges with pagination and exponential backoff from Stack Exchange API.
 
     Args:
         user_ids (list): List of user IDs to fetch badges for
@@ -89,8 +74,8 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str, task_obj
         try:
             data = safe_api_call(base_url, params=params)
             if not data:
-                    log_progress("No data returned from API.", "warning", task_obj=task_obj)
-                    return []
+                log_progress("No data returned from API.", "warning", task_obj=task_obj)
+                return []
             
             items = data.get("items", [])
             all_badges.extend(items)
@@ -105,7 +90,7 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str, task_obj
                 break
 
             page += 1
-            base_sleep_time = 2  # reset if successful
+            base_sleep_time = 2
             log_progress(f"Fetching next page of badges ({page})...", "fetch", task_obj=task_obj)
             time.sleep(base_sleep_time)
 
@@ -127,7 +112,6 @@ def fetch_users_badges(user_ids: list, api_key: str, access_token: str, task_obj
         log_progress("No badges were found for this batch of users.", "info", task_obj=task_obj)
     return all_badges
 
-
 def update_badges_data(users: list, api_key: str, access_token: str, task_obj=None) -> bool:
     """
     Update StackBadge and StackUserBadge based on badges fetched for users.
@@ -136,13 +120,11 @@ def update_badges_data(users: list, api_key: str, access_token: str, task_obj=No
         return False
 
     user_ids = [user.user_id for user in users]
-    # Trocado logger.info por log_progress
-    log_progress(f"-> Buscando badges para {len(user_ids)} usuários...", "badge", task_obj=task_obj)
+    log_progress(f"-> Fetching badges for {len(user_ids)} users...", "badge", task_obj=task_obj)
 
     badge_data = fetch_users_badges(user_ids, api_key, access_token)
     if not badge_data:
-        # Trocado logger.warning por log_progress
-        log_progress("Nenhum dado de badge retornado pela API para este lote.", "warning", task_obj=task_obj)
+        log_progress("No badge data returned by the API for this batch.", "warning", task_obj=task_obj)
         return False
 
     created_count = 0
@@ -175,18 +157,16 @@ def update_badges_data(users: list, api_key: str, access_token: str, task_obj=No
                     if created:
                         created_count += 1
         except IntegrityError as e:
-            # Trocado logger.error por log_progress
-            log_progress(f"Erro ao salvar badge {badge_id} para usuário {user_id}: {e}", "error", task_obj=task_obj)
+            log_progress(f"Error saving badge {badge_id} for user {user_id}: {e}", "error", task_obj=task_obj)
             continue
 
-    # Trocado logger.info por log_progress
     if created_count > 0:
-        log_progress(f"-> {created_count} novas associações de badges salvas.", "save", task_obj=task_obj)
+        log_progress(f"-> {created_count} new user-badge links saved.", "save", task_obj=task_obj)
         
     return created_count > 0
 
 def get_users_to_update(task_obj=None):
-    check_required_config(task_obj=task_obj)  # <- passa o task_obj
+    check_required_config(task_obj=task_obj)
     cutoff = timezone.now() - timedelta(days=7)
 
     return StackUser.objects.filter(
@@ -196,7 +176,7 @@ def get_users_to_update(task_obj=None):
 
 def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
-    Fetch collective data from Stack Exchange API with pagination and backoff
+    Fetch collective data from Stack Exchange API with pagination and backoff.
 
     Args:
         slugs (list): List of collective slugs to fetch
@@ -218,7 +198,7 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
 
         log_progress(f"-> Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective", task_obj=task_obj)
 
-        while True:  # Pagination loop
+        while True:
             params = {
                 'site': 'stackoverflow',
                 'key': api_key,
@@ -250,14 +230,12 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
                                     "name": c.get("name"),
                                     "description": c.get("description"),
                                     "link": c.get("link"),
-                                    "last_sync": timezone.now(),  # ✅ corrigido: DateTimeField
+                                    "last_sync": timezone.now(),
                                 }
                             )
                         except IntegrityError as e:
                             log_progress(f"Failed to save collective {c.get('slug')}: {e}", "error", task_obj=task_obj)
                             continue
-
-                    # TODO: StackCollectiveTag for all tags in tags field.
                 else:
                     log_progress(f"No collectives found on page {page}.", "warning", task_obj=task_obj)
 
@@ -271,7 +249,7 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
                     break
 
                 page += 1
-                base_sleep_time = 2  # reset on success
+                base_sleep_time = 2
                 time.sleep(base_sleep_time)
 
             except requests.exceptions.RequestException as e:
@@ -290,27 +268,22 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
 
     return all_collectives_data
 
-
 def link_users_to_collectives(users: list, fallback_collectives_data: list = None, task_obj=None):
     """
-    For each user in the list, create StackCollectiveUser links
-    based on their current user.collectives field.
-
-    If a collective slug is not found in the DB, it will be created using the
-    fallback_collectives_data (as returned from fetch_collectives_data).
+    For each user in the list, create StackCollectiveUser links based on their current user.collectives field.
+    If a collective slug is not found in the DB, it will be created using fallback_collectives_data
+    (as returned from fetch_collectives_data).
     """
     from stackoverflow.models import StackCollective, StackCollectiveUser
 
-    # Convert fallback_collectives_data (list) to dict {slug: collective_dict}
     if fallback_collectives_data and isinstance(fallback_collectives_data, list):
         fallback_collectives_data = {
             c["slug"]: c for c in fallback_collectives_data if "slug" in c
         }
 
-    link_triples = []  # (user, slug, role)
+    link_triples = []
     slugs = set()
 
-    # Extract (user, slug, role) triples
     for user in users:
         for col in user.collectives or []:
             collective_obj = col.get("collective", {})
@@ -323,7 +296,6 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
     if not link_triples:
         return
 
-    # Fetch all relevant collectives from DB
     slug_to_collective = {
         c.slug: c for c in StackCollective.objects.filter(slug__in=slugs)
     }
@@ -332,7 +304,6 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
     for user, slug, role in link_triples:
         collective = slug_to_collective.get(slug)
 
-        # If not found, try to create from fallback data
         if not collective and fallback_collectives_data:
             fallback = fallback_collectives_data.get(slug)
             if fallback:
@@ -343,10 +314,10 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                             "name": fallback.get("name"),
                             "description": fallback.get("description", ""),
                             "link": fallback.get("link") or "",
-                            "last_sync": timezone.now(),  # ✅ corrigido: DateTimeField
+                            "last_sync": timezone.now(),
                         }
                     )
-                    slug_to_collective[slug] = collective  # Cache it
+                    slug_to_collective[slug] = collective
                     log_progress(f"Created missing collective: {slug}", "save", task_obj=task_obj)
                 except IntegrityError as e:
                     log_progress(f"Failed to create collective {slug}: {e}", "error", task_obj=task_obj)
@@ -364,7 +335,6 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                     collective=collective,
                     defaults={"role": role or "unknown"}
                 )
-                # If it already exists, update role if it's changed
                 if not created and obj.role != (role or "unknown"):
                     obj.role = role or "unknown"
                     obj.save(update_fields=["role"])
@@ -375,10 +345,13 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
     log_progress(f"-> Created {created_count} new user-collective links.", "save", task_obj=task_obj)
 
 def sync_collective_tags(collectives_data: list, task_obj=None):
+    """
+    Ensure StackCollectiveTag links exist for each collective and its tags.
+    Creates any missing StackTag first, then links them.
+    """
     from stackoverflow.models import StackTag, StackCollective, StackCollectiveTag
 
     if not collectives_data:
-        # Trocado logger.warning por log_progress
         log_progress("No collective data provided to sync tags.", "warning", task_obj=task_obj)
         return
 
@@ -401,7 +374,6 @@ def sync_collective_tags(collectives_data: list, task_obj=None):
     for tag_name in missing_tags:
         tag_obj = StackTag.objects.create(name=tag_name)
         tag_objs[tag_name] = tag_obj
-        # Trocado logger.info por log_progress
         log_progress(f"Created missing Tag: {tag_name}", "save", task_obj=task_obj)
 
     collectives = {
@@ -412,14 +384,12 @@ def sync_collective_tags(collectives_data: list, task_obj=None):
     for slug, tag_list in slug_to_tags.items():
         collective = collectives.get(slug)
         if not collective:
-            # Trocado logger.warning por log_progress
             log_progress(f"Collective '{slug}' not found in DB. Skipping tag link.", "warning", task_obj=task_obj)
             continue
 
         for tag_name in tag_list:
             tag = tag_objs.get(tag_name)
             if not tag:
-                # Trocado logger.warning por log_progress
                 log_progress(f"Tag '{tag_name}' not found. Skipping link.", "warning", task_obj=task_obj)
                 continue
 
@@ -432,10 +402,8 @@ def sync_collective_tags(collectives_data: list, task_obj=None):
                     if created:
                         created_count += 1
             except IntegrityError as e:
-                # Trocado logger.error por log_progress
                 log_progress(f"Failed to link tag '{tag}' to collective '{collective.slug}': {e}", "error", task_obj=task_obj)
 
-    # Trocado logger.info por log_progress
     if created_count > 0:
         log_progress(f"-> Created {created_count} new links between collectives and tags.", "save", task_obj=task_obj)
 
@@ -450,8 +418,6 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str, task_obj=N
         batch_ids = user_ids[i:i + batch_size]
         ids_string = ';'.join(map(str, batch_ids))
         page = 1
-
-        # A chamada principal já informa o que está buscando, então os logs aqui foram removidos.
         
         while True:
             params = {
@@ -487,7 +453,7 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str, task_obj=N
                 status_code = getattr(e.response, 'status_code', None)
                 if status_code == 429:
                     log_progress("Rate limit hit. Pausing for a moment...", "warning", task_obj=task_obj)
-                    time.sleep(5) # Pausa curta para rate limit
+                    time.sleep(5)
                     continue
                 else:
                     log_progress(f"API Error while fetching users: {e}", "error", task_obj=task_obj)
@@ -495,10 +461,9 @@ def fetch_users_data(user_ids: list, api_key: str, access_token: str, task_obj=N
     
     return all_users_data
 
-
 def update_users_data(users: list, api_key: str, access_token: str, task_obj=None) -> set:
     """
-    Update multiple users' data with complete information from Stack Exchange API
+    Update multiple users' data with complete information from Stack Exchange API.
     
     Args:
         users (list): List of StackUser objects to update
@@ -512,30 +477,28 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         return set()
         
     user_ids = [user.user_id for user in users]
-    log_progress(f"-> Buscando perfis completos para {len(user_ids)} usuários...", "fetch", task_obj=task_obj)
+    log_progress(f"-> Fetching full profiles for {len(user_ids)} users...", "fetch", task_obj=task_obj)
     users_data = fetch_users_data(user_ids, api_key, access_token)
     
     if not users_data:
-        log_progress("Nenhum dado de perfil retornado pela API para este lote.", "warning", task_obj=task_obj)
+        log_progress("No profile data returned by the API for this batch.", "warning", task_obj=task_obj)
         return set()
     
-    # Create a dictionary for quick lookup
     users_dict = {user.user_id: user for user in users}
     updated_count = 0
     skipped_count = 0    
     unique_slugs = set()
-    now = timezone.now()   # datetime com tz
+    now = timezone.now()
 
     for user_data in users_data:
         user_id = user_data.get('user_id')
         if user_id not in users_dict:
-            log_progress(f"Usuário ID {user_id} da API não encontrado no lote do banco de dados.", "warning", task_obj=task_obj)
+            log_progress(f"User ID {user_id} from API not found in DB batch.", "warning", task_obj=task_obj)
             skipped_count += 1
             continue
             
         user = users_dict[user_id]
 
-        # Coletar slugs de collectives
         collectives = user_data.get('collectives', [])
         user.collectives = collectives
         for col in collectives:
@@ -543,14 +506,12 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
             if slug:
                 unique_slugs.add(slug)
         
-        # Atualizar campos do usuário
         user.display_name = user_data.get('display_name', user.display_name)
         user.reputation = user_data.get('reputation', user.reputation)
         user.profile_image = user_data.get('profile_image', user.profile_image)
         user.user_type = user_data.get('user_type', user.user_type)
         user.is_employee = user_data.get('is_employee', user.is_employee)
 
-        # Converter epoch -> datetime (UTC)
         user.creation_date      = epoch_to_dt(user_data.get('creation_date'))      or user.creation_date
         user.last_access_date   = epoch_to_dt(user_data.get('last_access_date'))   or user.last_access_date
         user.last_modified_date = epoch_to_dt(user_data.get('last_modified_date')) or user.last_modified_date
@@ -573,49 +534,41 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         user.reputation_change_week = user_data.get('reputation_change_week', user.reputation_change_week)
         user.reputation_change_day = user_data.get('reputation_change_day', user.reputation_change_day)
 
-        # time_mined como datetime
         user.time_mined = now
         
         user.save()
         updated_count += 1
     
-    log_progress(f"-> {updated_count} perfis de usuários atualizados.", "save", task_obj=task_obj)
+    log_progress(f"-> {updated_count} user profiles updated.", "save", task_obj=task_obj)
     if skipped_count > 0:
-        log_progress(f"{skipped_count} usuários foram ignorados (não encontrados no lote).", "warning", task_obj=task_obj)
+        log_progress(f"{skipped_count} users were skipped (not found in batch).", "warning", task_obj=task_obj)
 
     return unique_slugs
 
-# Em stackoverflow/functions/data_populator.py
-
 def populate_missing_data(api_key: str, access_token: str, task_obj=None):
     """
-    Populate missing data for users that need updating
+    Populate missing data for users that need updating.
     """
-    # Bloco 1: Verificação Inicial
     users_to_update = list(get_users_to_update())
     total_users = len(users_to_update)
-    log_progress(f"Encontrados {total_users} usuários para enriquecer os dados.", "info", task_obj=task_obj)
+    log_progress(f"Found {total_users} users to enrich.", "info", task_obj=task_obj)
     
     if total_users == 0:
         return
     
-    # Bloco 2: Preparação dos Lotes
     batch_size = 100
     total_batches = (total_users + batch_size - 1) // batch_size
-    log_progress(f"O processo será dividido em {total_batches} lotes.", "system", task_obj=task_obj)
+    log_progress(f"Processing will be split into {total_batches} batches.", "system", task_obj=task_obj)
     
-    # Suas variáveis de controle originais, mantidas
     all_unique_slugs = set()
     total_badges_updated = 0
     processed_user_ids = set()
     
-    # Bloco 3: Loop de Processamento
     for i in range(0, total_users, batch_size):
         batch_num = i // batch_size + 1
         batch_users = users_to_update[i:i + batch_size]
-        log_progress(f"Processando lote {batch_num}/{total_batches} ({len(batch_users)} usuários)...", "process", task_obj=task_obj)
+        log_progress(f"Processing batch {batch_num}/{total_batches} ({len(batch_users)} users)...", "process", task_obj=task_obj)
         
-        # Sua lógica original de update, intacta
         batch_slugs = update_users_data(batch_users, api_key, access_token, task_obj=task_obj)
         if batch_slugs:
             all_unique_slugs.update(batch_slugs)
@@ -625,21 +578,18 @@ def populate_missing_data(api_key: str, access_token: str, task_obj=None):
             
         processed_user_ids.update([user.user_id for user in batch_users])
     
-    # Bloco 4: Processamento de Coletivos
     if all_unique_slugs:
-        log_progress(f"Processando {len(all_unique_slugs)} coletivos (Collectives)...", "collective", task_obj=task_obj)
+        log_progress(f"Processing {len(all_unique_slugs)} collectives...", "collective", task_obj=task_obj)
         collectives = fetch_collectives_data(list(all_unique_slugs), api_key, access_token, task_obj=task_obj)
         link_users_to_collectives(users_to_update, collectives, task_obj=task_obj)
         sync_collective_tags(collectives)
     else:
-        log_progress("Nenhum coletivo para processar.", "info", task_obj=task_obj)
+        log_progress("No collectives to process.", "info", task_obj=task_obj)
     
-    # Bloco 5: Verificação Final (lógica mantida)
     if len(processed_user_ids) != total_users:
-        log_progress(f"Nem todos os usuários foram processados! Esperado: {total_users}, Processado: {len(processed_user_ids)}", "warning", task_obj=task_obj)
+        log_progress(f"Not all users were processed! Expected: {total_users}, Processed: {len(processed_user_ids)}", "warning", task_obj=task_obj)
     
-    # Log de Sucesso Final
-    log_progress(f"Enriquecimento finalizado. {len(processed_user_ids)} usuários foram verificados/atualizados.", "success", task_obj=task_obj)
+    log_progress(f"Enrichment finished. {len(processed_user_ids)} users were checked/updated.", "success", task_obj=task_obj)
     
 def main():
     """
@@ -653,21 +603,16 @@ def main():
         access_token = os.getenv("STACK_ACCESS_TOKEN")
 
         if not api_key or not access_token:
-            # Trocado logger.error por log_progress
             log_progress("API key or access token not provided in .env file.", "error")
             sys.exit(1)
 
-        # Trocado logger.info por log_progress
         log_progress("Starting data population process...", "system")
         populate_missing_data(api_key, access_token)
-        # Trocado logger.info por log_progress
         log_progress("Data population completed successfully.", "success")
 
     except Exception as e:
-        # Trocado logger.error por log_progress
         log_progress(f"An unexpected error occurred during data population: {e}", "error")
         sys.exit(1)
         
 if __name__ == "__main__":
     main()
-
