@@ -53,7 +53,6 @@ class ExportDataView(APIView):
 
         model_mapping = {
             'jiraissue': JiraIssue,
-            # Add other models if needed
         }
 
         if table not in model_mapping:

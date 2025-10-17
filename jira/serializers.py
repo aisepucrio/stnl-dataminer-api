@@ -73,9 +73,9 @@ class JiraIssueCollectSerializer(serializers.Serializer):
 
 class ExportDataSerializer(serializers.Serializer):
     table = serializers.CharField()
-    format = serializers.ChoiceField(choices=['json', 'csv'])  # permite JSON ou CSV
+    format = serializers.ChoiceField(choices=['json', 'csv'])  
     ids = serializers.ListField(
         child=serializers.IntegerField(), required=False, allow_empty=True
     )
     issue_type = serializers.CharField(required=False, allow_blank=True)
-    data_type = serializers.CharField(required=False, allow_blank=True)  # compatível com GitHub
+    data_type = serializers.CharField(required=False, allow_blank=True)  
