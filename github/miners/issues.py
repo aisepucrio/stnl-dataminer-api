@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from django.utils import timezone
 
 from .base import BaseMiner
-from .utils import APIMetrics, split_date_range
+from .utils import APIMetrics, split_date_range, update_task_progress_date
 from ..models import GitHubIssuePullRequest, GitHubIssue, GitHubMetadata
 
 
@@ -44,7 +44,7 @@ class IssuesMiner(BaseMiner):
         log_progress(f"🔎 Depth: {depth.upper()}")
 
         try:
-            log_progress("Verificando o total de issues a serem mineradas...")
+            log_progress("🔎 Checking total issues to be mined...")
             
             for period_start, period_end in split_date_range(start_date, end_date):
                 query = f"repo:{repo_name} is:issue"
@@ -64,7 +64,7 @@ class IssuesMiner(BaseMiner):
 
                 if response.status_code == 403 and 'rate limit' in response.text.lower():
                     if not self.handle_rate_limit(response, 'search'):
-                        log_progress("Failed to recover after rate limit during preflight check")
+                        log_progress("🚫 Failed to recover after rate limit during preflight check")
                         continue
                     response = requests.get("https://api.github.com/search/issues", params=params, headers=self.headers)
 
@@ -72,11 +72,11 @@ class IssuesMiner(BaseMiner):
                     data = response.json()
                     period_total = data.get('total_count', 0)
                     total_issues_count += period_total
-                    log_progress(f"Período {period_start} a {period_end}: {period_total} issues encontradas")
+                    log_progress(f"📆 Period {period_start} to {period_end}: {period_total} issues found")
                 else:
-                    log_progress(f"Erro na pré-verificação do período {period_start} a {period_end}: {response.status_code}")
+                    log_progress(f"❗ Error in pre-check for period {period_start} to {period_end}: {response.status_code}")
 
-            log_progress(f"Total de {total_issues_count} issues encontradas. Iniciando a coleta.")
+            log_progress(f"📦 Total of {total_issues_count} issues found. Starting collection.")
 
             for period_start, period_end in split_date_range(start_date, end_date):
                 log_progress(f"📊 Processing period: {period_start} to {period_end}")
@@ -113,7 +113,6 @@ class IssuesMiner(BaseMiner):
 
                     issues_in_page = len(data['items'])
                     period_issues_count += issues_in_page
-                    log_progress(f"📝 Page {page}: Processing {issues_in_page} issues...")
 
                     for index, issue in enumerate(data['items']):
                         current_timestamp = timezone.now()
@@ -125,9 +124,9 @@ class IssuesMiner(BaseMiner):
                         issue_number = issue['number']
                         
                         if total_issues_count > 0:
-                            log_progress(f"Mining issue {processed_count} of {total_issues_count}. Key: #{issue_number} - {issue['title']}")
+                            log_progress(f"⛏️ Mining issue {processed_count} of {total_issues_count}. Key: #{issue_number} - {issue['title']}")
                         else:
-                            log_progress(f"Mining issue #{issue_number} - {issue['title']}")
+                            log_progress(f"⛏️ Mining issue #{issue_number} - {issue['title']}")
                         
                         timeline_url = f'https://api.github.com/repos/{repo_name}/issues/{issue_number}/timeline'
                         headers = {**self.headers, 'Accept': 'application/vnd.github.mockingbird-preview'}
@@ -137,7 +136,7 @@ class IssuesMiner(BaseMiner):
                         timeline_events = []
                         if timeline_response.status_code == 403 and 'rate limit' in timeline_response.text.lower():
                             if not self.handle_rate_limit(timeline_response, 'core'):
-                                log_progress(f"[Issues] Failed to recover timeline #{issue_number} after rate limit")
+                                log_progress(f"🕒 [Issues] Failed to recover timeline #{issue_number} after rate limit")
                                 continue
                             timeline_response = requests.get(timeline_url, headers=headers)
                         
@@ -158,7 +157,7 @@ class IssuesMiner(BaseMiner):
                             
                             if comments_response.status_code == 403 and 'rate limit' in comments_response.text.lower():
                                 if not self.handle_rate_limit(comments_response, 'core'):
-                                    log_progress(f"[Issues] Failed to retrieve comments #{issue_number} after rate limit")
+                                    log_progress(f"💬 [Issues] Failed to retrieve comments #{issue_number} after rate limit")
                                     continue
                                 comments_response = requests.get(comments_url, headers=self.headers)
                             
@@ -203,7 +202,7 @@ class IssuesMiner(BaseMiner):
 
                         metadata_obj = GitHubMetadata.objects.filter(repository=repo_name).first()
                         if metadata_obj is None:
-                            log_progress(f"[ISSUES] GitHubMetadata not found for {repo_name}. Skipping.")
+                            log_progress(f"📛 [ISSUES] GitHubMetadata not found for {repo_name}. Skipping.")
                             continue
 
                         GitHubIssuePullRequest.objects.update_or_create(
@@ -243,12 +242,20 @@ class IssuesMiner(BaseMiner):
                     time.sleep(1)
 
                 log_progress(f"✅ Period completed: {period_issues_count} issues collected in {page} pages")
+                
+                # Update task progress - mark this date period as completely processed
+                if period_end and period_end != period_start:
+                    # For multi-day periods, use the end date
+                    update_task_progress_date(task_obj, period_end)
+                elif period_start:
+                    # For single-day periods, use the start date
+                    update_task_progress_date(task_obj, period_start)
 
             log_progress(f"✅ Extraction completed! Total issues collected: {len(all_issues)}")
             return all_issues
 
         except Exception as e:
             log_progress(f"❌ Error during extraction: {str(e)}")
-            raise RuntimeError(f"Issue extraction failed: {str(e)}") from e
+            raise RuntimeError(f"❌ Issue extraction failed: {str(e)}") from e
         finally:
             self.verify_token() 

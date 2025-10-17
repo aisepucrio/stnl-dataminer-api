@@ -17,7 +17,7 @@ class BaseMiner:
         
         result = self.load_tokens()
         if not result['success']:
-            raise Exception(f"Failed to initialize GitHub tokens: {result['error']}")
+            raise Exception(f"❌ Failed to initialize GitHub tokens: {result['error']}")
         
         print(f"✅ GitHub tokens initialized successfully:")
         print(f"   - Total tokens loaded: {result['tokens_loaded']}")
