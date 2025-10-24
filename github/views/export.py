@@ -11,7 +11,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from django_filters.rest_framework import DjangoFilterBackend  # usar backend diretamente
+from django_filters.rest_framework import DjangoFilterBackend  # use backend directly
 from django.db.models import Q
 
 from ..models import GitHubCommit, GitHubBranch, GitHubMetadata, GitHubIssuePullRequest
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _day_bounds_utc(d):
-    """Recebe date e devolve (start_dt_utc, end_dt_utc) no mesmo dia."""
+    """Receives a date and returns (start_dt_utc, end_dt_utc) for the same day."""
     start = datetime.combine(d, time.min).replace(tzinfo=timezone.utc)
     end = datetime.combine(d, time.max).replace(tzinfo=timezone.utc)
     return start, end
@@ -30,19 +30,17 @@ def _day_bounds_utc(d):
 
 def _date_field_for_model(model):
     """
-    Define qual campo de data usar para filtro por intervalo.
-    Ajuste aqui se necessário para outras tabelas.
+    Defines which date field to use for range filtering.
+    Adjust here if necessary for other tables.
     """
     if model is GitHubCommit:
         return "date"
     if model is GitHubIssuePullRequest:
         return "github_created_at"
     if model is GitHubMetadata:
-        return "github_created_at"  # ajuste se preferir outro
-    if model is GitHubBranch:
-        # se houver um campo de criação/atualização no model:
         return "github_created_at"
-    # fallback (sem filtro específico)
+    if model is GitHubBranch:
+        return "github_created_at"
     return None
 
 
@@ -53,10 +51,10 @@ class ExportDataView(APIView):
         description=(
             "Export data from GitHub tables.\n"
             "- `format=json|csv`\n"
-            "- Reaproveita filtros da UI via querystring (django-filters, search, ordering).\n"
-            "- Também aceita filtros no BODY: `date` (um dia), ou `start_date`/`end_date` (intervalo).\n"
-            "- Para `githubissuepullrequest`, permite `data_type=issue|pull_request`.\n"
-            "- Campo opcional `fields` para limitar colunas do CSV."
+            "- Reuses filters from the UI via querystring (django-filters, search, ordering).\n"
+            "- Also accepts filters in the BODY: `date` (single day) or `start_date`/`end_date` (range).\n"
+            "- For `githubissuepullrequest`, allows `data_type=issue|pull_request`.\n"
+            "- Optional field `fields` to limit CSV columns."
         ),
         request=ExportDataSerializer,
         responses={
@@ -89,7 +87,7 @@ class ExportDataView(APIView):
         data_type = serializer.validated_data.get('data_type')
         selected_fields = serializer.validated_data.get('fields')
 
-        # filtros de data vindos do body
+        # Date filters coming from the body
         body_date = serializer.validated_data.get('date')
         body_start = serializer.validated_data.get('start_date')
         body_end = serializer.validated_data.get('end_date')
@@ -113,26 +111,24 @@ class ExportDataView(APIView):
         state = serializer.validated_data.get("state")
         creator = serializer.validated_data.get("creator")
 
-        # Filtro específico de data_type para issues/PRs
+        # Filter for issues or pull requests
         if model is GitHubIssuePullRequest and data_type:
             queryset = queryset.filter(data_type=data_type)
 
-        # Filtro por IDs explícitos (se fornecidos)
+        # Filter by explicit IDs
         if ids:
             queryset = queryset.filter(id__in=ids)
 
         if repo:
             queryset = queryset.filter(repository_name__icontains=repo)
-
         if state:
             queryset = queryset.filter(state__iexact=state)
         if creator:
             queryset = queryset.filter(creator__icontains=creator)
 
-        # ===== Filtros da UI via querystring (DjangoFilterBackend) =====
+        # UI filters via querystring (DjangoFilterBackend)
         filterset_fields = _get_filterset_fields(model)
         if filterset_fields:
-            # Criamos uma "view fake" só com os atributos que o backend usa
             DummyView = type(
                 "DummyView",
                 (),
@@ -144,7 +140,7 @@ class ExportDataView(APIView):
             backend = DjangoFilterBackend()
             queryset = backend.filter_queryset(request, queryset, DummyView())
 
-        # ===== Busca ('search=') compatível com SearchFilter =====
+        # Search filter (compatible with SearchFilter)
         search_query = request.query_params.get('search')
         if search_query:
             search_fields = _get_search_fields(model) or []
@@ -157,15 +153,15 @@ class ExportDataView(APIView):
                         q |= Q(**{f"{fld}__icontains": search_query})
                 queryset = queryset.filter(q)
 
-        # ===== Ordenação ('ordering=') compatível com OrderingFilter =====
+        # Ordering (compatible with OrderingFilter)
         ordering = request.query_params.get('ordering')
         if ordering:
             try:
                 queryset = queryset.order_by(*[seg.strip() for seg in ordering.split(",") if seg.strip()])
             except Exception as e:
-                logger.warning(f"Ignorando ordering inválido '{ordering}': {e}")
+                logger.warning(f"Ignoring invalid ordering '{ordering}': {e}")
 
-        # ===== Filtro de data vindo do BODY (um dia ou intervalo) =====
+        # Date filter from body (single day or range)
         date_field = _date_field_for_model(model)
         if date_field:
             if body_date:
@@ -183,13 +179,13 @@ class ExportDataView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Base do nome do arquivo
+        # File name base
         filename_parts = [table]
         if model is GitHubIssuePullRequest and data_type:
             filename_parts.append(data_type)
         filename_base = f"{'_'.join(filename_parts)}_export"
 
-        # ===== Export JSON =====
+        # JSON export
         if format_type == 'json':
             data = []
             for obj in queryset:
@@ -217,14 +213,14 @@ class ExportDataView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-        # ===== Export CSV =====
+        # CSV export
         if not selected_fields:
             selected_fields = [f.name for f in model._meta.fields]
 
         def row_iter():
-            # Cabeçalho
+            # Header
             yield [smart_str(col) for col in selected_fields]
-            # Linhas
+            # Rows
             for obj in queryset.iterator(chunk_size=5000):
                 row = []
                 for col in selected_fields:

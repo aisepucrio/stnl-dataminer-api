@@ -25,7 +25,7 @@ router.register(r'metadata/collect', views.GitHubMetadataViewSet, basename='meta
 router.register(r'collect-all', views.GitHubCollectAllViewSet, basename='collect-all')
 
 urlpatterns = [
-    # PRIORIZE a rota de export antes do router
+    # PRIORITIZE the export route before the router
     path('export/', ExportDataView.as_view(), name='export-data'),
 
     path('', include(router.urls)),

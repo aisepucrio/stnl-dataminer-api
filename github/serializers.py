@@ -193,12 +193,12 @@ class ExportDataSerializer(serializers.Serializer):
         help_text="Optional: limit CSV columns to this list of field names"
     )
 
-    # Novos campos para filtro no BODY
+    # New fields for filter on the BODY
     date = serializers.DateField(required=False, help_text="Single day filter (UTC date)")
     start_date = serializers.DateTimeField(required=False, help_text="Start datetime (inclusive, UTC)")
     end_date = serializers.DateTimeField(required=False, help_text="End datetime (inclusive, UTC)")
 
-    # 🔥 Novos filtros extras
+    # Some extra new filters
     repository = serializers.CharField(required=False, help_text="Filter by repository name")
     state = serializers.CharField(required=False, help_text="Filter by issue/PR state (e.g. open, closed)")
     creator = serializers.CharField(required=False, help_text="Filter by creator username")
