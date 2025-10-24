@@ -65,10 +65,7 @@ class JiraIssueCollectView(APIView):
                     return Response({"error": "Each project must contain 'jira_domain' and 'project'."}, status=400)
 
             issuetypes = request.data.get('issuetypes', [])
-            
-            # CORREÇÃO APLICADA AQUI:
-            # Adiciona uma verificação para garantir que 'issuetypes', se fornecido, é uma lista.
-            # Isso impede que a API aceite tipos de dados inválidos.
+
             if 'issuetypes' in request.data and not isinstance(issuetypes, list):
                 return Response({"error": "'issuetypes' must be a list."}, status=status.HTTP_400_BAD_REQUEST)
 

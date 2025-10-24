@@ -26,9 +26,6 @@ from .models import (
 
 
 class JiraMiner:
-    # A CORREÇÃO ESTÁ AQUI:
-    # A classe de exceção agora herda de 'Exception', tornando-a uma
-    # exceção válida que pode ser capturada em um bloco try/except.
     class NoValidJiraTokenError(Exception):
         """Invalid token or all tokens have expired."""
         pass
@@ -272,7 +269,7 @@ class JiraMiner:
 
 
     def get_commits_for_issue(self, issue_key):
-        # Buscar o id numérico da issue
+        # Find the numerical id of the issue
         issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?fields=id"
         response = requests.get(issue_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -281,7 +278,7 @@ class JiraMiner:
         if not issue_id:
             return []
 
-        # Buscar os commits usando o id
+        # Search for commits using id
         jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/latest/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -767,8 +764,8 @@ class JiraMiner:
                     'author': c.get('author', ''),
                     'author_email': c.get('authorEmail', ''),
                     'message': c.get('message'),
-                    # repository: tentamos mapear para um GitHubMetadata existente pelo html_url
-                    # Caso não exista, deixamos como None
+                    # repository: we try to map to an existing GitHubMetadata by html_url
+                    # If it does not exist, we leave it as None
                     'repository': None,
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
