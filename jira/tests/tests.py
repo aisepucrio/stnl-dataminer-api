@@ -1,5 +1,3 @@
-# jira/tests/tests.py
-
 from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -7,13 +5,13 @@ from unittest.mock import patch, MagicMock
 import uuid
 from django.utils import timezone
 
-# Importa todos os models e a exceção customizada para os testes
+# Imports all models and custom exception for testing
 from jira.models import (
     JiraIssue, JiraProject, JiraUser, JiraComment, JiraSprint,
     JiraIssueType, JiraHistory, JiraHistoryItem, JiraCommit,
     JiraChecklist, JiraIssueLink, JiraActivityLog
 )
-from jira.miner import JiraMiner # Importado para testar a exceção
+from jira.miner import JiraMiner # Imported to test the exception
 from jobs.models import Task
 
 class JiraAPITests(APITestCase):

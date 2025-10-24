@@ -1,17 +1,12 @@
-# Em stackoverflow/views/collect.py
-
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from datetime import datetime
 import logging
 from celery import chain
-
-# Imports dos nossos módulos
 from ..tasks import collect_questions_task, repopulate_users_task
 from jobs.models import Task
-from drf_spectacular.utils import extend_schema # Para documentação da API
+from drf_spectacular.utils import extend_schema
 
-# O "Cardápio" de operações agora vive aqui dentro
 OPERATIONS = {
     'collect_questions': {
         'name': 'Coletar Novas Perguntas',
@@ -62,16 +57,12 @@ class StackOverflowViewSet(viewsets.ViewSet):
             options = request.data.get('options', [])
             if not options:
                 return Response({'error': 'A lista "options" é obrigatória.'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # ... (sua lógica de validação de 'options' continua igual) ...
             
             celery_task_chain = self._build_task_chain(options, request.data)
 
             if not celery_task_chain:
                 return Response({'error': 'Parâmetros insuficientes para as opções.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # --- MUDANÇA PRINCIPAL AQUI ---
-            # Apenas disparamos a tarefa. Não criamos mais o registro Task aqui.
             task_chain_result = celery_task_chain.apply_async()
             
             return Response(
