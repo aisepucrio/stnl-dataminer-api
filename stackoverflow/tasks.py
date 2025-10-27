@@ -5,24 +5,25 @@ from jobs.models import Task
 
 from .miner.question_fetcher import fetch_questions
 from .miner.get_additional_data import populate_missing_data
+
+
 @shared_task(bind=True)
 def collect_questions_task(self, start_date: str, end_date: str, tags=None):
     """
-    Tarefa Celery que executa a coleta de perguntas e atualiza o status.
+    Celery task that performs question collection and updates task status.
     """
     task_obj = None
     try:
-        operation_log = f"Iniciando coleta: {start_date} a {end_date}"
+        operation_log = f"Starting question collection: {start_date} to {end_date}"
         if tags:
             operation_log += f" (Tags: {tags})"
 
-
         task_obj = Task.objects.create(
-            task_id=self.request.id, 
-            operation=operation_log, 
+            task_id=self.request.id,
+            operation=operation_log,
             repository="Stack Overflow"
         )
-        
+
         fetch_questions(
             site='stackoverflow',
             start_date=start_date,
@@ -32,12 +33,12 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None):
             task_obj=task_obj,
             tags=tags
         )
-        
+
         task_obj.status = 'COMPLETED'
-        task_obj.operation = "Coleta finalizada com sucesso."
+        task_obj.operation = "Question collection successfully completed."
         task_obj.save(update_fields=['status', 'operation'])
-        
-        return f"Coleta de {start_date} a {end_date} concluída."
+
+        return f"Collection from {start_date} to {end_date} completed successfully."
 
     except Exception as e:
         if task_obj:
@@ -45,20 +46,21 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None):
             task_obj.error = str(e)
             task_obj.save(update_fields=['status', 'error'])
         raise e
-    
+
+
 @shared_task(bind=True, ignore_result=True)
 def repopulate_users_task(self, previous_task_result=None):
     """
-    Tarefa Celery que executa o enriquecimento de dados e atualiza o status.
+    Celery task that performs user data enrichment and updates task status.
     """
     task_obj = None
     try:
         task_obj = Task.objects.create(
-            task_id=self.request.id, 
-            operation="Iniciando enriquecimento de dados de usuários", 
+            task_id=self.request.id,
+            operation="Starting user data enrichment process",
             repository="Stack Overflow"
         )
-        
+
         populate_missing_data(
             api_key=settings.STACK_API_KEY,
             access_token=settings.STACK_ACCESS_TOKEN,
@@ -66,10 +68,10 @@ def repopulate_users_task(self, previous_task_result=None):
         )
 
         task_obj.status = 'COMPLETED'
-        task_obj.operation = "Enriquecimento de dados finalizado com sucesso."
+        task_obj.operation = "User data enrichment successfully completed."
         task_obj.save(update_fields=['status', 'operation'])
-        
-        return "Repopulação de usuários concluída."
+
+        return "User repopulation completed successfully."
 
     except Exception as e:
         if task_obj:

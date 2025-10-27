@@ -35,7 +35,7 @@ class JiraMiner:
         load_dotenv()
         self.jira_domain = jira_domain.strip()
         self.task_obj = task_obj 
-        self.log_progress(f"🔍 Received domain in JiraMiner: '{self.jira_domain}'")
+        self.log_progress(f" Received domain in JiraMiner: '{self.jira_domain}'")
 
 
         # Loading tokens
@@ -71,7 +71,7 @@ class JiraMiner:
     def switch_token(self):
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
         self.update_auth()
-        self.log_progress(f"🔍 Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
+        self.log_progress(f" Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
 
 
     def verify_token(self):
@@ -83,22 +83,22 @@ class JiraMiner:
                     print(f"Token {self.current_token_index + 1} is valid")
                     return
                 else:
-                    self.log_progress(f"❌ Token {self.current_token_index + 1} is invalid: {response.status_code}")
+                    self.log_progress(f"Token {self.current_token_index + 1} is invalid: {response.status_code}")
 
                     
                     
             except Exception as e:
-                self.log_progress(f"❌ Problem verifying {self.current_token_index + 1}: {e}")
+                self.log_progress(f"Problem verifying {self.current_token_index + 1}: {e}")
 
 
             self.switch_token()
 
-        raise self.NoValidJiraTokenError("❌ No valid Jira token found.")
+        raise self.NoValidJiraTokenError("No valid Jira token found.")
 
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
-            self.log_progress("🔍 Rate limit reached. Trying next token...")
+            self.log_progress(" Rate limit reached. Trying next token...")
 
             original_index = self.current_token_index
 
@@ -106,12 +106,12 @@ class JiraMiner:
                 self.switch_token()
                 retry = requests.get(response.request.url, headers=self.headers, auth=self.auth)
                 if retry.status_code != 429:
-                    self.log_progress("📋 New Token worked after rate limit.")
+                    self.log_progress(" New Token worked after rate limit.")
 
                     return True
 
             # If no token worked, wait for 60 seconds
-            self.log_progress("❌ All tokens failed after rate limit. Waiting for 60 seconds before retrying...")
+            self.log_progress("All tokens failed after rate limit. Waiting for 60 seconds before retrying...")
 
             time.sleep(60)
             return True
@@ -121,7 +121,7 @@ class JiraMiner:
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         custom_fields_mapping = self.get_custom_fields_mapping()
-        self.log_progress(f"🔍 Colecting project issues {project_key}...")
+        self.log_progress(f" Colecting project issues {project_key}...")
 
         # Find the Sprint field (e.g., customfield_10020)
         sprint_field_key = None
@@ -130,7 +130,7 @@ class JiraMiner:
                 sprint_field_key = field_id
                 break
 
-        self.log_progress(f"📋 Token {self.current_token_index + 1} is valid")
+        self.log_progress(f" Token {self.current_token_index + 1} is valid")
 
         # Build the static part of JQL
         base_jql = f'project="{project_key}"'
@@ -145,18 +145,18 @@ class JiraMiner:
             # Preflight to get total if not provided
             if total_hint is None:
                 pref_jql = quote(f"{base_jql} {jql_where}")
-                self.log_progress("🔍 Verificando o total de issues a serem mineradas...")
+                self.log_progress(" Checking the total number of issues to be mined...")
                 preflight_url = f"https://{self.jira_domain}/rest/api/3/search?jql={pref_jql}&maxResults=0"
                 try:
                     preflight_response = requests.get(preflight_url, headers=self.headers, auth=self.auth)
                     if preflight_response.status_code != 200:
                         raise Exception(
-                            f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}"
+                            f"Pre-check failed with status{preflight_response.status_code}: {preflight_response.text}"
                         )
                     total_hint = preflight_response.json().get('total', 0)
-                    self.log_progress(f"🔍 Total de {total_hint} issues encontradas. Iniciando a coleta.")
+                    self.log_progress(f" Total of {total_hint} issues found. Starting collection.")
                 except Exception as e:
-                    self.log_progress(f"❌ Falha no preflight: {e}")
+                    self.log_progress(f"Preflight failure: {e}")
                     return 0
 
             while True:
@@ -172,7 +172,7 @@ class JiraMiner:
 
                 if response.status_code != 200:
                     self.log_progress(
-                        f"❌ Failed to collect issues page: {response.status_code} - {response.text}"
+                        f"Failed to collect issues page: {response.status_code} - {response.text}"
                     )
                     break
 
@@ -246,7 +246,7 @@ class JiraMiner:
                     )
 
                     self.log_progress(
-                        f"⛏️ Mining issue {issue_count} of {total_hint}. Key: {issue_key} - {fields['summary']}"
+                        f" Mining issue {issue_count} of {total_hint}. Key: {issue_key} - {fields['summary']}"
                     )
 
                     # Sub-tables
@@ -290,7 +290,7 @@ class JiraMiner:
                 # Update task progress per completed day
                 if day_start:
                     update_task_progress_date(self.task_obj, day_start)
-                    self.log_progress(f"✅ Completed day {day_start}: {collected} issues")
+                    self.log_progress(f" Completed day {day_start}: {collected} issues")
 
         else:
             # Single run without per-day tracking
@@ -307,7 +307,7 @@ class JiraMiner:
 
 
     def get_commits_for_issue(self, issue_key):
-        # Buscar o id numérico da issue
+        # Search for the numeric issue id
         issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?fields=id"
         response = requests.get(issue_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -316,7 +316,7 @@ class JiraMiner:
         if not issue_id:
             return []
 
-        # Buscar os commits usando o id
+        # Search for commits using id
         jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/latest/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -357,7 +357,7 @@ class JiraMiner:
             return self.get_comments_for_issue(issue_key)
             
         if response.status_code != 200:
-            self.log_progress(f"❌ Problem collecting comments for {issue_key}: {response.status_code}")
+            self.log_progress(f"Problem collecting comments for {issue_key}: {response.status_code}")
 
             return []
             
@@ -395,7 +395,7 @@ class JiraMiner:
             return self.get_issue_history(issue_key)
             
         if response.status_code != 200:
-            self.log_progress(f"❌ Problem collecting history for {issue_key}: {response.status_code}")
+            self.log_progress(f"Problem collecting history for {issue_key}: {response.status_code}")
 
             return []
             
@@ -445,7 +445,7 @@ class JiraMiner:
             return self.get_activity_log(issue_key)
             
         if response.status_code != 200:
-            self.log_progress(f"❌ Problem collecting activity log for {issue_key}: {response.status_code}")
+            self.log_progress(f"Problem collecting activity log for {issue_key}: {response.status_code}")
 
             return []
             
@@ -535,7 +535,7 @@ class JiraMiner:
             return self.get_checklist(issue_key)
             
         if response.status_code != 200:
-            self.log_progress(f"❌ Problem collecting checklist for {issue_key}: {response.status_code}")
+            self.log_progress(f"Problem collecting checklist for {issue_key}: {response.status_code}")
 
             return []
             
@@ -802,8 +802,6 @@ class JiraMiner:
                     'author': c.get('author', ''),
                     'author_email': c.get('authorEmail', ''),
                     'message': c.get('message'),
-                    # repository: tentamos mapear para um GitHubMetadata existente pelo html_url
-                    # Caso não exista, deixamos como None
                     'repository': None,
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
@@ -836,4 +834,4 @@ class JiraMiner:
 
 
             except Exception as e:
-                self.log_progress(f"❌ Problem on saving sprint for {issue_obj.issue_key}: {e}")
+                self.log_progress(f"Problem on saving sprint for {issue_obj.issue_key}: {e}")
