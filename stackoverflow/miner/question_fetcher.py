@@ -1,10 +1,9 @@
 import requests
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timezone as dt_timezone, timedelta
 import time
 import logging
 from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment
 from django.utils import timezone
-from django.db import transaction
 from jobs.models import Task
 from stackoverflow.utils import epoch_to_dt
 
@@ -24,6 +23,30 @@ def log_progress(message: str, level: str = "info", task_obj: Task = None):
     if task_obj:
         task_obj.operation = message
         task_obj.save(update_fields=["operation"])
+
+def update_task_progress_date(task_obj: Task, completed_date: str) -> None:
+    """
+    Updates the task's date_last_update field to track scraping progress.
+
+    Args:
+        task_obj: Task object to update
+        completed_date: Date string in YYYY-MM-DD format that was completely processed
+    """
+    if not task_obj:
+        return
+    try:
+        # Convert string date to datetime (set to start of day UTC)
+        completed_datetime = datetime.strptime(completed_date, "%Y-%m-%d")
+        completed_datetime = completed_datetime.replace(tzinfo=dt_timezone.utc)
+
+        # Update the task's progress date
+        task_obj.date_last_update = completed_datetime
+        task_obj.save(update_fields=["date_last_update"])
+
+        print(f"[StackOverflow] 📅 Progress tracked: Completed scraping for {completed_date}", flush=True)
+    except Exception as e:
+        print(f"[StackOverflow] ⚠️ Warning: Could not update progress date: {str(e)}", flush=True)
+
 
 def create_or_update_user(user_id, user_data):
     stack_user = None
@@ -191,149 +214,179 @@ def fetch_questions(
     """
     base_url = "https://api.stackexchange.com/2.3/questions"
     
-    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-    start_timestamp = int(datetime.combine(start_dt.date(), datetime.min.time()).timestamp())
-    end_timestamp = int(datetime.combine(end_dt.date(), datetime.max.time()).timestamp())
-    
+    # convert start/end to date objects so we can iterate day-by-day
+    start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
+    end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
+
     log_progress(f"Starting collection from {start_date} to {end_date}", "system", task_obj=task_obj)
-    
-    params = {
-        'site': site,
-        'fromdate': start_timestamp,
-        'todate': end_timestamp,
-        'page': page,
-        'pagesize': min(page_size, 100),
-        'order': 'desc',
-        'sort': 'creation',
-        'filter': '!2xWEp6FHz8hT56C1LBQjFx25D4Dzmr*3(8D4ngdB5g',
-        'key': api_key,
-        'access_token': access_token
-    }
-    
+
     if tags:
-        params['tagged'] = tags
         log_progress(f"Filtering by tags: {tags}", "info", task_obj=task_obj)
 
     questions = []
-    total_questions_api = 0
     total_processed = 0
-    has_more = True
-    page = 1
 
-    while has_more:
-        try:
-            params['page'] = page
+    # iterate day-by-day and paginate inside each day to get a reliable per-day checkpoint
+    current_day = start_dt
+    while current_day <= end_dt:
+        day_start_ts = int(datetime.combine(current_day, datetime.min.time()).timestamp())
+        day_end_ts = int(datetime.combine(current_day, datetime.max.time()).timestamp())
 
-            log_progress(f"Fetching page {params['page']}...", "fetch", task_obj=task_obj)
-            response = requests.get(base_url, params=params)
-            log_progress(f"API responded with status {response.status_code}", "info", task_obj=task_obj)
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            if 'error_id' in data:
-                log_progress(f"API returned an error: {data.get('error_message', 'Unknown error')}", "error", task_obj=task_obj)
+        log_progress(f" Day {current_day.isoformat()}: fetching…", "fetch", task_obj=task_obj)
+
+        params = {
+            'site': site,
+            'fromdate': day_start_ts,
+            'todate': day_end_ts,
+            'page': 1,
+            'pagesize': min(page_size, 100),
+            # iterate within the day from oldest -> newest so finishing means "all older or equal to this day"
+            'order': 'asc',
+            'sort': 'creation',
+            'filter': '!2xWEp6FHz8hT56C1LBQjFx25D4Dzmr*3(8D4ngdB5g',
+            'key': api_key,
+            'access_token': access_token
+        }
+        if tags:
+            params['tagged'] = tags
+
+        has_more = True
+        day_aborted = False
+        # keep references to last response/data for day-level checks
+        response = None
+        data = None
+
+        while has_more:
+            try:
+                log_progress(f"Fetching page {params['page']} for {current_day.isoformat()}...", "fetch", task_obj=task_obj)
+                response = requests.get(base_url, params=params)
+                log_progress(f"API responded with status {response.status_code}", "info", task_obj=task_obj)
+                response.raise_for_status()
+                data = response.json()
+
+                if 'error_id' in data:
+                    log_progress(f"API returned an error: {data.get('error_message', 'Unknown error')}", "error", task_obj=task_obj)
+                    day_aborted = True
+                    break
+
+                items = data.get('items', [])
+                if not items:
+                    if params['page'] == 1:
+                        log_progress(f" Day {current_day.isoformat()}: no questions.", "warning", task_obj=task_obj)
+                    break
+
+                log_progress(f"🔄 {len(items)} questions (page {params['page']}) — saving…", "process", task_obj=task_obj)
+
+                # if this is the first page for the day, capture the day's total
+                if params.get('page', 1) == 1:
+                    day_total = data.get('total', 0)
+                    # if the day has no items, bail out of day pagination
+                    if day_total == 0:
+                        log_progress(f" Day {current_day.isoformat()}: no questions.", "warning", task_obj=task_obj)
+                        break
+                    # per-day processed counter for logging
+                    day_processed = 0
+
+                for item in items:
+                    # owner
+                    owner_data = item.get('owner', {})
+                    owner_id = owner_data.get('user_id')
+                    stack_user = create_or_update_user(owner_id, owner_data) if owner_id else None
+                    question_tags = item.get('tags', [])
+
+                    q_payload = {
+                        'question_id': item['question_id'],
+                        'title': item.get('title'),
+                        'body': item.get('body'),
+                        'creation_date': epoch_to_dt(item.get('creation_date')),
+                        'score': item.get('score', 0),
+                        'view_count': item.get('view_count', 0),
+                        'answer_count': item.get('answer_count', 0),
+                        'comment_count': item.get('comment_count', 0),
+                        'up_vote_count': item.get('up_vote_count', 0),
+                        'down_vote_count': item.get('down_vote_count', 0),
+                        'is_answered': item.get('is_answered', False),
+                        'accepted_answer_id': item.get('accepted_answer_id'),
+                        'owner': stack_user,
+                        'share_link': item.get('share_link'),
+                        'body_markdown': item.get('body_markdown'),
+                        'link': item.get('link'),
+                        'favorite_count': item.get('favorite_count', 0),
+                        'content_license': item.get('content_license', None),
+                        'last_activity_date': epoch_to_dt(item.get('last_activity_date')),
+                        'time_mined': timezone.now(),
+                    }
+
+                    stack_question, created = StackQuestion.objects.get_or_create(
+                        question_id=q_payload['question_id'],
+                        defaults=q_payload
+                    )
+
+                    # comments
+                    for comment in item.get('comments', []) or []:
+                        c_owner = comment.get('owner', {})
+                        c_owner_id = c_owner.get('user_id')
+                        c_user = create_or_update_user(c_owner_id, c_owner) if c_owner_id else None
+                        create_comment(comment, stack_question, c_user)
+
+                    # answers + answer comments
+                    if item.get('is_answered'):
+                        for answer in item.get('answers', []) or []:
+                            a_owner = answer.get('owner', {})
+                            a_owner_id = a_owner.get('user_id')
+                            a_user = create_or_update_user(a_owner_id, a_owner) if a_owner_id else None
+                            stack_answer = create_answer(answer, stack_question, a_user)
+
+                            for a_comment in answer.get('comments', []) or []:
+                                ac_owner = a_comment.get('owner', {})
+                                ac_owner_id = ac_owner.get('user_id')
+                                ac_user = create_or_update_user(ac_owner_id, ac_owner) if ac_owner_id else None
+                                create_comment(a_comment, stack_answer, ac_user)
+
+                    # tags
+                    tag_objs = []
+                    for tag_name in question_tags:
+                        tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
+                        tag_objs.append(tag_obj)
+                    stack_question.tags.set(tag_objs)
+
+                    # count only after persisted
+                    total_processed += 1
+                    day_processed += 1
+
+                    # per-day processing logs: include the day for context and progress
+                    title_preview = item.get('title', 'Untitled')[:60]
+                    log_progress(f"[{current_day.isoformat()}] [{day_processed}/{day_total}] Processing: '{title_preview}...'", "save", task_obj=task_obj)
+
+                    questions.append(make_question_serializable(q_payload, stack_user, question_tags))
+
+                has_more = data.get('has_more', False)
+                if has_more:
+                    params['page'] += 1
+                    log_progress("➡️ Moving to the next page…", "info", task_obj=task_obj)
+                    time.sleep(1)
+
+            except requests.exceptions.RequestException as e:
+                log_progress(f"Connection error: {str(e)}", "error", task_obj=task_obj)
+                # abort day without checkpoint
+                day_aborted = True
+                break
+            except Exception as e:
+                log_progress(f"An unexpected error occurred: {str(e)}", "error", task_obj=task_obj)
+                day_aborted = True
                 break
 
-            if page == 1:
-                total_questions_api = data.get('total', 0)
-                if total_questions_api == 0:
-                    log_progress("No questions found for the period.", "warning", task_obj=task_obj)
-                    return []
-                log_progress(f"{total_questions_api} questions found. Starting processing...", "info", task_obj=task_obj)
+        # checkpoint the day only if we didn't abort (i.e., we finished all pages for that day)
+        if not day_aborted:
+            try:
+                update_task_progress_date(task_obj, current_day.isoformat())
+            except Exception:
+                # already handled/logged inside update_task_progress_date
+                pass
 
-            items = data.get('items', [])
-            if not items:
-                if params['page'] == 1:
-                    log_progress("No questions found for the period.", "warning", task_obj=task_obj)
-                break
-                
-            log_progress(f"{len(items)} questions found. Saving to database...", "process", task_obj=task_obj)
-            
-            for item in items:
-                total_processed += 1
-
-                owner_data = item.get('owner', {})
-                owner_id = owner_data.get('user_id')
-                stack_user = create_or_update_user(owner_id, owner_data) if owner_id else None
-                question_tags = item.get('tags', [])
-
-                question_dict_for_saving = {
-                    'question_id': item['question_id'],
-                    'title': item.get('title'),
-                    'body': item.get('body'),
-                    'creation_date': epoch_to_dt(item.get('creation_date')),
-                    'score': item.get('score', 0),
-                    'view_count': item.get('view_count', 0),
-                    'answer_count': item.get('answer_count', 0),
-                    'comment_count': item.get('comment_count', 0),
-                    'up_vote_count': item.get('up_vote_count', 0),
-                    'down_vote_count': item.get('down_vote_count', 0),
-                    'is_answered': item.get('is_answered', False),
-                    'accepted_answer_id': item.get('accepted_answer_id'),
-                    'owner': stack_user,
-                    'share_link': item.get('share_link'),
-                    'body_markdown': item.get('body_markdown'),
-                    'link': item.get('link'),
-                    'favorite_count': item.get('favorite_count', 0),
-                    'content_license': item.get('content_license', None),
-                    'last_activity_date': epoch_to_dt(item.get('last_activity_date')),
-                    'time_mined': timezone.now(),
-                }
-
-                stack_question, created = StackQuestion.objects.get_or_create(
-                    question_id=question_dict_for_saving['question_id'],
-                    defaults=question_dict_for_saving
-                )
-                
-                serializable_question = make_question_serializable(question_dict_for_saving, stack_user, question_tags)
-                questions.append(serializable_question)
-
-                comments = item.get('comments', [])
-                if comments:
-                    for comment in comments:
-                        comment_owner_data = comment.get('owner', {})
-                        comment_owner_id = comment_owner_data.get('user_id')
-                        comment_owner = create_or_update_user(comment_owner_id, comment_owner_data) if comment_owner_id else None
-                        create_comment(comment, stack_question, comment_owner)
-
-                if item.get('is_answered'):
-                    for answer in item.get('answers', []):
-                        answer_owner_data = answer.get('owner', {})
-                        answer_owner_id = answer_owner_data.get('user_id')
-                        answer_owner = create_or_update_user(answer_owner_id, answer_owner_data) if answer_owner_id else None
-                        stack_answer = create_answer(answer, stack_question, answer_owner)
-                        
-                        answer_comments = answer.get('comments', [])
-                        if answer_comments:
-                            for comment in answer_comments:
-                                comment_owner_data = comment.get('owner', {})
-                                comment_owner_id = comment_owner_data.get('user_id')
-                                comment_owner = create_or_update_user(comment_owner_id, comment_owner_data) if comment_owner_id else None
-                                create_comment(comment, stack_answer, comment_owner)
-                
-                tag_objs = []
-                for tag_name in question_tags:
-                    tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
-                    tag_objs.append(tag_obj)
-                stack_question.tags.set(tag_objs)
-
-                title_preview = item.get('title', 'Untitled')[:60]
-                log_progress(f"[{total_processed}/{total_questions_api}] Processing: '{title_preview}...'", "save", task_obj=task_obj)
-
-            has_more = data.get('has_more', False)
-            if has_more:
-                page += 1
-                log_progress("Moving to the next page...", "info", task_obj=task_obj)
-                time.sleep(1)
-
-        except requests.exceptions.RequestException as e:
-            log_progress(f"Connection error: {str(e)}", "error", task_obj=task_obj)
-            break
-        except Exception as e:
-            log_progress(f"An unexpected error occurred: {str(e)}", "error", task_obj=task_obj)
-            break
+        current_day = current_day + timedelta(days=1)
     
     log_progress(f"Collection finished. {total_processed} questions processed in total.", "success", task_obj=task_obj)
+    # update the task's last processed date (mark the period as completed)
+    update_task_progress_date(task_obj, end_date)
     return questions
