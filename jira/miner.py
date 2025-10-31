@@ -25,11 +25,12 @@ from .models import (
 )
 
 from jira.utils import update_task_progress_date, split_date_range
+class NoValidJiraTokenError(Exception):
+    """Invalid token or all tokens have expired."""
+    pass
 
 class JiraMiner:
-    class NoValidJiraTokenError(Exception):
-        """Invalid token or all tokens have expired."""
-        pass
+    NoValidJiraTokenError = NoValidJiraTokenError
 
     def __init__(self, jira_domain, task_obj=None):
         load_dotenv()
