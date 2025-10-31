@@ -3,12 +3,10 @@ import requests
 import time
 import logging
 import os
-import sys
 from django.utils import timezone
 from django.db.models import Q
 from stackoverflow.models import (
     StackUser, StackBadge, StackCollective, StackUserBadge,
-    StackCollectiveUser, StackCollectiveTag, StackTag
 )
 from stackoverflow.miner.safe_api_call import safe_api_call
 from jobs.models import Task
@@ -120,7 +118,7 @@ def update_badges_data(users: list, api_key: str, access_token: str, task_obj=No
         return False
 
     user_ids = [user.user_id for user in users]
-    log_progress(f"-> Fetching badges for {len(user_ids)} users...", "badge", task_obj=task_obj)
+    log_progress(f"Fetching badges for {len(user_ids)} users...", "badge", task_obj=task_obj)
 
     badge_data = fetch_users_badges(user_ids, api_key, access_token)
     if not badge_data:
@@ -161,7 +159,7 @@ def update_badges_data(users: list, api_key: str, access_token: str, task_obj=No
             continue
 
     if created_count > 0:
-        log_progress(f"-> {created_count} new user-badge links saved.", "save", task_obj=task_obj)
+        log_progress(f"{created_count} new user-badge links saved.", "save", task_obj=task_obj)
         
     return created_count > 0
 
@@ -196,7 +194,7 @@ def fetch_collectives_data(slugs: list, api_key: str, access_token: str, task_ob
         slugs_string = ';'.join(batch_slugs)
         page = 1
 
-        log_progress(f"-> Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective", task_obj=task_obj)
+        log_progress(f" Fetching data for {len(batch_slugs)} collectives (batch {i // batch_size + 1})...", "collective", task_obj=task_obj)
 
         while True:
             params = {
@@ -342,7 +340,7 @@ def link_users_to_collectives(users: list, fallback_collectives_data: list = Non
                     created_count += 1
         except IntegrityError as e:
             log_progress(f"Failed to link user {user.user_id} to collective {collective.slug}: {e}", "error", task_obj=task_obj)
-    log_progress(f"-> Created {created_count} new user-collective links.", "save", task_obj=task_obj)
+    log_progress(f" Created {created_count} new user-collective links.", "save", task_obj=task_obj)
 
 def sync_collective_tags(collectives_data: list, task_obj=None):
     """
@@ -405,7 +403,7 @@ def sync_collective_tags(collectives_data: list, task_obj=None):
                 log_progress(f"Failed to link tag '{tag}' to collective '{collective.slug}': {e}", "error", task_obj=task_obj)
 
     if created_count > 0:
-        log_progress(f"-> Created {created_count} new links between collectives and tags.", "save", task_obj=task_obj)
+        log_progress(f" Created {created_count} new links between collectives and tags.", "save", task_obj=task_obj)
 
 def fetch_users_data(user_ids: list, api_key: str, access_token: str, task_obj=None) -> list:
     """
@@ -477,7 +475,7 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         return set()
         
     user_ids = [user.user_id for user in users]
-    log_progress(f"-> Fetching full profiles for {len(user_ids)} users...", "fetch", task_obj=task_obj)
+    log_progress(f" Fetching full profiles for {len(user_ids)} users...", "fetch", task_obj=task_obj)
     users_data = fetch_users_data(user_ids, api_key, access_token)
     
     if not users_data:
@@ -539,7 +537,7 @@ def update_users_data(users: list, api_key: str, access_token: str, task_obj=Non
         user.save()
         updated_count += 1
     
-    log_progress(f"-> {updated_count} user profiles updated.", "save", task_obj=task_obj)
+    log_progress(f" {updated_count} user profiles updated.", "save", task_obj=task_obj)
     if skipped_count > 0:
         log_progress(f"{skipped_count} users were skipped (not found in batch).", "warning", task_obj=task_obj)
 
