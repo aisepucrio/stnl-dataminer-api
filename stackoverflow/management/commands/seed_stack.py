@@ -15,7 +15,7 @@ from stackoverflow.models import (
 STACK_API_URL = (
     "https://api.stackexchange.com/2.3/questions"
     "?order=desc&sort=activity&site=stackoverflow"
-    "&filter=!-*jbN-o8P3E5"  
+    "&filter=!-*jbN-o8P3E5"
     "&pagesize=50"
 )
 
@@ -44,10 +44,33 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options.get("load"):
-            return self._load_from_snapshot(options["load"])
-        return self._fetch_and_seed(options.get("dump"))
+            result = self._load_from_snapshot(options["load"])
+        else:
+            result = self._fetch_and_seed(options.get("dump"))
 
+        # ALWAYS write `.stack_seed_done` ONLY inside correct folder
+        self._create_done_flag()
+
+        return result
+
+    # ---------------------------------------------------
+    # DONE FLAG WRITER
+    # ---------------------------------------------------
+    def _create_done_flag(self):
+        """Create .stack_seed_done inside stackoverflow/management/commands."""
+        base_path = Path(__file__).resolve().parent
+        done_path = base_path / ".stack_seed_done"
+
+        try:
+            with open(done_path, "w", encoding="utf-8") as f:
+                f.write("done")
+            self.stdout.write(self.style.SUCCESS(f"Created: {done_path}"))
+        except Exception as e:
+            self.stderr.write(f"Failed to create .stack_seed_done: {e}")
+
+    # ---------------------------------------------------
     # FETCH + SEED
+    # ---------------------------------------------------
     def _fetch_and_seed(self, dump):
         self.stdout.write("Fetching StackOverflow data...")
 
@@ -74,8 +97,7 @@ class Command(BaseCommand):
         for item in items:
             owner_data = item.get("owner") or {}
 
-    
-            # USER 
+            # USER
             user = None
             if owner_data.get("user_id"):
                 user, _ = StackUser.objects.get_or_create(
@@ -92,8 +114,7 @@ class Command(BaseCommand):
                     },
                 )
 
-    
-            # QUESTION 
+            # QUESTION
             question, _ = StackQuestion.objects.update_or_create(
                 question_id=item["question_id"],
                 defaults={
@@ -117,8 +138,7 @@ class Command(BaseCommand):
                 },
             )
 
-    
-            # ANSWERS   
+            # ANSWERS
             for ans in item.get("answers", []):
                 ans_owner_data = ans.get("owner") or {}
                 ans_user = None
@@ -155,8 +175,7 @@ class Command(BaseCommand):
                     },
                 )
 
-    
-            # COMMENTS    
+            # COMMENTS
             for com in item.get("comments", []):
                 com_owner = com.get("owner") or {}
                 com_user = None
@@ -164,9 +183,7 @@ class Command(BaseCommand):
                 if com_owner.get("user_id"):
                     com_user, _ = StackUser.objects.get_or_create(
                         user_id=com_owner["user_id"],
-                        defaults={
-                            "display_name": com_owner.get("display_name"),
-                        },
+                        defaults={"display_name": com_owner.get("display_name")},
                     )
 
                 StackComment.objects.update_or_create(
@@ -187,8 +204,7 @@ class Command(BaseCommand):
                     },
                 )
 
-
-        # DUMP SNAPSHOT
+        # SNAPSHOT
         if dump:
             base_dir = Path(__file__).resolve().parent
             output_path = base_dir / "stack_seed.json"
@@ -201,7 +217,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Stack seed data successfully populated."))
         return "done"
 
+    # ---------------------------------------------------
     # LOAD SNAPSHOT
+    # ---------------------------------------------------
     def _load_from_snapshot(self, filename):
         self.stdout.write(f"Loading Stack seed data from {filename}")
 

@@ -10,7 +10,6 @@ from github.models import (
     GitHubIssue,
 )
 
-
 REPO_OWNER = "psf"
 REPO_NAME = "requests"
 BASE_URL = "https://api.github.com"
@@ -20,6 +19,18 @@ def dt(value):
     if not value:
         return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def write_done_file():
+    """
+    Cria o arquivo '.github_seed_done' dentro de:
+    github/management/commands/
+    """
+    base_path = os.path.dirname(__file__)
+    filepath = os.path.join(base_path, ".github_seed_done")
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write("done")
+    return filepath
 
 
 class Command(BaseCommand):
@@ -39,20 +50,27 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options.get("load"):
-            return self._load_from_snapshot(options["load"])
+            result = self._load_from_snapshot(options["load"])
+            done_file = write_done_file()
+            self.stdout.write(f"Seed done file created: {done_file}")
+            return result
 
-        return self._fetch_and_seed(options.get("dump"))
+        result = self._fetch_and_seed(options.get("dump"))
+        done_file = write_done_file()
+        self.stdout.write(f"Seed done file created: {done_file}")
+        return result
 
+    # ---------------------------------------------------------
     # FETCH + SEED
+    # ---------------------------------------------------------
     def _fetch_and_seed(self, dump):
 
         token = os.environ.get("GITHUB_TOKENS")
-
         headers = {"Authorization": f"Bearer {token}"} if token else {}
 
         self.stdout.write(f"Fetching GitHub data for {REPO_OWNER}/{REPO_NAME}...")
 
-        # REPO METADATA
+        # -------------------- METADATA --------------------
         meta_url = f"{BASE_URL}/repos/{REPO_OWNER}/{REPO_NAME}"
         repo_data = requests.get(meta_url, headers=headers).json()
 
@@ -77,7 +95,7 @@ class Command(BaseCommand):
             }
         )
 
-        # COMMITS (last 50)
+        # -------------------- COMMITS --------------------
         commits_url = f"{BASE_URL}/repos/{REPO_OWNER}/{REPO_NAME}/commits?per_page=50"
         commits_data = requests.get(commits_url, headers=headers).json()
 
@@ -86,7 +104,7 @@ class Command(BaseCommand):
             author_info = commit_info.get("author", {})
             committer_info = commit_info.get("committer", {})
 
-            # author
+            # Author
             author = None
             if author_info.get("email"):
                 author, _ = GitHubAuthor.objects.get_or_create(
@@ -94,7 +112,7 @@ class Command(BaseCommand):
                     email=author_info.get("email"),
                 )
 
-            # committer
+            # Committer
             committer = None
             if committer_info.get("email"):
                 committer, _ = GitHubAuthor.objects.get_or_create(
@@ -116,10 +134,11 @@ class Command(BaseCommand):
                     "files_changed": 0,
                     "in_main_branch": True,
                     "merge": c.get("parents") and len(c["parents"]) > 1,
+                    "time_mined": None,
                 },
             )
 
-        # ISSUES (first 20)
+        # -------------------- ISSUES --------------------
         issues_url = f"{BASE_URL}/repos/{REPO_OWNER}/{REPO_NAME}/issues?state=all&per_page=20"
         issues_data = requests.get(issues_url, headers=headers).json()
 
@@ -149,10 +168,11 @@ class Command(BaseCommand):
                     "is_pull_request": False,
                     "author_association": issue.get("author_association"),
                     "reactions": issue.get("reactions", {}),
+                    "time_mined": None,
                 },
             )
 
-        # SNAPSHOT
+        # -------------------- SNAPSHOT --------------------
         if dump:
             snapshot = {
                 "metadata": repo_data,
@@ -163,12 +183,15 @@ class Command(BaseCommand):
             filepath = os.path.join(dirpath, "github_seed.json")
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, indent=2)
+
             self.stdout.write("Snapshot saved to github_seed.json")
 
         self.stdout.write(self.style.SUCCESS("GitHub seed data successfully populated."))
         return "done"
 
+    # ---------------------------------------------------------
     # LOAD SNAPSHOT
+    # ---------------------------------------------------------
     def _load_from_snapshot(self, filename):
         self.stdout.write(f"Loading GitHub seed from {filename}...")
 
@@ -195,13 +218,32 @@ class Command(BaseCommand):
         )
 
         for issue in issues:
+            if "pull_request" in issue:
+                continue
+
             GitHubIssue.objects.update_or_create(
                 issue_id=issue["id"],
                 defaults={
                     "repository": metadata,
                     "repository_name": repo_data.get("name", REPO_NAME),
+                    "number": issue.get("number"),
                     "title": issue.get("title"),
                     "state": issue.get("state"),
+                    "creator": issue.get("user", {}).get("login"),
+                    "assignees": [a["login"] for a in issue.get("assignees", [])],
+                    "labels": [l["name"] for l in issue.get("labels", [])],
+                    "milestone": None,
+                    "locked": issue.get("locked", False),
+                    "github_created_at": dt(issue.get("created_at")),
+                    "github_updated_at": dt(issue.get("updated_at")),
+                    "closed_at": dt(issue.get("closed_at")),
+                    "body": issue.get("body"),
+                    "comments": [],
+                    "timeline_events": [],
+                    "is_pull_request": False,
+                    "author_association": issue.get("author_association"),
+                    "reactions": issue.get("reactions", {}),
+                    "time_mined": None,
                 }
             )
 

@@ -17,30 +17,27 @@ fi
 echo "Migrations applied successfully."
 
 # Load Jira seed (only once)
-if [ ! -f /app/.seed_done ]; then
-    echo "Loading initial Jira seed from jira_seed.json..."
-    python manage.py seed_jira_data --load jira_seed.json || true
-    touch /app/.seed_done
+if [ ! -f jira/management/commands/.jira_seed_done ]; then
+    echo "Loading initial Jira seed..."
+    python manage.py seed_jira_data --load jira/management/commands/jira_seed.json || true
     echo "Jira seed loaded."
 else
     echo "Jira seed already loaded — skipping."
 fi
 
 # Load StackOverflow seed (only once)
-if [ ! -f /app/.stack_seed_done ]; then
+if [ ! -f stackoverflow/management/commands/.stack_seed_done ]; then
     echo "Loading initial StackOverflow seed from stack_seed.json..."
     python manage.py seed_stack --load stackoverflow/management/commands/stack_seed.json || true
-    touch /app/.stack_seed_done
     echo "StackOverflow seed loaded."
 else
     echo "StackOverflow seed already loaded — skipping."
 fi
 
 # Load GitHub seed (only once)
-if [ ! -f /app/.github_seed_done ]; then
+if [ ! -f github/management/commands/.github_seed_done ]; then
     echo "Loading initial GitHub seed from github_seed.json..."
-    python manage.py seed_github_data --load github_seed.json || true
-    touch /app/.github_seed_done
+    python manage.py seed_github_data --load github/management/commands/github_seed.json || true
     echo "GitHub seed loaded."
 else
     echo "GitHub seed already loaded — skipping."

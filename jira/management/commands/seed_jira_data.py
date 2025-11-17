@@ -29,10 +29,33 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options.get("load"):
-            return self._load_from_snapshot(options["load"])
-        return self._fetch_and_seed(options.get("dump"))
+            result = self._load_from_snapshot(options["load"])
+        else:
+            result = self._fetch_and_seed(options.get("dump"))
 
+        # ALWAYS create .jira_seed_done inside the correct folder
+        self._create_done_flag()
+
+        return result
+
+    # ---------------------------------------------------------
+    # DONE FLAG
+    # ---------------------------------------------------------
+    def _create_done_flag(self):
+        """Create .jira_seed_done inside jira/management/commands"""
+        base_path = os.path.dirname(__file__)
+        filepath = os.path.join(base_path, ".jira_seed_done")
+
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write("done")
+            self.stdout.write(self.style.SUCCESS(f"Created: {filepath}"))
+        except Exception as e:
+            self.stderr.write(f"Could not create .jira_seed_done: {e}")
+
+    # ---------------------------------------------------------
     # FETCH FROM API
+    # ---------------------------------------------------------
     def _fetch_and_seed(self, dump=False):
         self.stdout.write("Fetching Jira data...")
 
@@ -50,7 +73,6 @@ class Command(BaseCommand):
         for issue in issues:
             fields = issue.get("fields", {})
 
-    
             # USER: assignee, creator, reporter
             def get_user(user_data):
                 if not user_data:
@@ -71,8 +93,7 @@ class Command(BaseCommand):
             creator = get_user(fields.get("creator"))
             reporter = get_user(fields.get("reporter"))
 
-    
-            # PROJECT 
+            # PROJECT
             project_data = fields.get("project") or {}
 
             project, _ = JiraProject.objects.get_or_create(
@@ -85,12 +106,10 @@ class Command(BaseCommand):
                 }
             )
 
-    
             # STATUS (string)
-            status_data = fields.get("status") or {}
-            status_name = status_data.get("name", "Unknown")
-    
-            # ISSUE  
+            status_name = (fields.get("status") or {}).get("name", "Unknown")
+
+            # ISSUE
             JiraIssue.objects.update_or_create(
                 issue_key=issue["key"],
                 defaults={
@@ -108,17 +127,21 @@ class Command(BaseCommand):
                 }
             )
 
-
         # SAVE SNAPSHOT
         if dump:
-            base_path = os.path.dirname(__file__)  
+            base_path = os.path.dirname(__file__)
             filename = os.path.join(base_path, "jira_seed.json")
 
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
             self.stdout.write(f"Snapshot saved to {filename}")
+
+        return "done"
+
+    # ---------------------------------------------------------
     # LOAD FROM SNAPSHOT
+    # ---------------------------------------------------------
     def _load_from_snapshot(self, filename):
         self.stdout.write(f"Loading Jira seed data from {filename}")
 
@@ -153,7 +176,6 @@ class Command(BaseCommand):
             creator = get_user(fields.get("creator"))
             reporter = get_user(fields.get("reporter"))
 
-            # PROJECT
             project_data = fields.get("project") or {}
 
             project, _ = JiraProject.objects.get_or_create(
