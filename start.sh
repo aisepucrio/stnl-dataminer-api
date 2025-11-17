@@ -16,6 +16,16 @@ if [ $? -ne 0 ]; then
 fi
 echo "Migrations applied successfully."
 
+# Load Jira seed (only once)
+if [ ! -f /app/.seed_done ]; then
+    echo "Loading initial Jira seed from jira_seed.json..."
+    python manage.py seed_jira_data --load jira_seed.json || true
+    touch /app/.seed_done
+    echo "Jira seed loaded."
+else
+    echo "Jira seed already loaded — skipping."
+fi
+
 echo "Collecting static files..."
 python manage.py collectstatic --no-input
 echo "Static files collected successfully."
