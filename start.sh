@@ -26,6 +26,16 @@ else
     echo "Jira seed already loaded — skipping."
 fi
 
+# Load StackOverflow seed (only once)
+if [ ! -f /app/.stack_seed_done ]; then
+    echo "Loading initial StackOverflow seed from stack_seed.json..."
+    python manage.py seed_stack --load stackoverflow/management/commands/stack_seed.json || true
+    touch /app/.stack_seed_done
+    echo "StackOverflow seed loaded."
+else
+    echo "StackOverflow seed already loaded — skipping."
+fi
+
 echo "Collecting static files..."
 python manage.py collectstatic --no-input
 echo "Static files collected successfully."
