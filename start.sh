@@ -36,6 +36,16 @@ else
     echo "StackOverflow seed already loaded — skipping."
 fi
 
+# Load GitHub seed (only once)
+if [ ! -f /app/.github_seed_done ]; then
+    echo "Loading initial GitHub seed from github_seed.json..."
+    python manage.py seed_github_data --load github_seed.json || true
+    touch /app/.github_seed_done
+    echo "GitHub seed loaded."
+else
+    echo "GitHub seed already loaded — skipping."
+fi
+
 echo "Collecting static files..."
 python manage.py collectstatic --no-input
 echo "Static files collected successfully."

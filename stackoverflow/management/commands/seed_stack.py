@@ -15,7 +15,7 @@ from stackoverflow.models import (
 STACK_API_URL = (
     "https://api.stackexchange.com/2.3/questions"
     "?order=desc&sort=activity&site=stackoverflow"
-    "&filter=!-*jbN-o8P3E5"  # includes body, answers, comments
+    "&filter=!-*jbN-o8P3E5"  
     "&pagesize=50"
 )
 
@@ -47,9 +47,7 @@ class Command(BaseCommand):
             return self._load_from_snapshot(options["load"])
         return self._fetch_and_seed(options.get("dump"))
 
-    # --------------------------
     # FETCH + SEED
-    # --------------------------
     def _fetch_and_seed(self, dump):
         self.stdout.write("Fetching StackOverflow data...")
 
@@ -76,9 +74,8 @@ class Command(BaseCommand):
         for item in items:
             owner_data = item.get("owner") or {}
 
-            # --------------------------
-            # USER
-            # --------------------------
+    
+            # USER 
             user = None
             if owner_data.get("user_id"):
                 user, _ = StackUser.objects.get_or_create(
@@ -95,9 +92,8 @@ class Command(BaseCommand):
                     },
                 )
 
-            # --------------------------
-            # QUESTION
-            # --------------------------
+    
+            # QUESTION 
             question, _ = StackQuestion.objects.update_or_create(
                 question_id=item["question_id"],
                 defaults={
@@ -121,9 +117,8 @@ class Command(BaseCommand):
                 },
             )
 
-            # --------------------------
-            # ANSWERS
-            # --------------------------
+    
+            # ANSWERS   
             for ans in item.get("answers", []):
                 ans_owner_data = ans.get("owner") or {}
                 ans_user = None
@@ -160,9 +155,8 @@ class Command(BaseCommand):
                     },
                 )
 
-            # --------------------------
-            # COMMENTS
-            # --------------------------
+    
+            # COMMENTS    
             for com in item.get("comments", []):
                 com_owner = com.get("owner") or {}
                 com_user = None
@@ -193,9 +187,8 @@ class Command(BaseCommand):
                     },
                 )
 
-        # --------------------------
-        # DUMP SNAPSHOT (UPDATED)
-        # --------------------------
+
+        # DUMP SNAPSHOT
         if dump:
             base_dir = Path(__file__).resolve().parent
             output_path = base_dir / "stack_seed.json"
@@ -208,9 +201,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Stack seed data successfully populated."))
         return "done"
 
-    # --------------------------
     # LOAD SNAPSHOT
-    # --------------------------
     def _load_from_snapshot(self, filename):
         self.stdout.write(f"Loading Stack seed data from {filename}")
 

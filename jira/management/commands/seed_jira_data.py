@@ -1,4 +1,5 @@
 import json
+import os
 import requests
 from django.core.management.base import BaseCommand
 from jira.models import (
@@ -31,9 +32,7 @@ class Command(BaseCommand):
             return self._load_from_snapshot(options["load"])
         return self._fetch_and_seed(options.get("dump"))
 
-    # ===========================================================
     # FETCH FROM API
-    # ===========================================================
     def _fetch_and_seed(self, dump=False):
         self.stdout.write("Fetching Jira data...")
 
@@ -51,9 +50,8 @@ class Command(BaseCommand):
         for issue in issues:
             fields = issue.get("fields", {})
 
-            # ===================================================
+    
             # USER: assignee, creator, reporter
-            # ===================================================
             def get_user(user_data):
                 if not user_data:
                     return None
@@ -73,9 +71,8 @@ class Command(BaseCommand):
             creator = get_user(fields.get("creator"))
             reporter = get_user(fields.get("reporter"))
 
-            # ===================================================
-            # PROJECT
-            # ===================================================
+    
+            # PROJECT 
             project_data = fields.get("project") or {}
 
             project, _ = JiraProject.objects.get_or_create(
@@ -88,15 +85,12 @@ class Command(BaseCommand):
                 }
             )
 
-            # ===================================================
+    
             # STATUS (string)
-            # ===================================================
             status_data = fields.get("status") or {}
             status_name = status_data.get("name", "Unknown")
-
-            # ===================================================
-            # ISSUE
-            # ===================================================
+    
+            # ISSUE  
             JiraIssue.objects.update_or_create(
                 issue_key=issue["key"],
                 defaults={
@@ -114,20 +108,17 @@ class Command(BaseCommand):
                 }
             )
 
-        # ===================================================
+
         # SAVE SNAPSHOT
-        # ===================================================
         if dump:
-            with open("jira_seed.json", "w", encoding="utf-8") as f:
+            base_path = os.path.dirname(__file__)  
+            filename = os.path.join(base_path, "jira_seed.json")
+
+            with open(filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.stdout.write("Snapshot saved to jira_seed.json")
 
-        self.stdout.write(self.style.SUCCESS("Jira seed data successfully populated."))
-        return "done"
-
-    # ===========================================================
+            self.stdout.write(f"Snapshot saved to {filename}")
     # LOAD FROM SNAPSHOT
-    # ===========================================================
     def _load_from_snapshot(self, filename):
         self.stdout.write(f"Loading Jira seed data from {filename}")
 
