@@ -1,82 +1,74 @@
 import requests
-from datetime import datetime
+from datetime import datetime, timezone as dt_timezone
 import time
 import logging
-from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment# Import StackQuestion and StackUser models
+from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag, StackComment
 from django.utils import timezone
 from django.db import transaction
 from jobs.models import Task
+from stackoverflow.utils import epoch_to_dt
 
 logger = logging.getLogger(__name__)
 
 def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
-    Exibe feedback no terminal e, se um task_obj for fornecido,
-    salva o progresso no banco de dados.
+    Show feedback in the terminal and, if a task_obj is provided,
+    persist the progress message to the database for the frontend.
     """
     emojis = {
         "info": "ℹ️", "success": "✅", "warning": "🟡", "error": "❌",
         "system": "⚙️", "fetch": "🔎", "save": "💾", "process": "🔄"
     }
-    
-    # Monta a mensagem para o terminal (continua igual)
     terminal_message = f"[StackOverflow] {emojis.get(level, '➡️ ')} {message}"
     print(terminal_message, flush=True)
-    
-    # A MÁGICA PARA O FRONTEND ACONTECE AQUI:
     if task_obj:
-        # Se a função recebeu um objeto de tarefa, ela atualiza
-        # o campo 'operation' com a mensagem limpa e salva no banco.
-        task_obj.operation = message 
+        task_obj.operation = message
         task_obj.save(update_fields=["operation"])
-
 
 def create_or_update_user(user_id, user_data):
     stack_user = None
     try:
-        current_time = int(timezone.now().timestamp())
         stack_user, created = StackUser.objects.get_or_create(
-        user_id=user_id,
-        defaults={
-            'display_name': user_data.get('display_name'),
-            'reputation': user_data.get('reputation', 0),
-            'profile_image': user_data.get('profile_image'),
-            'user_type': user_data.get('user_type'),
-            'is_employee': user_data.get('is_employee', False),
-            'creation_date': user_data.get('creation_date'),
-            'last_access_date': user_data.get('last_access_date'),
-            'last_modified_date': user_data.get('last_modified_date'),
-            'link': user_data.get('link'),
-            'accept_rate': user_data.get('accept_rate'),
-            'about_me': user_data.get('about_me'),
-            'location': user_data.get('location'),
-            'website_url': user_data.get('website_url'),
-            'account_id': user_data.get('account_id'),
-            'badge_counts': user_data.get('badge_counts'),
-            'collectives': user_data.get('collectives'),
-            'view_count': user_data.get('view_count', 0),
-            'down_vote_count': user_data.get('down_vote_count', 0),
-            'up_vote_count': user_data.get('up_vote_count', 0),
-            'answer_count': user_data.get('answer_count', 0),
-            'question_count': user_data.get('question_count', 0),
-            'reputation_change_year': user_data.get('reputation_change_year', 0),
-            'reputation_change_quarter': user_data.get('reputation_change_quarter', 0),
-            'reputation_change_month': user_data.get('reputation_change_month', 0),
-            'reputation_change_week': user_data.get('reputation_change_week', 0),
-            'reputation_change_day': user_data.get('reputation_change_day', 0),
-            'time_mined': None  # Set to null to indicate incomplete data
-        }
+            user_id=user_id,
+            defaults={
+                'display_name': user_data.get('display_name'),
+                'reputation': user_data.get('reputation', 0),
+                'profile_image': user_data.get('profile_image'),
+                'user_type': user_data.get('user_type'),
+                'is_employee': user_data.get('is_employee', False),
+                'creation_date': epoch_to_dt(user_data.get('creation_date')),
+                'last_access_date': epoch_to_dt(user_data.get('last_access_date')),
+                'last_modified_date': epoch_to_dt(user_data.get('last_modified_date')),
+                'link': user_data.get('link'),
+                'accept_rate': user_data.get('accept_rate'),
+                'about_me': user_data.get('about_me'),
+                'location': user_data.get('location'),
+                'website_url': user_data.get('website_url'),
+                'account_id': user_data.get('account_id'),
+                'badge_counts': user_data.get('badge_counts'),
+                'collectives': user_data.get('collectives'),
+                'view_count': user_data.get('view_count', 0),
+                'down_vote_count': user_data.get('down_vote_count', 0),
+                'up_vote_count': user_data.get('up_vote_count', 0),
+                'answer_count': user_data.get('answer_count', 0),
+                'question_count': user_data.get('question_count', 0),
+                'reputation_change_year': user_data.get('reputation_change_year', 0),
+                'reputation_change_quarter': user_data.get('reputation_change_quarter', 0),
+                'reputation_change_month': user_data.get('reputation_change_month', 0),
+                'reputation_change_week': user_data.get('reputation_change_week', 0),
+                'reputation_change_day': user_data.get('reputation_change_day', 0),
+                'time_mined': None
+            }
         )
         if not created:
-            # Update existing user fields if necessary (optional, but good practice)
             stack_user.display_name = user_data.get('display_name', stack_user.display_name)
             stack_user.reputation = user_data.get('reputation', stack_user.reputation)
             stack_user.profile_image = user_data.get('profile_image', stack_user.profile_image)
             stack_user.user_type = user_data.get('user_type', stack_user.user_type)
             stack_user.is_employee = user_data.get('is_employee', stack_user.is_employee)
-            stack_user.creation_date = user_data.get('creation_date', stack_user.creation_date)
-            stack_user.last_access_date = user_data.get('last_access_date', stack_user.last_access_date)
-            stack_user.last_modified_date = user_data.get('last_modified_date', stack_user.last_modified_date)
+            stack_user.creation_date = epoch_to_dt(user_data.get('creation_date')) or stack_user.creation_date
+            stack_user.last_access_date = epoch_to_dt(user_data.get('last_access_date')) or stack_user.last_access_date
+            stack_user.last_modified_date = epoch_to_dt(user_data.get('last_modified_date')) or stack_user.last_modified_date
             stack_user.link = user_data.get('link', stack_user.link)
             stack_user.accept_rate = user_data.get('accept_rate', stack_user.accept_rate)
             stack_user.about_me = user_data.get('about_me', stack_user.about_me)
@@ -95,7 +87,7 @@ def create_or_update_user(user_id, user_data):
             stack_user.reputation_change_month = user_data.get('reputation_change_month', stack_user.reputation_change_month)
             stack_user.reputation_change_week = user_data.get('reputation_change_week', stack_user.reputation_change_week)
             stack_user.reputation_change_day = user_data.get('reputation_change_day', stack_user.reputation_change_day)
-            stack_user.time_mined = None  # Set to null to indicate incomplete data
+            stack_user.time_mined = None
             stack_user.save()
     except Exception as e:
         logger.error(f"Error processing StackUser with ID {user_data}: {e}")
@@ -112,46 +104,49 @@ def create_answer(answer_data, question, owner):
             'up_vote_count': answer_data.get('up_vote_count', 0),
             'down_vote_count': answer_data.get('down_vote_count', 0),
             'is_accepted': answer_data.get('is_accepted', False),
-            'creation_date': answer_data.get('creation_date'),
+            'creation_date': epoch_to_dt(answer_data.get('creation_date')),
             'content_license': answer_data.get('content_license'),
-            'last_activity_date': answer_data.get('last_activity_date'),
+            'last_activity_date': epoch_to_dt(answer_data.get('last_activity_date')),
             'owner': owner,
             'share_link': answer_data.get('share_link'),
             'body_markdown': answer_data.get('body_markdown'),
             'link': answer_data.get('link'),
             'title': answer_data.get('title'),
-            'time_mined': int(time.time()),
+            'time_mined': timezone.now(),
         }
     )
     return answer
 
 def create_comment(comment_data, parent, owner):
-    # figure out which FK to set
+    """
+    Create or fetch a StackComment and attach it to a question or answer,
+    based on the 'parent' instance type.
+    """
     question_obj = parent if isinstance(parent, StackQuestion) else None
-    answer_obj   = parent if isinstance(parent, StackAnswer)  else None
+    answer_obj = parent if isinstance(parent, StackAnswer) else None
 
     comment, _ = StackComment.objects.get_or_create(
         comment_id=comment_data.get('comment_id'),
         defaults={
-            'post_type':       comment_data.get('post_type'),
-            'post_id':         comment_data.get('post_id'),
-            'body':            comment_data.get('body'),
-            'score':           comment_data.get('score', 0),
-            'creation_date':   comment_data.get('creation_date'),
+            'post_type': comment_data.get('post_type'),
+            'post_id': comment_data.get('post_id'),
+            'body': comment_data.get('body'),
+            'score': comment_data.get('score', 0),
+            'creation_date': epoch_to_dt(comment_data.get('creation_date')),
             'content_license': comment_data.get('content_license'),
-            'edited':          comment_data.get('edited', False),
-            'owner':           owner,
-            'body_markdown':   comment_data.get('body_markdown'),
-            'link':            comment_data.get('link'),
-            'time_mined':      int(time.time()),
-            'question':        question_obj,
-            'answer':          answer_obj,
+            'edited': comment_data.get('edited', False),
+            'owner': owner,
+            'body_markdown': comment_data.get('body_markdown'),
+            'link': comment_data.get('link'),
+            'time_mined': timezone.now(),
+            'question': question_obj,
+            'answer': answer_obj,
         }
     )
     return comment
 
 def make_question_serializable(question_data, stack_user, question_tags):
-    """Convert question data to JSON-serializable format"""
+    """Convert question data to a JSON-serializable structure for API/response use."""
     return {
         'question_id': question_data['question_id'],
         'title': question_data.get('title'),
@@ -180,19 +175,28 @@ def make_question_serializable(question_data, stack_user, question_tags):
         'time_mined': question_data.get('time_mined'),
     }
 
-def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, access_token: str, page: int = 1, page_size: int = 100, task_obj=None, tags=None):
+def fetch_questions(
+    site: str,
+    start_date: str,
+    end_date: str,
+    api_key: str,
+    access_token: str,
+    page: int = 1,
+    page_size: int = 100,
+    task_obj=None,
+    tags=None
+):
     """
     Fetch questions from Stack Overflow with user-friendly feedback.
     """
-    base_url = f"https://api.stackexchange.com/2.3/questions"
+    base_url = "https://api.stackexchange.com/2.3/questions"
     
-    # Convert dates to Unix timestamps
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
     start_timestamp = int(datetime.combine(start_dt.date(), datetime.min.time()).timestamp())
     end_timestamp = int(datetime.combine(end_dt.date(), datetime.max.time()).timestamp())
     
-    log_progress(f"Iniciando coleta de {start_date} a {end_date}", "system", task_obj=task_obj )
+    log_progress(f"Starting collection from {start_date} to {end_date}", "system", task_obj=task_obj)
     
     params = {
         'site': site,
@@ -202,14 +206,14 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
         'pagesize': min(page_size, 100),
         'order': 'desc',
         'sort': 'creation',
-        'filter': '!2xWEp6FHz8hT56C1LBQjFx25D4Dzmr*3(8D4ngdB5g',  # Beast filter
+        'filter': '!2xWEp6FHz8hT56C1LBQjFx25D4Dzmr*3(8D4ngdB5g',
         'key': api_key,
         'access_token': access_token
     }
     
     if tags:
         params['tagged'] = tags
-        log_progress(f"Filtrando pelas tags: {tags}", "info", task_obj=task_obj)
+        log_progress(f"Filtering by tags: {tags}", "info", task_obj=task_obj)
 
     questions = []
     total_questions_api = 0
@@ -217,61 +221,67 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
     has_more = True
     page = 1
 
-    # --- Loop principal para processar todas as páginas ---
     while has_more:
         try:
             params['page'] = page
 
-            log_progress(f"Buscando página {params['page']}...", "fetch", task_obj=task_obj )
+            log_progress(f"Fetching page {params['page']}...", "fetch", task_obj=task_obj)
             response = requests.get(base_url, params=params)
-            log_progress(f"API respondeu com status {response.status_code}", "info", task_obj=task_obj )
+            log_progress(f"API responded with status {response.status_code}", "info", task_obj=task_obj)
             
             response.raise_for_status()
-            
             data = response.json()
             
             if 'error_id' in data:
-                log_progress(f"API retornou um erro: {data.get('error_message', 'Erro desconhecido')}", "error", task_obj=task_obj )
+                log_progress(f"API returned an error: {data.get('error_message', 'Unknown error')}", "error", task_obj=task_obj)
                 break
-                        # Pega o total de perguntas na PRIMEIRA chamada e o armazena
+
             if page == 1:
                 total_questions_api = data.get('total', 0)
                 if total_questions_api == 0:
-                    log_progress("Nenhuma pergunta encontrada para o período.", "warning", task_obj=task_obj )
+                    log_progress("No questions found for the period.", "warning", task_obj=task_obj)
                     return []
-                log_progress(f"Total de {total_questions_api} perguntas encontradas na API. Iniciando processamento...", "info", task_obj=task_obj )
+                log_progress(f"{total_questions_api} questions found. Starting processing...", "info", task_obj=task_obj)
 
             items = data.get('items', [])
             if not items:
-                if params['page'] == 1: # Só avisa se não encontrar nada na primeira página
-                    log_progress("Nenhuma pergunta encontrada para o período.", "warning", task_obj=task_obj )
+                if params['page'] == 1:
+                    log_progress("No questions found for the period.", "warning", task_obj=task_obj)
                 break
                 
-            log_progress(f"{len(items)} perguntas encontradas. Salvando no banco de dados...", "process", task_obj=task_obj )
+            log_progress(f"{len(items)} questions found. Saving to database...", "process", task_obj=task_obj)
             
             for item in items:
                 total_processed += 1
-                # --- A sua lógica original de salvamento permanece INTACTA ---
+
                 owner_data = item.get('owner', {})
                 owner_id = owner_data.get('user_id')
-                stack_user = None
-                if owner_id:
-                    stack_user = create_or_update_user(owner_id, owner_data)
-
+                stack_user = create_or_update_user(owner_id, owner_data) if owner_id else None
                 question_tags = item.get('tags', [])
 
                 question_dict_for_saving = {
-                    'question_id': item['question_id'], 'title': item.get('title'), 'body': item.get('body'),
-                    'creation_date': item.get('creation_date'), 'score': item.get('score', 0),
-                    'view_count': item.get('view_count', 0), 'answer_count': item.get('answer_count', 0),
-                    'comment_count': item.get('comment_count', 0), 'up_vote_count': item.get('up_vote_count', 0),
-                    'down_vote_count': item.get('down_vote_count', 0), 'is_answered': item.get('is_answered', False),
-                    'accepted_answer_id': item.get('accepted_answer_id'), 'owner': stack_user,
-                    'share_link': item.get('share_link'), 'body_markdown': item.get('body_markdown'),
-                    'link': item.get('link'), 'favorite_count': item.get('favorite_count', 0),
-                    'content_license': item.get('content_license', None), 'last_activity_date': item.get('last_activity_date'),
-                    'time_mined': int(time.time()),
+                    'question_id': item['question_id'],
+                    'title': item.get('title'),
+                    'body': item.get('body'),
+                    'creation_date': epoch_to_dt(item.get('creation_date')),
+                    'score': item.get('score', 0),
+                    'view_count': item.get('view_count', 0),
+                    'answer_count': item.get('answer_count', 0),
+                    'comment_count': item.get('comment_count', 0),
+                    'up_vote_count': item.get('up_vote_count', 0),
+                    'down_vote_count': item.get('down_vote_count', 0),
+                    'is_answered': item.get('is_answered', False),
+                    'accepted_answer_id': item.get('accepted_answer_id'),
+                    'owner': stack_user,
+                    'share_link': item.get('share_link'),
+                    'body_markdown': item.get('body_markdown'),
+                    'link': item.get('link'),
+                    'favorite_count': item.get('favorite_count', 0),
+                    'content_license': item.get('content_license', None),
+                    'last_activity_date': epoch_to_dt(item.get('last_activity_date')),
+                    'time_mined': timezone.now(),
                 }
+
                 stack_question, created = StackQuestion.objects.get_or_create(
                     question_id=question_dict_for_saving['question_id'],
                     defaults=question_dict_for_saving
@@ -285,19 +295,14 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     for comment in comments:
                         comment_owner_data = comment.get('owner', {})
                         comment_owner_id = comment_owner_data.get('user_id')
-                        comment_owner = None
-                        if comment_owner_id:
-                            comment_owner = create_or_update_user(comment_owner_id, comment_owner_data)
+                        comment_owner = create_or_update_user(comment_owner_id, comment_owner_data) if comment_owner_id else None
                         create_comment(comment, stack_question, comment_owner)
 
                 if item.get('is_answered'):
                     for answer in item.get('answers', []):
                         answer_owner_data = answer.get('owner', {})
                         answer_owner_id = answer_owner_data.get('user_id')
-                        answer_owner = None
-                        if answer_owner_id:
-                            answer_owner = create_or_update_user(answer_owner_id, answer_owner_data)
-                        
+                        answer_owner = create_or_update_user(answer_owner_id, answer_owner_data) if answer_owner_id else None
                         stack_answer = create_answer(answer, stack_question, answer_owner)
                         
                         answer_comments = answer.get('comments', [])
@@ -305,9 +310,7 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                             for comment in answer_comments:
                                 comment_owner_data = comment.get('owner', {})
                                 comment_owner_id = comment_owner_data.get('user_id')
-                                comment_owner = None
-                                if comment_owner_id:
-                                    comment_owner = create_or_update_user(comment_owner_id, comment_owner_data)
+                                comment_owner = create_or_update_user(comment_owner_id, comment_owner_data) if comment_owner_id else None
                                 create_comment(comment, stack_answer, comment_owner)
                 
                 tag_objs = []
@@ -315,27 +318,22 @@ def fetch_questions(site: str, start_date: str, end_date: str, api_key: str, acc
                     tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
                     tag_objs.append(tag_obj)
                 stack_question.tags.set(tag_objs)
-                titulo = item.get('title', 'Sem Título')[:60]
-                log_progress(f"[{total_processed}/{total_questions_api}] Processando: '{titulo}...'", "save", task_obj=task_obj )
-            
-                # --- Fim da sua lógica original ---
 
-            
+                title_preview = item.get('title', 'Untitled')[:60]
+                log_progress(f"[{total_processed}/{total_questions_api}] Processing: '{title_preview}...'", "save", task_obj=task_obj)
 
-            
-            # ATIVANDO A PAGINAÇÃO (MUDANÇA IMPORTANTE!)
             has_more = data.get('has_more', False)
             if has_more:
                 page += 1
-                log_progress(f"Avançando para a próxima página...", "info", task_obj=task_obj )
-                time.sleep(1)  # Pausa para respeitar a API
+                log_progress("Moving to the next page...", "info", task_obj=task_obj)
+                time.sleep(1)
 
         except requests.exceptions.RequestException as e:
-            log_progress(f"Erro de conexão: {str(e)}", "error", task_obj=task_obj )
-            break # Interrompe o loop
+            log_progress(f"Connection error: {str(e)}", "error", task_obj=task_obj)
+            break
         except Exception as e:
-            log_progress(f"Um erro inesperado ocorreu: {str(e)}", "error", task_obj=task_obj )
+            log_progress(f"An unexpected error occurred: {str(e)}", "error", task_obj=task_obj)
             break
     
-    log_progress(f"Coleta finalizada. Total de {total_processed} perguntas processadas.", "success", task_obj=task_obj )
+    log_progress(f"Collection finished. {total_processed} questions processed in total.", "success", task_obj=task_obj)
     return questions

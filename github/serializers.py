@@ -151,7 +151,15 @@ class GitHubCollectAllSerializer(serializers.Serializer):
     def validate_repositories(self, value):
         if not value:
             raise serializers.ValidationError("At least one repository must be provided for mining")
-        return value
+        
+        unique_repos = []
+        seen = set()
+        for repo in value:
+            if repo not in seen:
+                unique_repos.append(repo)
+                seen.add(repo)
+        
+        return unique_repos
 
     def validate(self, data):
         if 'start_date' in data and 'end_date' in data:
