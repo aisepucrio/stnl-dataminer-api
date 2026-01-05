@@ -45,8 +45,7 @@ def create_or_update_user(user_id, user_data):
                 'location': user_data.get('location'),
                 'website_url': user_data.get('website_url'),
                 'account_id': user_data.get('account_id'),
-                'badge_counts': user_data.get('badge_counts'),
-                'collectives': user_data.get('collectives'),
+                # REMOVIDOS: badge_counts / collectives (não existem mais no model)
                 'view_count': user_data.get('view_count', 0),
                 'down_vote_count': user_data.get('down_vote_count', 0),
                 'up_vote_count': user_data.get('up_vote_count', 0),
@@ -60,6 +59,7 @@ def create_or_update_user(user_id, user_data):
                 'time_mined': None
             }
         )
+
         if not created:
             stack_user.display_name = user_data.get('display_name', stack_user.display_name)
             stack_user.reputation = user_data.get('reputation', stack_user.reputation)
@@ -75,8 +75,7 @@ def create_or_update_user(user_id, user_data):
             stack_user.location = user_data.get('location', stack_user.location)
             stack_user.website_url = user_data.get('website_url', stack_user.website_url)
             stack_user.account_id = user_data.get('account_id', stack_user.account_id)
-            stack_user.badge_counts = user_data.get('badge_counts', stack_user.badge_counts)
-            stack_user.collectives = user_data.get('collectives', stack_user.collectives)
+            # REMOVIDOS: badge_counts / collectives (não existem mais no model)
             stack_user.view_count = user_data.get('view_count', stack_user.view_count)
             stack_user.down_vote_count = user_data.get('down_vote_count', stack_user.down_vote_count)
             stack_user.up_vote_count = user_data.get('up_vote_count', stack_user.up_vote_count)
@@ -89,6 +88,7 @@ def create_or_update_user(user_id, user_data):
             stack_user.reputation_change_day = user_data.get('reputation_change_day', stack_user.reputation_change_day)
             stack_user.time_mined = None
             stack_user.save()
+
     except Exception as e:
         logger.error(f"Error processing StackUser with ID {user_data}: {e}")
     return stack_user
