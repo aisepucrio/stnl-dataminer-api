@@ -6,7 +6,7 @@ from django.utils import timezone as dj_tz
 
 import traceback
 
-from jobs.models import Task  # ⬅️ Imports the model that will save the progress
+from jobs.models import Task
 
 
 # Helper to reuse or create tasks
@@ -22,10 +22,10 @@ def _reuse_or_create_task(self, *, defaults, task_pk=None):
 
 @shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None, task_pk=None):
-    # ⬇️ Creates or updates the Task in the database (reutiliza quando task_pk fornecido)
+    #Creates or updates the Task in the database (reutiliza quando task_pk fornecido)
     defaults = {
-        "operation": f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}",
-        # Guarda domínio e projeto juntos para reinício
+        "operation": f"Starting Jira issue collection: {project_key} on domain {jira_domain}",
+        # Guard domain and project together for restart
         "repository": f"{jira_domain}/{project_key}",
         "status": "STARTED",
         "date_init": start_date,
@@ -35,17 +35,17 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
     task_obj, _ = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     try:
-        print(f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}", flush=True)
+        print(f"Starting Jira issue collection: {project_key} on domain {jira_domain}", flush=True)
 
-        # ⬇️ Passes the task_obj to the JiraMiner
+        #Passes the task_obj to the JiraMiner
         miner = JiraMiner(jira_domain, task_obj=task_obj)
         issues = miner.collect_jira_issues(project_key, issuetypes, start_date, end_date)
 
-        print(f"✅ Collection completed: {issues['total_issues']} issues collected.", flush=True)
+        print(f"Collection completed: {issues['total_issues']} issues collected.", flush=True)
 
-        # ⬇️ Updates the task with success
+        #Updates the task with success
         task_obj.status = "SUCCESS"
-        task_obj.operation = f"✅ Collection completed: {issues['total_issues']} issues collected."
+        task_obj.operation = f"Collection completed: {issues['total_issues']} issues collected."
         task_obj.result = issues
         task_obj.save(update_fields=["status", "operation", "result"])
 
@@ -56,7 +56,7 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
             'data': issues
         }
     except JiraMiner.NoValidJiraTokenError as e:
-        print(f"[JiraTask] ❌ No valid token: {e}", flush=True)
+        print(f"[JiraTask] No valid token: {e}", flush=True)
         task_obj.status = "FAILURE"
         task_obj.error_type = "NO_VALID_JIRA_TOKEN"
         task_obj.error = str(e)
@@ -71,12 +71,12 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
             'repository': jira_domain
         }
     except Exception as e:
-        print(f"❌ Unexpected error while collecting Jira issues: {e}\n{traceback.format_exc()}", flush=True)
+        print(f"Unexpected error while collecting Jira issues: {e}\n{traceback.format_exc()}", flush=True)
         task_obj.status = "FAILURE"
         task_obj.error_type = "UNEXPECTED_EXCEPTION"
         task_obj.error = str(e)
         task_obj.result = {"traceback": traceback.format_exc()}
-        task_obj.operation = f"❌ Unexpected error: {str(e)}"
+        task_obj.operation = f"Unexpected error: {str(e)}"
         task_obj.save(update_fields=["status", "error_type", "error", "result", "operation"])
 
         return {
