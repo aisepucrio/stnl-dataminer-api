@@ -25,18 +25,17 @@ from .models import (
 )
 
 from jira.utils import update_task_progress_date, split_date_range
-class NoValidJiraTokenError(Exception):
-    """Invalid token or all tokens have expired."""
-    pass
 
 class JiraMiner:
-    NoValidJiraTokenError = NoValidJiraTokenError
+    class NoValidJiraTokenError(Exception):
+        """Invalid token or all tokens have expired."""
+        pass
 
     def __init__(self, jira_domain, task_obj=None):
         load_dotenv()
         self.jira_domain = jira_domain.strip()
         self.task_obj = task_obj 
-        self.log_progress(f" Received domain in JiraMiner: '{self.jira_domain}'")
+        self.log_progress(f"🔍 Received domain in JiraMiner: '{self.jira_domain}'")
 
 
         # Loading tokens
@@ -72,7 +71,7 @@ class JiraMiner:
     def switch_token(self):
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
         self.update_auth()
-        self.log_progress(f" Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
+        self.log_progress(f"🔍 Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
 
 
     def verify_token(self):
@@ -84,22 +83,22 @@ class JiraMiner:
                     print(f"Token {self.current_token_index + 1} is valid")
                     return
                 else:
-                    self.log_progress(f"Token {self.current_token_index + 1} is invalid: {response.status_code}")
+                    self.log_progress(f"❌ Token {self.current_token_index + 1} is invalid: {response.status_code}")
 
                     
                     
             except Exception as e:
-                self.log_progress(f"Problem verifying {self.current_token_index + 1}: {e}")
+                self.log_progress(f"❌ Problem verifying {self.current_token_index + 1}: {e}")
 
 
             self.switch_token()
 
-        raise self.NoValidJiraTokenError("No valid Jira token found.")
+        raise self.NoValidJiraTokenError("❌ No valid Jira token found.")
 
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
-            self.log_progress(" Rate limit reached. Trying next token...")
+            self.log_progress("🔍 Rate limit reached. Trying next token...")
 
             original_index = self.current_token_index
 
@@ -107,7 +106,7 @@ class JiraMiner:
                 self.switch_token()
                 retry = requests.get(response.request.url, headers=self.headers, auth=self.auth)
                 if retry.status_code != 429:
-                    self.log_progress(" New Token worked after rate limit.")
+                    self.log_progress("New Token worked after rate limit.")
 
                     return True
 
@@ -122,7 +121,7 @@ class JiraMiner:
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         custom_fields_mapping = self.get_custom_fields_mapping()
-        self.log_progress(f" Colecting project issues {project_key}...")
+        self.log_progress(f"🔍 Colecting project issues {project_key}...")
 
         # Find the Sprint field (e.g., customfield_10020)
         sprint_field_key = None
@@ -131,7 +130,7 @@ class JiraMiner:
                 sprint_field_key = field_id
                 break
 
-        self.log_progress(f" Token {self.current_token_index + 1} is valid")
+        self.log_progress(f"Token {self.current_token_index + 1} is valid")
 
         # Build the static part of JQL
         base_jql = f'project="{project_key}"'
@@ -141,45 +140,59 @@ class JiraMiner:
 
         # Helper to run a single JQL (paged) and return collected count
         def run_paged_collection(jql_where: str, total_hint: int | None = None) -> int:
-            max_results, start_at, collected = 100, 0, 0
+            collected = 0
+            next_page_token = None
 
-            # Preflight to get total if not provided
-            if total_hint is None:
-                pref_jql = quote(f"{base_jql} {jql_where}")
-                self.log_progress(" Checking the total number of issues to be mined...")
-                preflight_url = f"https://{self.jira_domain}/rest/api/3/search?jql={pref_jql}&maxResults=0"
-                try:
-                    preflight_response = requests.get(preflight_url, headers=self.headers, auth=self.auth)
-                    if preflight_response.status_code != 200:
-                        raise Exception(
-                            f"Pre-check failed with status{preflight_response.status_code}: {preflight_response.text}"
-                        )
-                    total_hint = preflight_response.json().get('total', 0)
-                    self.log_progress(f" Total of {total_hint} issues found. Starting collection.")
-                except Exception as e:
-                    self.log_progress(f"Preflight failure: {e}")
-                    return 0
+            jql_query = f"{base_jql} {jql_where}".strip()
+            self.log_progress("Checking the approximate total of issues to be mined...")
 
+            try:
+                count_url = f"https://{self.jira_domain}/rest/api/3/search/approximate-count"
+                count_payload = {"jql": jql_query}
+                count_resp = requests.post(count_url, headers=self.headers, auth=self.auth, json=count_payload)
+                if count_resp.status_code == 200:
+                    total_hint = count_resp.json().get("count", 0)
+                    self.log_progress(f"Approximately {total_hint} issues found.")
+                else:
+                    self.log_progress(f"It was not possible to obtain the approximate count: {count_resp.text}")
+            except Exception as e:
+                self.log_progress(f"Error querying approach-count: {e}")
+
+            self.log_progress("Starting collection via new API /search/jql...")
             while True:
-                encoded_jql = quote(f"{base_jql} {jql_where}")
-                jira_url = (
-                    f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}"
-                    f"&startAt={start_at}&maxResults={max_results}&expand=changelog"
-                )
-                response = requests.get(jira_url, headers=self.headers, auth=self.auth)
+                payload = {
+                    "jql": jql_query,
+                    "maxResults": 100,
+                }
+                if next_page_token:
+                    payload["nextPageToken"] = next_page_token
 
-                if self.handle_rate_limit(response):
-                    continue
+                search_url = f"https://{self.jira_domain}/rest/api/3/search/jql"
+                resp = requests.post(search_url, headers=self.headers, auth=self.auth, json=payload)
 
-                if response.status_code != 200:
-                    self.log_progress(
-                        f"Failed to collect issues page: {response.status_code} - {response.text}"
-                    )
+                if resp.status_code != 200:
+                    self.log_progress(f"❌ Erro ao buscar issues: {resp.status_code} - {resp.text}")
                     break
 
-                issues = response.json().get('issues', [])
-                if not issues:
+                data = resp.json()
+                issues_meta = data.get("issues", [])
+                next_page_token = data.get("nextPageToken")
+
+                if not issues_meta:
                     break
+
+                issue_ids = [i["id"] for i in issues_meta if "id" in i]
+
+                bulk_url = f"https://{self.jira_domain}/rest/api/3/issue/bulkfetch"
+                bulk_payload = {"issueIdsOrKeys": issue_ids, "fields": ["*all"]}
+                bulk_resp = requests.post(bulk_url, headers=self.headers, auth=self.auth, json=bulk_payload)
+
+                if bulk_resp.status_code != 200:
+                    self.log_progress(f"Error when looking for details: {bulk_resp.status_code} - {bulk_resp.text}")
+                    break
+
+                bulk_data = bulk_resp.json()
+                issues = bulk_data.get("issues", [])
 
                 for index, issue_data in enumerate(issues):
                     issue_count = collected + index + 1
@@ -189,11 +202,9 @@ class JiraMiner:
                     current_timestamp = timezone.now()
                     description = self.extract_words_from_description(fields.get("description"))
 
-                    # Injects the sprint field readable
                     if sprint_field_key:
                         fields["sprint"] = fields.get(sprint_field_key)
 
-                    # Ensure related objects
                     project_obj, _ = JiraProject.objects.get_or_create(
                         id=fields['project']['id'],
                         defaults={
@@ -246,9 +257,7 @@ class JiraMiner:
                         }
                     )
 
-                    self.log_progress(
-                        f" Mining issue {issue_count} of {total_hint}. Key: {issue_key} - {fields['summary']}"
-                    )
+                    self.log_progress(f"⛏️ Mining issue {issue_count} of {total_hint}. Key: {issue_key}")
 
                     # Sub-tables
                     self.save_comments(issue_key, issue_obj)
@@ -259,11 +268,13 @@ class JiraMiner:
                     self.save_sprints(fields, issue_obj)
 
                 collected += len(issues)
-                start_at += max_results
-                if len(issues) < max_results:
+                if not next_page_token:
                     break
 
             return collected
+
+
+
 
         total_collected = 0
 
@@ -291,7 +302,7 @@ class JiraMiner:
                 # Update task progress per completed day
                 if day_start:
                     update_task_progress_date(self.task_obj, day_start)
-                    self.log_progress(f" Completed day {day_start}: {collected} issues")
+                    self.log_progress(f"Completed day {day_start}: {collected} issues")
 
         else:
             # Single run without per-day tracking
@@ -308,7 +319,7 @@ class JiraMiner:
 
 
     def get_commits_for_issue(self, issue_key):
-        # Search for the numeric issue id
+        # Buscar o id numérico da issue
         issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?fields=id"
         response = requests.get(issue_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -317,7 +328,7 @@ class JiraMiner:
         if not issue_id:
             return []
 
-        # Search for commits using id
+        # Buscar os commits usando o id
         jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/latest/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -803,6 +814,8 @@ class JiraMiner:
                     'author': c.get('author', ''),
                     'author_email': c.get('authorEmail', ''),
                     'message': c.get('message'),
+                    # repository: we try to map to an existing GitHubMetadata by html_url
+                    # If it does not exist, we leave it as None
                     'repository': None,
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }

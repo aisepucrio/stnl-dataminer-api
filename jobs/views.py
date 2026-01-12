@@ -10,6 +10,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+from django.utils.module_loading import import_string
 
 # Log configuration
 logger = logging.getLogger(__name__)
@@ -252,21 +253,11 @@ class TaskStatusView(APIView):
 
 
 class RestartCollectionView(APIView):
-    """
-    Generic view to restart collection tasks.
-    Routes to GitHub or Jira restart handlers based on task type.
-    """
-    
     @extend_schema(
         summary="Restart collection from last progress + 1 day",
         tags=["Jobs"],
         parameters=[
-            OpenApiParameter(
-                name='task_id',
-                type=str,
-                location=OpenApiParameter.PATH,
-                description='Task ID to restart'
-            )
+            OpenApiParameter(name='task_id', type=str, location=OpenApiParameter.PATH, description='Task ID to restart')
         ],
         responses={
             202: OpenApiResponse(description="Restart scheduled successfully"),
@@ -303,42 +294,39 @@ class RestartCollectionView(APIView):
         task_type = getattr(task_obj, "type", "")
         logger.info(f"Task type: '{task_type}'")
         
-        if task_type.startswith('github_'):
-            # GitHub task 
-            logger.info("Routing to GitHub restart handler")
-            try:
-                from github.tasks import restart_collection
-                async_result = restart_collection.apply_async(kwargs={
-                    "task_pk": task_obj.id
-                })
-                logger.info(f"GitHub restart task dispatched: {async_result.id}")
-            except Exception as e:
-                logger.error(f"Error dispatching GitHub restart: {str(e)}")
-                return Response({
-                    "error": f"Error dispatching restart: {str(e)}",
-                    "task_id": task_id
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        elif task_type.startswith('jira_'):
-            # Jira task 
-            logger.info("Routing to Jira restart handler")
-            try:
-                from jira.tasks import restart_collection as jira_restart_collection
-                async_result = jira_restart_collection.apply_async(kwargs={
-                    "task_pk": task_obj.id
-                })
-                logger.info(f"Jira restart task dispatched: {async_result.id}")
-            except Exception as e:
-                logger.error(f"Error dispatching Jira restart: {str(e)}")
-                return Response({
-                    "error": f"Error dispatching restart: {str(e)}",
-                    "task_id": task_id
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        else:
-            logger.error(f"Unknown task type: '{task_type}'")
+        # Extract provider key from task type
+        provider_key = (task_type or "").split("_", 1)[0].strip().lower()
+
+        if not provider_key:
+            logger.error(f"Unknown provider key from task type: '{task_type}'")
             return Response({
-                "error": f"Unknown task type: {task_type}",
+                "error": f"Unknown provider key: {provider_key}",
                 "task_id": task_id
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        handler_path = f"{provider_key}.tasks.restart_collection"
+        logger.info(f"Routing to {provider_key} restart handler ({handler_path})")
+
+        # Dynamically import the handler
+        try:
+            handler = import_string(handler_path)
+        except Exception as e:
+            logger.error(f"Failed to import handler '{handler_path}': {e}")
+            return Response({
+                "error": f"Cannot import handler for provider '{provider_key}'",
+                "task_id": task_id
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Dispatch the restart task
+        try:
+            async_result = handler.apply_async(kwargs={"task_pk": task_obj.id})
+            logger.info(f"{provider_key} restart task dispatched: {async_result.id}")
+        except Exception as e:
+            logger.error(f"Error dispatching {provider_key} restart: {str(e)}")
+            return Response({
+                "error": f"Error dispatching restart: {str(e)}",
+                "task_id": task_id
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
             "message": "Restart scheduled",

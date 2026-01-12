@@ -110,6 +110,7 @@ def fetch_commits(self, repo_name, start_date=None, end_date=None, commit_sha=No
         commits = miner.get_commits(repo_name, start_date, end_date, commit_sha=commit_sha, task_obj=task_obj)
 
         task_obj.status = 'SUCCESS'
+        task_obj.operation = f"Completed GitHub commit collection: {repo_name}"
         task_obj.result = {
             'operation': 'fetch_commits',
             'repository': repo_name,
@@ -212,6 +213,7 @@ def fetch_issues(self, repo_name, start_date=None, end_date=None, depth='basic',
         issues = miner.get_issues(repo_name, start_date, end_date, depth, task_obj)
 
         task_obj.status = 'SUCCESS'
+        task_obj.operation = f"Completed GitHub issue collection: {repo_name}"
         task_obj.result = {
             'count': len(issues),
             'repository': repo_name,
@@ -312,6 +314,7 @@ def fetch_pull_requests(self, repo_name, start_date=None, end_date=None, depth='
         pull_requests = miner.get_pull_requests(repo_name, start_date, end_date, depth, task_obj)
 
         task_obj.status = 'SUCCESS'
+        task_obj.operation = f"Completed GitHub pull request collection: {repo_name}"
         task_obj.result = {
             'count': len(pull_requests),
             'repository': repo_name,
@@ -407,6 +410,7 @@ def fetch_branches(self, repo_name, task_pk=None):
         branches = miner.get_branches(repo_name)
 
         task_obj.status = 'SUCCESS'
+        task_obj.operation = f"Completed GitHub branches collection: {repo_name}"
         task_obj.result = {
             'count': len(branches),
             'repository': repo_name
@@ -518,6 +522,7 @@ def fetch_metadata(self, repo_name, task_pk=None):
         }
 
         task_obj.status = 'SUCCESS'
+        task_obj.operation = f"Completed GitHub metadata collection: {repo_name}"
         task_obj.result = {
             'repository': repo_name,
             'metadata': metadata_dict
