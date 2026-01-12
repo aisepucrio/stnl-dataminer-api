@@ -5,7 +5,6 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 
 from .miner.question_fetcher import fetch_questions
-from .miner.get_additional_data import populate_missing_data
 
 # Helper to reuse or create tasks based on task_pk
 def _reuse_or_create_task(self, *, defaults, task_pk=None):
