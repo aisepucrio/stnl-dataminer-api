@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     StackUser, StackQuestion, StackAnswer, StackComment,
-    StackTag, StackBadge, StackCollective, StackTagSynonym
+    StackTag,
+    # StackBadge, StackCollective, StackTagSynonym
 )
 from .utils import StackDateTimeHandler
 
@@ -80,23 +81,23 @@ class StackCommentSerializer(serializers.ModelSerializer):
         return StackDateTimeHandler.format_date(obj.creation_date)
 
 
-class StackBadgeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = StackBadge
-        fields = '__all__'
+# class StackBadgeSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = StackBadge
+#         fields = '__all__'
 
 
-class StackCollectiveSerializer(serializers.ModelSerializer):
-    tags = StackTagSerializer(many=True, read_only=True)
+# class StackCollectiveSerializer(serializers.ModelSerializer):
+#     tags = StackTagSerializer(many=True, read_only=True)
 
-    last_sync_formatted = serializers.SerializerMethodField()
+#     last_sync_formatted = serializers.SerializerMethodField()
 
-    class Meta:
-        model = StackCollective
-        fields = '__all__'
+#     class Meta:
+#         model = StackCollective
+#         fields = '__all__'
 
-    def get_last_sync_formatted(self, obj):
-        return StackDateTimeHandler.format_date(obj.last_sync)
+#     def get_last_sync_formatted(self, obj):
+#         return StackDateTimeHandler.format_date(obj.last_sync)
 
 
 class StackTagSynonymSerializer(serializers.ModelSerializer):
