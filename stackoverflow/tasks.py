@@ -3,31 +3,32 @@ from django.conf import settings
 from jobs.models import Task
 from django.utils import timezone
 from datetime import datetime, timedelta
+import uuid
+import traceback
 
 from .miner.question_fetcher import fetch_questions
-from .miner.get_additional_data import populate_missing_data
 
-# Helper to reuse or create tasks based on task_pk
+
 def _reuse_or_create_task(self, *, defaults, task_pk=None):
     if task_pk:
-        update_data = {**defaults, "task_id": self.request.id}
+        update_data = {**defaults, "task_id": getattr(getattr(self, "request", None), "id", None)}
         update_data.pop("date_init", None)
         updated = Task.objects.filter(pk=task_pk).update(**update_data)
         if updated:
             return Task.objects.get(pk=task_pk), False
-    return Task.objects.get_or_create(task_id=self.request.id, defaults=defaults)
 
-# from .miner.get_additional_data import populate_missing_data
+    task_id = getattr(getattr(self, "request", None), "id", None) or str(uuid.uuid4())
+    return Task.objects.get_or_create(task_id=task_id, defaults=defaults)
+
+
 @shared_task(bind=True)
 def collect_questions_task(self, start_date: str, end_date: str, tags=None, task_pk=None):
-    """
-    Celery task that performs the collection of Stack Overflow questions
-    """
     task_obj = None
     try:
         operation_log = f"🔄 Starting collection: {start_date} to {end_date}"
         if tags:
             operation_log += f" (Tags: {tags})"
+
         defaults = {
             "operation": operation_log,
             "repository": "Stack Overflow",
@@ -37,108 +38,109 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             "date_end": end_date,
         }
 
-        task_obj, created = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
+        task_obj, _ = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
         fetch_questions(
-            site='stackoverflow',
+            site="stackoverflow",
             start_date=start_date,
             end_date=end_date,
             api_key=settings.STACK_API_KEY,
             access_token=settings.STACK_ACCESS_TOKEN,
             task_obj=task_obj,
-            tags=tags
+            tags=tags,
         )
-        
-        task_obj.status = 'SUCCESS'
-        task_obj.operation = "✅ Collection completed successfully."
-        task_obj.save(update_fields=['status', 'operation'])
 
-        return f"Collection from {start_date} to {end_date} completed."
+        result_payload = {
+            "operation": "collect_questions",
+            "repository": "stackoverflow",
+            "start_date": start_date,
+            "end_date": end_date,
+            "tags": tags,
+            "status": "success",
+        }
+
+        task_obj.status = "COMPLETED"
+        task_obj.operation = "✅ Collection completed successfully."
+        task_obj.result = result_payload
+        task_obj.save(update_fields=["status", "operation", "result"])
+
+        return result_payload
 
     except Exception as e:
+        msg = str(e)
+
+        if "Invalid Stack token" in msg:
+            code = "NO_VALID_STACK_TOKEN"
+        elif "Invalid API key" in msg:
+            code = "INVALID_API_CREDENTIALS"
+        else:
+            code = "UNEXPECTED_EXCEPTION"
+
+        result_payload = {
+            "operation": "collect_questions",
+            "repository": "stackoverflow",
+            "start_date": start_date,
+            "end_date": end_date,
+            "tags": tags,
+            "status": "error",
+            "code": code,
+            "message": msg,
+        }
+
+        if code == "UNEXPECTED_EXCEPTION":
+            result_payload["traceback"] = traceback.format_exc()
+
         if task_obj:
-            task_obj.status = 'FAILURE'
-            task_obj.error = str(e)
-            task_obj.save(update_fields=['status', 'error'])
-        raise e
-    
-# @shared_task(bind=True, ignore_result=True)
-# def repopulate_users_task(self, previous_task_result=None):
-#     """
-#     Tarefa Celery que executa o enriquecimento de dados e atualiza o status.
-#     """
-#     task_obj = None
-#     try:
-#         task_obj = Task.objects.create(
-#             task_id=self.request.id, 
-#             operation="Iniciando enriquecimento de dados de usuários", 
-#             repository="Stack Overflow"
-#         )
-        
-#         populate_missing_data(
-#             api_key=settings.STACK_API_KEY,
-#             access_token=settings.STACK_ACCESS_TOKEN,
-#             task_obj=task_obj
-#         )
+            task_obj.status = "FAILURE"
+            task_obj.error_type = code
+            task_obj.error = msg
+            task_obj.operation = msg
+            task_obj.result = result_payload
 
-#         task_obj.status = 'COMPLETED'
-#         task_obj.operation = "Enriquecimento de dados finalizado com sucesso."
-#         task_obj.save(update_fields=['status', 'operation'])
-        
-#         return "Repopulação de usuários concluída."
+            update_fields = ["status", "error_type", "error", "operation", "result"]
+            if code in ("NO_VALID_STACK_TOKEN", "INVALID_API_CREDENTIALS"):
+                task_obj.token_validation_error = True
+                update_fields.append("token_validation_error")
 
-#     except Exception as e:
-#         if task_obj:
-#             task_obj.status = 'FAILED'
-#             task_obj.error = str(e)
-#             task_obj.save(update_fields=['status', 'error'])
-#         raise e
+            task_obj.save(update_fields=update_fields)
+
+        return result_payload
+
 
 @shared_task(bind=True, name="stackoverflow.restart_collection")
 def restart_collection(self, task_pk: str):
-    """Restart collection for a StackOverflow task from task.date_last_update + 1 day.
-    """
     task_obj = Task.objects.get(pk=task_pk)
 
     collect_type = (task_obj.type or "").strip().lower()
-   
 
-    # try to extract tags from the Task if available (non-breaking)
-    tags = getattr(task_obj, 'tags', None)
+    tags = getattr(task_obj, "tags", None)
 
     if collect_type.startswith("stackoverflow_question_collection"):
-        
         end_date = task_obj.date_end
 
         base = task_obj.date_last_update or getattr(task_obj, "date_init", None)
         start_date = (base + timedelta(days=1)) if base else None
-        # normalize to date string YYYY-MM-DD expected by collect task
         if isinstance(start_date, datetime) and timezone.is_naive(start_date):
             start_date = timezone.make_aware(start_date, timezone.get_current_timezone())
 
         if isinstance(start_date, datetime):
             start_date_str = start_date.date().isoformat()
-        elif hasattr(start_date, 'isoformat'):
-            # likely already a date
+        elif hasattr(start_date, "isoformat"):
             start_date_str = start_date.isoformat()
         else:
             start_date_str = None
 
         if isinstance(end_date, datetime):
             end_date_str = end_date.date().isoformat()
-        elif hasattr(end_date, 'isoformat'):
+        elif hasattr(end_date, "isoformat"):
             end_date_str = end_date.isoformat()
         else:
             end_date_str = None
-        # dispatch the collect_questions_task with the computed window and pass the original task PK
-        new_id = collect_questions_task.apply_async(args=[start_date_str, end_date_str, tags, task_pk]).id
 
-    #elif collect_type.startswith("stackoverflow_user_repopulation"):
-        # IMPLEMENT HERE 
+        new_id = collect_questions_task.apply_async(args=[start_date_str, end_date_str, tags, task_pk]).id
     else:
         self.update_state(state="FAILURE", meta={"error": f"Tipo desconhecido: {collect_type}"})
         return {"status": "FAILURE", "error": f"Tipo desconhecido: {collect_type}"}
 
     self.update_state(state="SUCCESS", meta={"spawned_task_pk": new_id, "type": collect_type})
     return {"status": "SUCCESS", "spawned_task_pk": new_id, "type": collect_type}
-
