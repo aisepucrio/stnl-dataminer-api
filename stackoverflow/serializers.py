@@ -100,7 +100,14 @@ class StackCommentSerializer(serializers.ModelSerializer):
 #         return StackDateTimeHandler.format_date(obj.last_sync)
 
 
-# class StackTagSynonymSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = StackTagSynonym
-#         fields = '__all__'
+class StackTagSynonymSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StackTagSynonym
+        fields = '__all__'
+
+class ExportStackoverflowDataSerializer(serializers.Serializer):
+    format = serializers.ChoiceField(choices=["csv", "json"], default="csv")
+    ids = serializers.ListField(
+        child=serializers.IntegerField(), required=False, help_text="IDs específicos a exportar"
+    )
+    min_score = serializers.IntegerField(required=False, help_text="Filtrar perguntas com score mínimo")
