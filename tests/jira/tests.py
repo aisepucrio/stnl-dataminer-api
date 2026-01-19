@@ -5,10 +5,7 @@ from unittest.mock import patch, MagicMock
 import uuid
 from django.utils import timezone
 
-
-#///////////////////////////////////////////////////////////////////////////////////////
-#run tests on docker using: docker compose run --rm web python manage.py test jira -v 2
-#///////////////////////////////////////////////////////////////////////////////////////
+#run tests on docker using: docker compose exec web python manage.py test
 
 # Imports all models and the custom exception for testing
 from jira.models import (

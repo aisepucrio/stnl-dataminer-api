@@ -14,6 +14,10 @@ from github.models import (
 from github.miners.base import BaseMiner
 from jobs.models import Task
 
+# GitHub API Tests
+
+#run tests on docker using: docker compose exec web python manage.py test
+
 class GitHubAPITests(APITestCase):
 
     def setUp(self):

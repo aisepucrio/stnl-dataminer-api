@@ -7,10 +7,11 @@ import uuid
 from stackoverflow.models import StackUser, StackQuestion, StackTag
 from jobs.models import Task
 
-
-# =============================================================================
 # Stack Overflow API Tests
-# =============================================================================
+
+#run tests on docker using: docker compose exec web python manage.py test
+
+
 class StackOverflowAPITests(APITestCase):
     """Integration tests for Stack Overflow API endpoints."""
 
@@ -126,9 +127,7 @@ class StackOverflowAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
-# =============================================================================
 # Celery Task Tests
-# =============================================================================
 class StackOverflowTasksTests(APITestCase):
     """Unit tests for Stack Overflow Celery task logic."""
 
