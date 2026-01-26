@@ -36,14 +36,15 @@ class CommitsMiner(BaseMiner):
                     auth_url = f'https://{token}@github.com/{repo_url.split("github.com/")[1]}'
                     
                     git_config = [
-                        'http.postBuffer=524288000',  
-                        'http.lowSpeedLimit=1000',
-                        'http.lowSpeedTime=300',
-                        'http.sslVerify=false'  
+                        ("http.postBuffer", "524288000"),
+                        ("http.lowSpeedLimit", "1000"),
+                        ("http.lowSpeedTime", "300"),
+                        ("http.sslVerify", "false"),
                     ]
-                    
-                    for config in git_config:
-                        os.system(f'git config --global {config}')
+
+                    for key, value in git_config:
+                        os.system(f'git config --global {key} {value}')
+
                     
                     Repo.clone_from(auth_url, clone_path)
                     print(f"Repository cloned successfully: {clone_path}", flush=True)

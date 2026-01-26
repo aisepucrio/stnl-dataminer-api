@@ -140,32 +140,59 @@ class JiraMiner:
 
         # Helper to run a single JQL (paged) and return collected count
         def run_paged_collection(jql_where: str, total_hint: int | None = None) -> int:
-            max_results, start_at, collected = 100, 0, 0
+            max_results, collected = 100, 0
+            next_page_token = None
 
-            # Preflight to get total if not provided
+            # Preflight to get total if not provided (migrated to /rest/api/3/search/jql)
             if total_hint is None:
-                pref_jql = quote(f"{base_jql} {jql_where}")
                 self.log_progress("🔍 Verificando o total de issues a serem mineradas...")
-                preflight_url = f"https://{self.jira_domain}/rest/api/3/search?jql={pref_jql}&maxResults=0"
+                preflight_url = f"https://{self.jira_domain}/rest/api/3/search/jql"
+                preflight_payload = {
+                    "jql": f"{base_jql} {jql_where}",
+                    "maxResults": 1,
+                    "fields": ["id"],  # mínimo só pra obter total/isLast/nextPageToken
+                }
+
                 try:
-                    preflight_response = requests.get(preflight_url, headers=self.headers, auth=self.auth)
+                    preflight_response = requests.post(
+                        preflight_url,
+                        headers={**self.headers, "Content-Type": "application/json"},
+                        auth=self.auth,
+                        json=preflight_payload,
+                    )
                     if preflight_response.status_code != 200:
                         raise Exception(
                             f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}"
                         )
-                    total_hint = preflight_response.json().get('total', 0)
-                    self.log_progress(f"🔍 Total de {total_hint} issues encontradas. Iniciando a coleta.")
+
+                    preflight_json = preflight_response.json()
+                    # Nem sempre existe "total" no novo endpoint; se não existir, mantemos None
+                    total_hint = preflight_json.get("total", None)
+                    if total_hint is not None:
+                        self.log_progress(f"🔍 Total de {total_hint} issues encontradas. Iniciando a coleta.")
+                    else:
+                        self.log_progress("🔍 Total indisponível no endpoint /search/jql — iniciando a coleta sem total_hint.")
                 except Exception as e:
-                    self.log_progress(f"❌ Falha no preflight: {e}")
-                    return 0
+                    self.log_progress(f"❌ Falha no preflight: {e} — continuando sem total_hint")
+                    total_hint = None
 
             while True:
-                encoded_jql = quote(f"{base_jql} {jql_where}")
-                jira_url = (
-                    f"https://{self.jira_domain}/rest/api/3/search?jql={encoded_jql}"
-                    f"&startAt={start_at}&maxResults={max_results}&expand=changelog"
+                jira_url = f"https://{self.jira_domain}/rest/api/3/search/jql"
+                payload = {
+                    "jql": f"{base_jql} {jql_where}",
+                    "maxResults": max_results,
+                    "expand": "changelog",
+                    "fields": ["*all"],  # garante que venha issue["fields"] como antes
+                }
+                if next_page_token:
+                    payload["nextPageToken"] = next_page_token
+
+                response = requests.post(
+                    jira_url,
+                    headers={**self.headers, "Content-Type": "application/json"},
+                    auth=self.auth,
+                    json=payload,
                 )
-                response = requests.get(jira_url, headers=self.headers, auth=self.auth)
 
                 if self.handle_rate_limit(response):
                     continue
@@ -176,13 +203,20 @@ class JiraMiner:
                     )
                     break
 
-                issues = response.json().get('issues', [])
+                data = response.json()
+                issues = data.get("issues", [])
                 if not issues:
                     break
 
                 for index, issue_data in enumerate(issues):
                     issue_count = collected + index + 1
-                    fields = issue_data["fields"]
+
+                    fields = issue_data.get("fields")
+                    if not isinstance(fields, dict):
+                        # Evita KeyError('fields') caso o Jira retorne payload parcial/inesperado
+                        self.log_progress(f"⚠️ Issue sem 'fields' (pulando): {issue_data.get('key', issue_data.get('id', 'unknown'))}")
+                        continue
+
                     issue_id = issue_data["id"]
                     issue_key = issue_data["key"]
                     current_timestamp = timezone.now()
@@ -245,8 +279,9 @@ class JiraMiner:
                         }
                     )
 
+                    hint = total_hint if total_hint is not None else "?"
                     self.log_progress(
-                        f"⛏️ Mining issue {issue_count} of {total_hint}. Key: {issue_key} - {fields['summary']}"
+                        f"⛏️ Mining issue {issue_count} of {hint}. Key: {issue_key} - {fields['summary']}"
                     )
 
                     # Sub-tables
@@ -258,11 +293,15 @@ class JiraMiner:
                     self.save_sprints(fields, issue_obj)
 
                 collected += len(issues)
-                start_at += max_results
-                if len(issues) < max_results:
+
+                # Pagination via nextPageToken (novo endpoint)
+                next_page_token = data.get("nextPageToken")
+                if data.get("isLast") is True or not next_page_token:
                     break
 
             return collected
+
+
 
         total_collected = 0
 
