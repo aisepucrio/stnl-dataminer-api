@@ -35,7 +35,7 @@ class JiraMiner:
         load_dotenv()
         self.jira_domain = jira_domain.strip()
         self.task_obj = task_obj 
-        self.log_progress(f"🔍 Received domain in JiraMiner: '{self.jira_domain}'")
+        self.log_progress(f" Received domain in JiraMiner: '{self.jira_domain}'")
 
 
         # Loading tokens
@@ -71,7 +71,7 @@ class JiraMiner:
     def switch_token(self):
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
         self.update_auth()
-        self.log_progress(f"🔍 Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
+        self.log_progress(f" Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
 
 
     def verify_token(self):
@@ -98,7 +98,7 @@ class JiraMiner:
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
-            self.log_progress("🔍 Rate limit reached. Trying next token...")
+            self.log_progress(" Rate limit reached. Trying next token...")
 
             original_index = self.current_token_index
 
@@ -121,7 +121,7 @@ class JiraMiner:
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         custom_fields_mapping = self.get_custom_fields_mapping()
-        self.log_progress(f"🔍 Colecting project issues {project_key}...")
+        self.log_progress(f" Colecting project issues {project_key}...")
 
         # Find the Sprint field (e.g., customfield_10020)
         sprint_field_key = None
@@ -145,12 +145,12 @@ class JiraMiner:
 
             # Preflight to get total if not provided (migrated to /rest/api/3/search/jql)
             if total_hint is None:
-                self.log_progress("🔍 Verificando o total de issues a serem mineradas...")
+                self.log_progress(" Checking total number of issues to be mined...")
                 preflight_url = f"https://{self.jira_domain}/rest/api/3/search/jql"
                 preflight_payload = {
                     "jql": f"{base_jql} {jql_where}",
                     "maxResults": 1,
-                    "fields": ["id"],  # mínimo só pra obter total/isLast/nextPageToken
+                    "fields": ["id"],  # minimum required only to obtain total/isLast/nextPageToken
                 }
 
                 try:
@@ -162,18 +162,18 @@ class JiraMiner:
                     )
                     if preflight_response.status_code != 200:
                         raise Exception(
-                            f"A pré-verificação falhou com status {preflight_response.status_code}: {preflight_response.text}"
+                            f"Preflight failed with status {preflight_response.status_code}: {preflight_response.text}"
                         )
 
                     preflight_json = preflight_response.json()
-                    # Nem sempre existe "total" no novo endpoint; se não existir, mantemos None
+                    # "total" is not always present in the new endpoint; if missing, keep None
                     total_hint = preflight_json.get("total", None)
                     if total_hint is not None:
-                        self.log_progress(f"🔍 Total de {total_hint} issues encontradas. Iniciando a coleta.")
+                        self.log_progress(f" Total of {total_hint} issues found. Starting collection.")
                     else:
-                        self.log_progress("🔍 Total indisponível no endpoint /search/jql — iniciando a coleta sem total_hint.")
+                        self.log_progress(" Total not available in /search/jql endpoint — starting collection without total_hint.")
                 except Exception as e:
-                    self.log_progress(f"❌ Falha no preflight: {e} — continuando sem total_hint")
+                    self.log_progress(f" Preflight failed: {e} — continuing without total_hint")
                     total_hint = None
 
             while True:
@@ -182,7 +182,7 @@ class JiraMiner:
                     "jql": f"{base_jql} {jql_where}",
                     "maxResults": max_results,
                     "expand": "changelog",
-                    "fields": ["*all"],  # garante que venha issue["fields"] como antes
+                    "fields": ["*all"],  # ensures issue["fields"] is present as before
                 }
                 if next_page_token:
                     payload["nextPageToken"] = next_page_token
@@ -199,7 +199,7 @@ class JiraMiner:
 
                 if response.status_code != 200:
                     self.log_progress(
-                        f"❌ Failed to collect issues page: {response.status_code} - {response.text}"
+                        f" Failed to collect issues page: {response.status_code} - {response.text}"
                     )
                     break
 
@@ -213,8 +213,10 @@ class JiraMiner:
 
                     fields = issue_data.get("fields")
                     if not isinstance(fields, dict):
-                        # Evita KeyError('fields') caso o Jira retorne payload parcial/inesperado
-                        self.log_progress(f"⚠️ Issue sem 'fields' (pulando): {issue_data.get('key', issue_data.get('id', 'unknown'))}")
+                        # Prevents KeyError('fields') if Jira returns partial/unexpected payload
+                        self.log_progress(
+                            f" Issue without 'fields' (skipping): {issue_data.get('key', issue_data.get('id', 'unknown'))}"
+                        )
                         continue
 
                     issue_id = issue_data["id"]
@@ -222,7 +224,7 @@ class JiraMiner:
                     current_timestamp = timezone.now()
                     description = self.extract_words_from_description(fields.get("description"))
 
-                    # Injects the sprint field readable
+                    # Injects the sprint field in a readable format
                     if sprint_field_key:
                         fields["sprint"] = fields.get(sprint_field_key)
 
@@ -281,7 +283,7 @@ class JiraMiner:
 
                     hint = total_hint if total_hint is not None else "?"
                     self.log_progress(
-                        f"⛏️ Mining issue {issue_count} of {hint}. Key: {issue_key} - {fields['summary']}"
+                        f" Mining issue {issue_count} of {hint}. Key: {issue_key} - {fields['summary']}"
                     )
 
                     # Sub-tables
@@ -294,12 +296,13 @@ class JiraMiner:
 
                 collected += len(issues)
 
-                # Pagination via nextPageToken (novo endpoint)
+                # Pagination via nextPageToken (new endpoint)
                 next_page_token = data.get("nextPageToken")
                 if data.get("isLast") is True or not next_page_token:
                     break
 
             return collected
+
 
 
 
@@ -346,7 +349,7 @@ class JiraMiner:
 
 
     def get_commits_for_issue(self, issue_key):
-        # Buscar o id numérico da issue
+        # Search for the numeric ID of the issue
         issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?fields=id"
         response = requests.get(issue_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -355,7 +358,7 @@ class JiraMiner:
         if not issue_id:
             return []
 
-        # Buscar os commits usando o id
+        # Search for commits using the issue ID
         jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/latest/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -841,8 +844,8 @@ class JiraMiner:
                     'author': c.get('author', ''),
                     'author_email': c.get('authorEmail', ''),
                     'message': c.get('message'),
-                    # repository: tentamos mapear para um GitHubMetadata existente pelo html_url
-                    # Caso não exista, deixamos como None
+                    # repository: we try to map to an existing GitHubMetadata by html_url
+                    # If it doesn't exist, we leave it as None
                     'repository': None,
                     'timestamp': timezone.now()  # Ideally parse from data if available
                 }
