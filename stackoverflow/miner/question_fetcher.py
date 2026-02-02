@@ -7,8 +7,10 @@ from django.utils import timezone
 from django.db import transaction
 from jobs.models import Task
 from stackoverflow.utils import epoch_to_dt
+from .safe_api_call import safe_api_call
 
 logger = logging.getLogger(__name__)
+
 
 def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
@@ -24,6 +26,42 @@ def log_progress(message: str, level: str = "info", task_obj: Task = None):
     if task_obj:
         task_obj.operation = message
         task_obj.save(update_fields=["operation"])
+
+
+def _normalize_tag_value(value):
+    """
+    Stack Exchange expects tagged/nottagged as a single string separated by ';'
+    Example: "python;django"
+    Accepts:
+      - list[str]
+      - "python;django"
+      - "python, django"
+      - "python django"
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        cleaned = [str(v).strip() for v in value if str(v).strip()]
+        return ";".join(cleaned) if cleaned else None
+
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        # convert commas/spaces to ';' only if user didn't already provide ';'
+        if ";" in s:
+            return s
+        if "," in s:
+            parts = [p.strip() for p in s.split(",") if p.strip()]
+            return ";".join(parts) if parts else None
+        # if it's "python django", split by whitespace
+        parts = [p.strip() for p in s.split() if p.strip()]
+        return ";".join(parts) if parts else s
+
+    # fallback
+    return str(value).strip() or None
+
 
 def create_or_update_user(user_id, user_data):
     stack_user = None
@@ -93,6 +131,7 @@ def create_or_update_user(user_id, user_data):
         logger.error(f"Error processing StackUser with ID {user_data}: {e}")
     return stack_user
 
+
 def create_answer(answer_data, question, owner):
     answer, _ = StackAnswer.objects.get_or_create(
         answer_id=answer_data.get('answer_id'),
@@ -116,6 +155,7 @@ def create_answer(answer_data, question, owner):
         }
     )
     return answer
+
 
 def create_comment(comment_data, parent, owner):
     """
@@ -144,6 +184,7 @@ def create_comment(comment_data, parent, owner):
         }
     )
     return comment
+
 
 def make_question_serializable(question_data, stack_user, question_tags):
     """Convert question data to a JSON-serializable structure for API/response use."""
@@ -175,6 +216,7 @@ def make_question_serializable(question_data, stack_user, question_tags):
         'time_mined': question_data.get('time_mined'),
     }
 
+
 def fetch_questions(
     site: str,
     start_date: str,
@@ -184,36 +226,48 @@ def fetch_questions(
     page: int = 1,
     page_size: int = 100,
     task_obj=None,
-    tags=None
+    tags=None,
+    filters=None,
+    mode: str = "default",
 ):
     """
     Fetch questions from Stack Overflow with user-friendly feedback.
+
+    mode:
+      - "default": uses /questions (basic mining)
+      - "advanced": uses /search/advanced (filters like accepted/views/answers/etc.)
     """
-    base_url = "https://api.stackexchange.com/2.3/questions"
-    
+    is_advanced = (mode == "advanced")
+
+    base_url = "https://api.stackexchange.com/2.3/search/advanced" if is_advanced \
+        else "https://api.stackexchange.com/2.3/questions"
+
     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
     start_timestamp = int(datetime.combine(start_dt.date(), datetime.min.time()).timestamp())
     end_timestamp = int(datetime.combine(end_dt.date(), datetime.max.time()).timestamp())
-    
-    log_progress(f"Starting collection from {start_date} to {end_date}", "system", task_obj=task_obj)
-    
+
+    log_progress(f"Starting collection from {start_date} to {end_date} (mode={mode})", "system", task_obj=task_obj)
+
     params = {
         'site': site,
         'fromdate': start_timestamp,
         'todate': end_timestamp,
         'page': page,
         'pagesize': min(page_size, 100),
+        # keep deterministic behavior; these are NOT user-controlled
         'order': 'desc',
         'sort': 'creation',
         'filter': '!2xWEp6FHz8hT56C1LBQjFx25D4Dzmr*3(8D4ngdB5g',
         'key': api_key,
         'access_token': access_token
     }
-    
-    if tags:
-        params['tagged'] = tags
-        log_progress(f"Filtering by tags: {tags}", "info", task_obj=task_obj)
+
+    # Tags normalization (important!)
+    tagged = _normalize_tag_value(tags)
+    if tagged:
+        params['tagged'] = tagged
+        log_progress(f"Filtering by tags: {tagged}", "info", task_obj=task_obj)
 
     questions = []
     total_questions_api = 0
@@ -226,14 +280,71 @@ def fetch_questions(
             params['page'] = page
 
             log_progress(f"Fetching page {params['page']}...", "fetch", task_obj=task_obj)
-            response = requests.get(base_url, params=params)
-            log_progress(f"API responded with status {response.status_code}", "info", task_obj=task_obj)
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            if 'error_id' in data:
-                log_progress(f"API returned an error: {data.get('error_message', 'Unknown error')}", "error", task_obj=task_obj)
+
+            # Apply filters (behavior depends on endpoint mode)
+            if filters:
+                if filters.get('min') is not None:
+                    params['min'] = filters['min']
+                if filters.get('max') is not None:
+                    params['max'] = filters['max']
+
+                # intitle/title behavior
+                if filters.get('intitle'):
+                    # /questions supports "intitle", advanced supports "title"
+                    if is_advanced:
+                        params['title'] = filters['intitle']
+                    else:
+                        params['intitle'] = filters['intitle']
+
+                if is_advanced:
+                    # Advanced-only filters (safe to apply here)
+                    if filters.get('accepted') is not None:
+                        params['accepted'] = filters['accepted']
+
+                    if filters.get('answers') is not None:
+                        params['answers'] = filters['answers']
+
+                    if filters.get('views') is not None:
+                        params['views'] = filters['views']
+
+                    if filters.get('closed') is not None:
+                        params['closed'] = filters['closed']
+
+                    if filters.get('migrated') is not None:
+                        params['migrated'] = filters['migrated']
+
+                    if filters.get('user') is not None:
+                        params['user'] = filters['user']
+
+                    nottagged = _normalize_tag_value(filters.get('nottagged'))
+                    if nottagged:
+                        params['nottagged'] = nottagged
+
+                else:
+                    # Default endpoint does NOT support these reliably; ignore + warn
+                    unsupported_keys = []
+                    for k in ('accepted', 'answers', 'views', 'closed', 'migrated', 'user', 'nottagged'):
+                        if filters.get(k) is not None and filters.get(k) != "":
+                            unsupported_keys.append(k)
+                    if unsupported_keys:
+                        log_progress(
+                            f"Ignoring unsupported filters on default endpoint: {unsupported_keys}. "
+                            f"Use /collect/advanced/ for these.",
+                            "warning",
+                            task_obj=task_obj
+                        )
+
+                log_progress(f"Applying filters: {filters}", "info", task_obj=task_obj)
+
+            # DEBUG FILTERS (TEMP)
+            logger.warning("[SO][DEBUG] endpoint=%s", base_url)
+            logger.warning("[SO][DEBUG] params=%s", params)
+
+            data = safe_api_call(base_url, params)
+
+            # Se safe_api_call falhou (quota baixa, erro não recuperável, etc.)
+            if not data:
+                log_progress("API call failed or quota too low. Aborting.", "error", task_obj=task_obj)
                 break
 
             if page == 1:
@@ -248,9 +359,9 @@ def fetch_questions(
                 if params['page'] == 1:
                     log_progress("No questions found for the period.", "warning", task_obj=task_obj)
                 break
-                
+
             log_progress(f"{len(items)} questions found. Saving to database...", "process", task_obj=task_obj)
-            
+
             for item in items:
                 total_processed += 1
 
@@ -286,7 +397,7 @@ def fetch_questions(
                     question_id=question_dict_for_saving['question_id'],
                     defaults=question_dict_for_saving
                 )
-                
+
                 serializable_question = make_question_serializable(question_dict_for_saving, stack_user, question_tags)
                 questions.append(serializable_question)
 
@@ -304,7 +415,7 @@ def fetch_questions(
                         answer_owner_id = answer_owner_data.get('user_id')
                         answer_owner = create_or_update_user(answer_owner_id, answer_owner_data) if answer_owner_id else None
                         stack_answer = create_answer(answer, stack_question, answer_owner)
-                        
+
                         answer_comments = answer.get('comments', [])
                         if answer_comments:
                             for comment in answer_comments:
@@ -312,7 +423,7 @@ def fetch_questions(
                                 comment_owner_id = comment_owner_data.get('user_id')
                                 comment_owner = create_or_update_user(comment_owner_id, comment_owner_data) if comment_owner_id else None
                                 create_comment(comment, stack_answer, comment_owner)
-                
+
                 tag_objs = []
                 for tag_name in question_tags:
                     tag_obj, _ = StackTag.objects.get_or_create(name=tag_name)
@@ -320,7 +431,11 @@ def fetch_questions(
                 stack_question.tags.set(tag_objs)
 
                 title_preview = item.get('title', 'Untitled')[:60]
-                log_progress(f"[{total_processed}/{total_questions_api}] Processing: '{title_preview}...'", "save", task_obj=task_obj)
+                log_progress(
+                    f"[{total_processed}/{total_questions_api}] Processing: '{title_preview}...'",
+                    "save",
+                    task_obj=task_obj
+                )
 
             has_more = data.get('has_more', False)
             if has_more:
@@ -334,6 +449,6 @@ def fetch_questions(
         except Exception as e:
             log_progress(f"An unexpected error occurred: {str(e)}", "error", task_obj=task_obj)
             break
-    
+
     log_progress(f"Collection finished. {total_processed} questions processed in total.", "success", task_obj=task_obj)
     return questions
