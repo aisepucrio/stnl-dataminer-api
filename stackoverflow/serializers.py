@@ -1,9 +1,5 @@
 from rest_framework import serializers
-from .models import (
-    StackUser, StackQuestion, StackAnswer, StackComment,
-    StackTag,
-    # StackBadge, StackCollective, StackTagSynonym
-)
+from .models import StackUser, StackQuestion, StackAnswer, StackComment, StackTag
 from .utils import StackDateTimeHandler
 
 
@@ -14,7 +10,7 @@ class StackUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackUser
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
@@ -29,7 +25,7 @@ class StackUserSerializer(serializers.ModelSerializer):
 class StackTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = StackTag
-        fields = '__all__'
+        fields = "__all__"
 
 
 class StackQuestionSerializer(serializers.ModelSerializer):
@@ -41,7 +37,7 @@ class StackQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackQuestion
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
@@ -59,7 +55,7 @@ class StackAnswerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackAnswer
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
@@ -75,39 +71,20 @@ class StackCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackComment
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
 
 
-# class StackBadgeSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = StackBadge
-#         fields = '__all__'
-
-
-# class StackCollectiveSerializer(serializers.ModelSerializer):
-#     tags = StackTagSerializer(many=True, read_only=True)
-
-#     last_sync_formatted = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = StackCollective
-#         fields = '__all__'
-
-#     def get_last_sync_formatted(self, obj):
-#         return StackDateTimeHandler.format_date(obj.last_sync)
-
-
-# class StackTagSynonymSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = StackTagSynonym
-#         fields = '__all__'
-
 class ExportStackoverflowDataSerializer(serializers.Serializer):
     format = serializers.ChoiceField(choices=["csv", "json"], default="csv")
     ids = serializers.ListField(
-        child=serializers.IntegerField(), required=False, help_text="IDs específicos a exportar"
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="IDs específicos a exportar",
     )
-    min_score = serializers.IntegerField(required=False, help_text="Filtrar perguntas com score mínimo")
+    min_score = serializers.IntegerField(
+        required=False,
+        help_text="Filtrar perguntas com score mínimo",
+    )
