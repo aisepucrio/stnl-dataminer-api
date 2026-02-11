@@ -10,7 +10,7 @@ class StackUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackUser
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
@@ -25,7 +25,7 @@ class StackUserSerializer(serializers.ModelSerializer):
 class StackTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = StackTag
-        fields = '__all__'
+        fields = "__all__"
 
 
 class StackQuestionSerializer(serializers.ModelSerializer):
@@ -37,7 +37,7 @@ class StackQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackQuestion
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
@@ -55,7 +55,7 @@ class StackAnswerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackAnswer
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
@@ -71,14 +71,20 @@ class StackCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StackComment
-        fields = '__all__'
+        fields = "__all__"
 
     def get_creation_date_formatted(self, obj):
         return StackDateTimeHandler.format_date(obj.creation_date)
 
+
 class ExportStackoverflowDataSerializer(serializers.Serializer):
     format = serializers.ChoiceField(choices=["csv", "json"], default="csv")
     ids = serializers.ListField(
-        child=serializers.IntegerField(), required=False, help_text="IDs específicos a exportar"
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="IDs específicos a exportar",
     )
-    min_score = serializers.IntegerField(required=False, help_text="Filtrar perguntas com score mínimo")
+    min_score = serializers.IntegerField(
+        required=False,
+        help_text="Filtrar perguntas com score mínimo",
+    )
