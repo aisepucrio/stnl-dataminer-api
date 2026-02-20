@@ -5,7 +5,7 @@ from .models import (
     JiraActivityLog, JiraHistory, JiraHistoryItem
 )
 
-# Register your models here.
+# Models are registered here
 admin.site.register(JiraIssue)
 admin.site.register(JiraProject)
 admin.site.register(JiraUser)
