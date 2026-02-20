@@ -1,32 +1,44 @@
 from celery import shared_task
 from jira.miner import JiraMiner
-from django.conf import settings
 from datetime import datetime, timedelta
 from django.utils import timezone as dj_tz
 
 import traceback
+import uuid
+from jobs.models import Task
 
-from jobs.models import Task  # ⬅️ Imports the model that will save the progress
 
-
-# Helper to reuse or create tasks
 def _reuse_or_create_task(self, *, defaults, task_pk=None):
     if task_pk:
-        update_data = {**defaults, "task_id": self.request.id}
+        update_data = {**defaults, "task_id": getattr(getattr(self, "request", None), "id", None)}
         update_data.pop("date_init", None)
         updated = Task.objects.filter(pk=task_pk).update(**update_data)
         if updated:
             return Task.objects.get(pk=task_pk), False
-    return Task.objects.get_or_create(task_id=self.request.id, defaults=defaults)
+
+    task_id = getattr(getattr(self, "request", None), "id", None) or str(uuid.uuid4())
+    return Task.objects.get_or_create(task_id=task_id, defaults=defaults)
+
+
+def _is_no_valid_jira_token_error(exc: Exception) -> bool:
+    try:
+        if isinstance(exc, JiraMiner.NoValidJiraTokenError):
+            return True
+    except TypeError:
+        pass
+    return exc.__class__.__name__ == "NoValidJiraTokenError"
 
 
 @shared_task(bind=True)
 def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_date=None, end_date=None, task_pk=None):
-    # ⬇️ Creates or updates the Task in the database (reutiliza quando task_pk fornecido)
+    if getattr(getattr(self, "request", None), "id", None):
+        self.update_state(state="STARTED")
+
+    repo_full = f"{jira_domain}/{project_key}"
+
     defaults = {
-        "operation": f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}",
-        # Guarda domínio e projeto juntos para reinício
-        "repository": f"{jira_domain}/{project_key}",
+        "operation": f"Starting Jira issue collection: {project_key} on domain {jira_domain}",
+        "repository": repo_full,
         "status": "STARTED",
         "date_init": start_date,
         "date_end": end_date,
@@ -35,83 +47,85 @@ def collect_jira_issues_task(self, jira_domain, project_key, issuetypes, start_d
     task_obj, _ = _reuse_or_create_task(self, defaults=defaults, task_pk=task_pk)
 
     try:
-        print(f"🔄 Starting Jira issue collection: {project_key} on domain {jira_domain}", flush=True)
+        print(f"Starting Jira issue collection: {project_key} on domain {jira_domain}", flush=True)
 
-        # ⬇️ Passes the task_obj to the JiraMiner
         miner = JiraMiner(jira_domain, task_obj=task_obj)
         issues = miner.collect_jira_issues(project_key, issuetypes, start_date, end_date)
 
-        print(f"✅ Collection completed: {issues['total_issues']} issues collected.", flush=True)
+        result_payload = {
+            **(issues or {}),
+            "operation": "collect_jira_issues",
+            "repository": repo_full,
+        }
 
-        # ⬇️ Updates the task with success
         task_obj.status = "SUCCESS"
-        task_obj.operation = f"✅ Collection completed: {issues['total_issues']} issues collected."
-        task_obj.result = issues
+        task_obj.operation = f"Collection completed: {result_payload.get('total_issues', 0)} issues collected."
+        task_obj.result = result_payload
         task_obj.save(update_fields=["status", "operation", "result"])
 
-        return {
-            'status': 'success',
-            'operation': 'collect_jira_issues',
-            'repository': jira_domain,
-            'data': issues
-        }
-    except JiraMiner.NoValidJiraTokenError as e:
-        print(f"[JiraTask] ❌ No valid token: {e}", flush=True)
-        task_obj.status = "FAILURE"
-        task_obj.error_type = "NO_VALID_JIRA_TOKEN"
-        task_obj.error = str(e)
-        task_obj.token_validation_error = True
-        task_obj.operation = str(e)
-        task_obj.save(update_fields=["status", "error_type", "error", "token_validation_error", "operation"])
-        return {
-            'status': 'error',
-            'code': 'NO_VALID_JIRA_TOKEN',
-            'message': str(e),
-            'operation': 'collect_jira_issues',
-            'repository': jira_domain
-        }
+        if getattr(getattr(self, "request", None), "id", None):
+            self.update_state(state="SUCCESS", meta=result_payload)
+
+        return result_payload
+
     except Exception as e:
-        print(f"❌ Unexpected error while collecting Jira issues: {e}\n{traceback.format_exc()}", flush=True)
+        if _is_no_valid_jira_token_error(e):
+            task_obj.status = "FAILURE"
+            task_obj.error_type = "NO_VALID_JIRA_TOKEN"
+            task_obj.error = str(e)
+            task_obj.token_validation_error = True
+            task_obj.operation = str(e)
+            task_obj.result = {
+                "status": "error",
+                "operation": "collect_jira_issues",
+                "repository": repo_full,
+                "error": str(e),
+                "code": "NO_VALID_JIRA_TOKEN",
+            }
+            task_obj.save(update_fields=["status", "error_type", "error", "token_validation_error", "operation", "result"])
+
+            if getattr(getattr(self, "request", None), "id", None):
+                self.update_state(state="FAILURE", meta=task_obj.result)
+
+            return task_obj.result
+
         task_obj.status = "FAILURE"
         task_obj.error_type = "UNEXPECTED_EXCEPTION"
         task_obj.error = str(e)
-        task_obj.result = {"traceback": traceback.format_exc()}
-        task_obj.operation = f"❌ Unexpected error: {str(e)}"
+        task_obj.result = {
+            "status": "error",
+            "operation": "collect_jira_issues",
+            "repository": repo_full,
+            "error": str(e),
+            "code": "UNEXPECTED_EXCEPTION",
+            "traceback": traceback.format_exc(),
+        }
+        task_obj.operation = f"Unexpected error: {str(e)}"
         task_obj.save(update_fields=["status", "error_type", "error", "result", "operation"])
 
-        return {
-            'status': 'error',
-            'code': 'UNEXPECTED_EXCEPTION',
-            'message': str(e),
-            'traceback': traceback.format_exc(),
-            'operation': 'collect_jira_issues',
-            'repository': jira_domain
-        }
+        if getattr(getattr(self, "request", None), "id", None):
+            self.update_state(state="FAILURE", meta=task_obj.result)
+
+        return task_obj.result
 
 
 @shared_task(bind=True, name="jira.restart_collection")
 def restart_collection(self, task_pk: str):
-    """Restart Jira issue collection from the last completed day."""
     task_obj = Task.objects.get(pk=task_pk)
 
-    # Wait for repository
     repo = task_obj.repository or ""
     if "/" not in repo:
-        # Without a project, we can't reliably restart
         self.update_state(state="FAILURE", meta={"error": "repository missing project key", "repository": repo})
         return {"status": "FAILURE", "error": "repository missing project key", "repository": repo}
 
     jira_domain, project_key = repo.split("/", 1)
-
     end_date = task_obj.date_end
 
-    # Defines new start_date = (date_last_update + 1 day) or date_init
     base = task_obj.date_last_update or getattr(task_obj, "date_init", None)
     start_date = (base + timedelta(days=1)) if base else None
     if isinstance(start_date, datetime) and dj_tz.is_naive(start_date):
         start_date = dj_tz.make_aware(start_date, dj_tz.get_default_timezone())
 
-    # Spawn a new task using the same Task (doesn't change date_init)
     new_task = collect_jira_issues_task.delay(
         jira_domain=jira_domain,
         project_key=project_key,

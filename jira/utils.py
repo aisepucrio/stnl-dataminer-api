@@ -64,6 +64,6 @@ def update_task_progress_date(task_obj, completed_date: str) -> None:
         completed_datetime = completed_datetime.replace(tzinfo=timezone.utc)
         task_obj.date_last_update = completed_datetime
         task_obj.save(update_fields=["date_last_update"])
-        print(f"📅 Progress tracked (Jira): Completed scraping for {completed_date}", flush=True)
+        print(f" Progress tracked (Jira): Completed scraping for {completed_date}", flush=True)
     except Exception as e:
-        print(f"⚠️ Warning (Jira): Could not update progress date: {str(e)}", flush=True)
+        print(f" Warning (Jira): Could not update progress date: {str(e)}", flush=True)

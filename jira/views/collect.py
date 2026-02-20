@@ -16,84 +16,118 @@ logger = logging.getLogger(__name__)
 @extend_schema(
     tags=['Jira'],
     summary="Collect Jira Issues",
-    description="Initiates a task to collect issues from a Jira project",
+    description="Initiates a task to collect issues from one or more Jira projects.",
     request={
         'application/json': {
             'type': 'object',
             'properties': {
-                'jira_domain': {'type': 'string', 'description': 'Jira instance domain'},
-                'project_key': {'type': 'string', 'description': 'Jira project key'},
-                'issuetypes': {'type': 'array', 'items': {'type': 'string'}, 'description': 'List of issue types to collect'},
+                'projects': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'jira_domain': {'type': 'string', 'description': 'Jira instance domain'},
+                            'project_key': {'type': 'string', 'description': 'Jira project key'}
+                        },
+                        'required': ['jira_domain', 'project_key']
+                    },
+                    'description': 'List of Jira projects to collect issues from'
+                },
+                'issuetypes': {
+                    'type': 'array',
+                    'items': {'type': 'string'},
+                    'description': 'List of issue types to collect'
+                },
                 'start_date': {'type': 'string', 'format': 'date-time', 'nullable': True},
                 'end_date': {'type': 'string', 'format': 'date-time', 'nullable': True}
             },
-            'required': ['jira_domain', 'project_key']
+            'required': ['projects']
         }
     },
     responses={
         202: {
             'type': 'object',
             'properties': {
-                'task_id': {'type': 'string'},
-                'message': {'type': 'string'},
-                'status_endpoint': {'type': 'string'}
+                'tasks': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'task_id': {'type': 'string'},
+                            'repository': {'type': 'string'}
+                        }
+                    }
+                },
+                'message': {'type': 'string'}
             }
         },
-        400: {'description': 'Missing required fields'},
+        400: {'description': 'Missing or invalid required fields'},
         500: {'description': 'Internal server error'}
     }
 )
 class JiraIssueCollectView(APIView):
+    """
+    API endpoint that initiates Celery tasks to collect issues from Jira projects.
+    """
+
     def post(self, request, *args, **kwargs):
         try:
-            projects = request.data.get('projects', [])
-        
-            if not projects:
-                return Response({"error": "No project provided."}, status=400)
+            data = request.data
+            projects = data.get('projects', [])
 
-            for project_info in projects:
-                jira_domain = project_info.get('jira_domain')
-                project_key = project_info.get('project_key')
-
-                if not jira_domain or not project_key:
-                    return Response({"error": "Each project must contain 'jira_domain' and 'project'."}, status=400)
-
-            issuetypes = request.data.get('issuetypes', [])  
-            start_date = request.data.get('start_date', None)
-            end_date = request.data.get('end_date', None)
-
-            # Get variables from .env
-            jira_email = settings.JIRA_EMAIL
-            jira_api_token = settings.JIRA_API_TOKEN
-
-            # Debug: Check if JIRA credentials were loaded correctly
-            logger.info(f"JIRA Email: {jira_email}")
-            logger.info(f"JIRA API Token: {jira_api_token[:5]}*****")  # Hides part of the token for security
-
-            # Validation of required fields
-            if not all([jira_domain, project_key]):
+            # 1. Validate that 'projects' is a list
+            if not isinstance(projects, list):
                 return Response(
-                    {"error": "Missing required fields: jira_domain, project_key, jira_email, jira_api_token"},
+                    {"error": "'projects' must be a list of objects"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Start Celery task (Removed jira_email and jira_api_token from the call)
-            tasks = []
+            if not projects:
+                return Response({"error": "No project provided."}, status=status.HTTP_400_BAD_REQUEST)
 
+            # 2. Validate that each item in 'projects' is a dict with required keys
             for project_info in projects:
-                jira_domain = project_info.get('jira_domain')
-                project_key = project_info.get('project_key')
-
-                if not jira_domain or not project_key:
+                if not isinstance(project_info, dict) or "jira_domain" not in project_info or "project_key" not in project_info:
                     return Response(
-                        {"error": "Each project must contain 'jira_domain' and 'project'."},
-                        status=400
+                        {"error": "Each project must be an object containing 'jira_domain' and 'project_key'."},
+                        status=status.HTTP_400_BAD_REQUEST
                     )
+
+            # 3. Validate the type of 'issuetypes'
+            issuetypes = data.get('issuetypes', [])
+            if issuetypes is not None and not isinstance(issuetypes, list):
+                return Response(
+                    {"error": "'issuetypes' must be a list"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            start_date = data.get('start_date', None)
+            end_date = data.get('end_date', None)
+
+            # 4. Load Jira credentials from environment variables
+            jira_email = settings.JIRA_EMAIL
+            jira_api_token = settings.JIRA_API_TOKEN
+
+            logger.info(f"JIRA Email: {jira_email}")
+            logger.info(f"JIRA API Token: {jira_api_token[:5]}*****")
+
+            # Validate credentials
+            if not jira_email or not jira_api_token:
+                return Response(
+                    {"error": "Missing JIRA credentials in settings."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # 5. Trigger Celery tasks
+            tasks = []
+            for project_info in projects:
+                jira_domain = project_info['jira_domain']
+                project_key = project_info['project_key']
 
                 task = collect_jira_issues_task.delay(
                     jira_domain,
                     project_key,
-                    issuetypes if issuetypes else [], 
+                    issuetypes if issuetypes else [],
                     start_date,
                     end_date
                 )
@@ -103,16 +137,15 @@ class JiraIssueCollectView(APIView):
                     "repository": f"{jira_domain}/{project_key}"
                 })
 
-
+            # Return 202 response
             return Response(
                 {
-                    "task_id": task.id,
-                    "message": "Task successfully initiated",
-                    "status_endpoint": f"http://localhost:8000/api/jobs/tasks/{task.id}/"
+                    "tasks": tasks,
+                    "message": "Task(s) successfully initiated"
                 },
                 status=status.HTTP_202_ACCEPTED
             )
-        
+
         except Exception as e:
             logger.error(f"Error in JiraIssueCollectView: {e}", exc_info=True)
             return Response(

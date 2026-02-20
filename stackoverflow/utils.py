@@ -1,4 +1,3 @@
-# stackoverflow/utils.py
 from datetime import datetime, timezone as dt_timezone
 from typing import Optional, Union
 
@@ -64,8 +63,6 @@ def validate_date_range(start_date: Optional[datetime], end_date: Optional[datet
     if start_date and end_date and start_date > end_date:
         raise ValueError("Start date must be before end date")
 
-
-# Optional: keep a class wrapper for backward compatibility
 class StackDateTimeHandler:
     epoch_to_dt = staticmethod(epoch_to_dt)
     parse_date = staticmethod(parse_date)
