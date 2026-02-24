@@ -7,7 +7,6 @@ import uuid
 import traceback
 
 from .miner.question_fetcher import fetch_questions
-from .miner.get_additional_data import populate_missing_data
 
 
 def _reuse_or_create_task(self, *, defaults, task_pk=None):
@@ -27,7 +26,7 @@ def _reuse_or_create_task(self, *, defaults, task_pk=None):
 
 
 @shared_task(bind=True)
-def collect_questions_task(self, start_date: str, end_date: str, tags=None, task_pk=None):
+def collect_questions_task(self, start_date: str, end_date: str, tags=None, task_pk=None, filters=None, mode=None):
     task_obj = None
 
     try:
@@ -54,6 +53,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             access_token=settings.STACK_ACCESS_TOKEN,
             task_obj=task_obj,
             tags=tags,
+            filters=filters,
         )
 
         result_payload = {
@@ -88,6 +88,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             "start_date": start_date,
             "end_date": end_date,
             "tags": tags,
+            "filters": filters,  
             "status": "error",
             "code": code,
             "message": msg,
