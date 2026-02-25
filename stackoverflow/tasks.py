@@ -11,8 +11,12 @@ from .miner.question_fetcher import fetch_questions
 
 def _reuse_or_create_task(self, *, defaults, task_pk=None):
     if task_pk:
-        update_data = {**defaults, "task_id": getattr(getattr(self, "request", None), "id", None)}
+        update_data = {
+            **defaults,
+            "task_id": getattr(getattr(self, "request", None), "id", None),
+        }
         update_data.pop("date_init", None)
+
         updated = Task.objects.filter(pk=task_pk).update(**update_data)
         if updated:
             return Task.objects.get(pk=task_pk), False
@@ -22,8 +26,9 @@ def _reuse_or_create_task(self, *, defaults, task_pk=None):
 
 
 @shared_task(bind=True)
-def collect_questions_task(self, start_date: str, end_date: str, tags=None, task_pk=None):
+def collect_questions_task(self, start_date: str, end_date: str, tags=None, filters=None, mode: str = "default", task_pk=None):
     task_obj = None
+
     try:
         operation_log = f"🔄 Starting collection: {start_date} to {end_date}"
         if tags:
@@ -48,6 +53,8 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             access_token=settings.STACK_ACCESS_TOKEN,
             task_obj=task_obj,
             tags=tags,
+            filters=filters,
+            mode=mode,
         )
 
         result_payload = {
@@ -56,6 +63,8 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             "start_date": start_date,
             "end_date": end_date,
             "tags": tags,
+            "filters": filters,
+            "mode": mode,
             "status": "success",
         }
 
@@ -82,6 +91,8 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             "start_date": start_date,
             "end_date": end_date,
             "tags": tags,
+            "filters": filters,
+            "mode": mode,
             "status": "error",
             "code": code,
             "message": msg,
@@ -98,6 +109,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             task_obj.result = result_payload
 
             update_fields = ["status", "error_type", "error", "operation", "result"]
+
             if code in ("NO_VALID_STACK_TOKEN", "INVALID_API_CREDENTIALS"):
                 task_obj.token_validation_error = True
                 update_fields.append("token_validation_error")
@@ -110,37 +122,30 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
 @shared_task(bind=True, name="stackoverflow.restart_collection")
 def restart_collection(self, task_pk: str):
     task_obj = Task.objects.get(pk=task_pk)
-
     collect_type = (task_obj.type or "").strip().lower()
 
     tags = getattr(task_obj, "tags", None)
+    filters = getattr(task_obj, "filters", None)
+    mode = getattr(task_obj, "mode", "default")
 
     if collect_type.startswith("stackoverflow_question_collection"):
         end_date = task_obj.date_end
-
         base = task_obj.date_last_update or getattr(task_obj, "date_init", None)
         start_date = (base + timedelta(days=1)) if base else None
+
         if isinstance(start_date, datetime) and timezone.is_naive(start_date):
-            start_date = timezone.make_aware(start_date, timezone.get_current_timezone())
+            start_date = timezone.make_aware(
+                start_date, timezone.get_current_timezone()
+            )
 
-        if isinstance(start_date, datetime):
-            start_date_str = start_date.date().isoformat()
-        elif hasattr(start_date, "isoformat"):
-            start_date_str = start_date.isoformat()
-        else:
-            start_date_str = None
+        start_date_str = start_date.date().isoformat() if start_date else None
+        end_date_str = end_date.date().isoformat() if end_date else None
 
-        if isinstance(end_date, datetime):
-            end_date_str = end_date.date().isoformat()
-        elif hasattr(end_date, "isoformat"):
-            end_date_str = end_date.isoformat()
-        else:
-            end_date_str = None
-
-        new_id = collect_questions_task.apply_async(args=[start_date_str, end_date_str, tags, task_pk]).id
+        new_id = collect_questions_task.apply_async(
+            args=[start_date_str, end_date_str, tags, filters, mode],
+            kwargs={"task_pk": task_pk},
+        ).id
     else:
-        self.update_state(state="FAILURE", meta={"error": f"Tipo desconhecido: {collect_type}"})
-        return {"status": "FAILURE", "error": f"Tipo desconhecido: {collect_type}"}
+        return {"status": "FAILURE", "error": f"Unknown task type: {collect_type}"}
 
-    self.update_state(state="SUCCESS", meta={"spawned_task_pk": new_id, "type": collect_type})
     return {"status": "SUCCESS", "spawned_task_pk": new_id, "type": collect_type}
