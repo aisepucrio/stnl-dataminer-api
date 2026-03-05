@@ -16,6 +16,23 @@ if [ $? -ne 0 ]; then
 fi
 echo "Migrations applied successfully."
 
+# Load seeds (only once)
+echo "Checking if seed data is already loaded..."
+
+HAS_SEED=$(python manage.py shell -c "from github.models import GitHubAuthor; print(GitHubAuthor.objects.exists())" 2>/dev/null || echo "True")
+
+if [ "$HAS_SEED" = "False" ]; then
+    if [ -f "seed/all.json" ]; then
+        echo "Loading seed fixtures from seed/all.json..."
+        python manage.py loaddata seed/all.json
+        echo "Seeds loaded."
+    else
+        echo "seed/all.json not found — skipping seed load."
+    fi
+else
+    echo "Seeds already loaded — skipping."
+fi
+
 echo "Collecting static files..."
 python manage.py collectstatic --no-input
 echo "Static files collected successfully."

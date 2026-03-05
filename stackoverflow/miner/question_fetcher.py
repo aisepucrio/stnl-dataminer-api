@@ -6,8 +6,10 @@ from stackoverflow.models import StackQuestion, StackUser, StackAnswer, StackTag
 from django.utils import timezone
 from jobs.models import Task
 from stackoverflow.utils import epoch_to_dt
+from .safe_api_call import safe_api_call
 
 logger = logging.getLogger(__name__)
+
 
 def log_progress(message: str, level: str = "info", task_obj: Task = None):
     """
@@ -23,6 +25,42 @@ def log_progress(message: str, level: str = "info", task_obj: Task = None):
     if task_obj:
         task_obj.operation = message
         task_obj.save(update_fields=["operation"])
+
+
+def _normalize_tag_value(value):
+    """
+    Stack Exchange expects tagged/nottagged as a single string separated by ';'
+    Example: "python;django"
+    Accepts:
+      - list[str]
+      - "python;django"
+      - "python, django"
+      - "python django"
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, list):
+        cleaned = [str(v).strip() for v in value if str(v).strip()]
+        return ";".join(cleaned) if cleaned else None
+
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        # convert commas/spaces to ';' only if user didn't already provide ';'
+        if ";" in s:
+            return s
+        if "," in s:
+            parts = [p.strip() for p in s.split(",") if p.strip()]
+            return ";".join(parts) if parts else None
+        # if it's "python django", split by whitespace
+        parts = [p.strip() for p in s.split() if p.strip()]
+        return ";".join(parts) if parts else s
+
+    # fallback
+    return str(value).strip() or None
+
 
 def update_task_progress_date(task_obj: Task, completed_date: str) -> None:
     """
@@ -116,6 +154,7 @@ def create_or_update_user(user_id, user_data):
         logger.error(f"Error processing StackUser with ID {user_data}: {e}")
     return stack_user
 
+
 def create_answer(answer_data, question, owner):
     answer, _ = StackAnswer.objects.get_or_create(
         answer_id=answer_data.get('answer_id'),
@@ -139,6 +178,7 @@ def create_answer(answer_data, question, owner):
         }
     )
     return answer
+
 
 def create_comment(comment_data, parent, owner):
     """
@@ -167,6 +207,7 @@ def create_comment(comment_data, parent, owner):
         }
     )
     return comment
+
 
 def make_question_serializable(question_data, stack_user, question_tags):
     """Convert question data to a JSON-serializable structure for API/response use."""
@@ -198,6 +239,7 @@ def make_question_serializable(question_data, stack_user, question_tags):
         'time_mined': question_data.get('time_mined'),
     }
 
+
 def fetch_questions(
     site: str,
     start_date: str,
@@ -207,21 +249,32 @@ def fetch_questions(
     page: int = 1,
     page_size: int = 100,
     task_obj=None,
-    tags=None
+    tags=None,
+    filters=None,
+    mode: str = "default",
 ):
     """
     Fetch questions from Stack Overflow with user-friendly feedback.
+
+    mode:
+      - "default": uses /questions (basic mining)
+      - "advanced": uses /search/advanced (filters like accepted/views/answers/etc.)
     """
-    base_url = "https://api.stackexchange.com/2.3/questions"
-    
+    is_advanced = (mode == "advanced")
+
+    base_url = "https://api.stackexchange.com/2.3/search/advanced" if is_advanced \
+        else "https://api.stackexchange.com/2.3/questions"
+
     # convert start/end to date objects so we can iterate day-by-day
     start_dt = datetime.strptime(start_date, '%Y-%m-%d').date()
     end_dt = datetime.strptime(end_date, '%Y-%m-%d').date()
 
-    log_progress(f"Starting collection from {start_date} to {end_date}", "system", task_obj=task_obj)
+    log_progress(f"Starting collection from {start_date} to {end_date} (mode={mode})", "system", task_obj=task_obj)
 
-    if tags:
-        log_progress(f"Filtering by tags: {tags}", "info", task_obj=task_obj)
+    # Tags normalization (important!)
+    tagged = _normalize_tag_value(tags)
+    if tagged:
+        log_progress(f"Filtering by tags: {tagged}", "info", task_obj=task_obj)
 
     questions = []
     total_processed = 0
@@ -247,45 +300,116 @@ def fetch_questions(
             'key': api_key,
             'access_token': access_token
         }
-        if tags:
-            params['tagged'] = tags
+
+        if tagged:
+            params['tagged'] = tagged
 
         has_more = True
         day_aborted = False
-        # keep references to last response/data for day-level checks
-        response = None
-        data = None
 
         while has_more:
             try:
-                log_progress(f"Fetching page {params['page']} for {current_day.isoformat()}...", "fetch", task_obj=task_obj)
-                response = requests.get(base_url, params=params)
-                log_progress(f"API responded with status {response.status_code}", "info", task_obj=task_obj)
-                response.raise_for_status()
-                data = response.json()
+                log_progress(
+                    f"Fetching page {params['page']} for {current_day.isoformat()}...",
+                    "fetch",
+                    task_obj=task_obj
+                )
 
-                if 'error_id' in data:
-                    log_progress(f"API returned an error: {data.get('error_message', 'Unknown error')}", "error", task_obj=task_obj)
+                # -------------------------
+                # Apply filters (behavior depends on endpoint mode)
+                # -------------------------
+                # (1) advanced endpoint requires `q`
+                if not is_advanced:
+                    params.pop("q", None)
+
+
+                # (2) clean filter keys that might "stick" across pages/days
+                for k in ("min", "max", "title", "accepted", "answers", "views",
+                          "closed", "migrated", "user", "nottagged"):
+                    params.pop(k, None)
+
+
+                if filters:
+                    if filters.get("min") is not None:
+                        params["min"] = filters["min"]
+                    if filters.get("max") is not None:
+                        params["max"] = filters["max"]
+
+                    # intitle/title behavior
+                    if filters.get("intitle"):
+                        if is_advanced:
+                            params["title"] = filters["intitle"]  # advanced uses `title`
+                        else:
+                            params["intitle"] = filters["intitle"]  # /questions supports `intitle`
+
+                    if is_advanced:
+                        # Advanced-only filters (safe to apply here)
+                        if filters.get("accepted") is not None:
+                            params["accepted"] = filters["accepted"]
+                        if filters.get("answers") is not None:
+                            params["answers"] = filters["answers"]
+                        if filters.get("views") is not None:
+                            params["views"] = filters["views"]
+                        if filters.get("closed") is not None:
+                            params["closed"] = filters["closed"]
+                        if filters.get("migrated") is not None:
+                            params["migrated"] = filters["migrated"]
+                        if filters.get("user") is not None:
+                            params["user"] = filters["user"]
+
+                        nottagged = _normalize_tag_value(filters.get("nottagged"))
+                        if nottagged:
+                            params["nottagged"] = nottagged
+                    else:
+                        # Default endpoint does NOT support these reliably; ignore + warn
+                        unsupported_keys = []
+                        for k in ("accepted", "answers", "views", "closed", "migrated", "user", "nottagged"):
+                            if filters.get(k) is not None and filters.get(k) != "":
+                                unsupported_keys.append(k)
+                        if unsupported_keys:
+                            log_progress(
+                                f"Ignoring unsupported filters on default endpoint: {unsupported_keys}. "
+                                f"Use /collect/advanced/ for these.",
+                                "warning",
+                                task_obj=task_obj
+                            )
+
+                    log_progress(f"Applying filters: {filters}", "info", task_obj=task_obj)
+
+                # DEBUG FILTERS (TEMP)
+                logger.warning("[SO][DEBUG] endpoint=%s", base_url)
+                logger.warning("[SO][DEBUG] params=%s", params)
+
+                data = safe_api_call(base_url, params)
+
+                if not data:
+                    log_progress("API call failed or quota too low. Aborting.", "error", task_obj=task_obj)
                     day_aborted = True
                     break
 
-                items = data.get('items', [])
+                if "error_id" in data:
+                    log_progress(
+                        f"API returned an error: {data.get('error_message', 'Unknown error')}",
+                        "error",
+                        task_obj=task_obj
+                    )
+                    day_aborted = True
+                    break
+
+                items = data.get("items", [])
                 if not items:
-                    if params['page'] == 1:
+                    if params["page"] == 1:
                         log_progress(f" Day {current_day.isoformat()}: no questions.", "warning", task_obj=task_obj)
                     break
 
                 log_progress(f"🔄 {len(items)} questions (page {params['page']}) — saving…", "process", task_obj=task_obj)
 
-                # if this is the first page for the day, capture the day's total
-                if params.get('page', 1) == 1:
-                    day_total = data.get('total', 0)
-                    # if the day has no items, bail out of day pagination
-                    if day_total == 0:
-                        log_progress(f" Day {current_day.isoformat()}: no questions.", "warning", task_obj=task_obj)
-                        break
-                    # per-day processed counter for logging
+                # if this is the first page for the day, capture a "best effort" total
+                if params.get("page", 1) == 1:
+                    day_total = data.get("total", None)
+                    day_total = day_total if day_total is not None else "?"
                     day_processed = 0
+
 
                 for item in items:
                     # owner
@@ -366,11 +490,6 @@ def fetch_questions(
                     log_progress("➡️ Moving to the next page…", "info", task_obj=task_obj)
                     time.sleep(1)
 
-            except requests.exceptions.RequestException as e:
-                log_progress(f"Connection error: {str(e)}", "error", task_obj=task_obj)
-                # abort day without checkpoint
-                day_aborted = True
-                break
             except Exception as e:
                 log_progress(f"An unexpected error occurred: {str(e)}", "error", task_obj=task_obj)
                 day_aborted = True
@@ -385,7 +504,7 @@ def fetch_questions(
                 pass
 
         current_day = current_day + timedelta(days=1)
-    
+
     log_progress(f"Collection finished. {total_processed} questions processed in total.", "success", task_obj=task_obj)
     # update the task's last processed date (mark the period as completed)
     update_task_progress_date(task_obj, end_date)

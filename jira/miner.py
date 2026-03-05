@@ -35,7 +35,7 @@ class JiraMiner:
         load_dotenv()
         self.jira_domain = jira_domain.strip()
         self.task_obj = task_obj 
-        self.log_progress(f"🔍 Received domain in JiraMiner: '{self.jira_domain}'")
+        self.log_progress(f" Received domain in JiraMiner: '{self.jira_domain}'")
 
 
         # Loading tokens
@@ -71,7 +71,7 @@ class JiraMiner:
     def switch_token(self):
         self.current_token_index = (self.current_token_index + 1) % len(self.tokens)
         self.update_auth()
-        self.log_progress(f"🔍 Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
+        self.log_progress(f" Switching to token {self.current_token_index + 1}/{len(self.tokens)}")
 
 
     def verify_token(self):
@@ -98,7 +98,7 @@ class JiraMiner:
 
     def handle_rate_limit(self, response):
         if response.status_code == 429 or "rate limit" in response.text.lower():
-            self.log_progress("🔍 Rate limit reached. Trying next token...")
+            self.log_progress(" Rate limit reached. Trying next token...")
 
             original_index = self.current_token_index
 
@@ -121,7 +121,7 @@ class JiraMiner:
 
     def collect_jira_issues(self, project_key, issuetypes, start_date=None, end_date=None):
         custom_fields_mapping = self.get_custom_fields_mapping()
-        self.log_progress(f"🔍 Colecting project issues {project_key}...")
+        self.log_progress(f" Colecting project issues {project_key}...")
 
         # Find the Sprint field (e.g., customfield_10020)
         sprint_field_key = None
@@ -156,9 +156,10 @@ class JiraMiner:
                 else:
                     self.log_progress(f"It was not possible to obtain the approximate count: {count_resp.text}")
             except Exception as e:
-                self.log_progress(f"Error querying approach-count: {e}")
+                self.log_progress(f"Error querying approximate-count: {e}")
 
             self.log_progress("Starting collection via new API /search/jql...")
+
             while True:
                 payload = {
                     "jql": jql_query,
@@ -171,7 +172,7 @@ class JiraMiner:
                 resp = requests.post(search_url, headers=self.headers, auth=self.auth, json=payload)
 
                 if resp.status_code != 200:
-                    self.log_progress(f"❌ Erro ao buscar issues: {resp.status_code} - {resp.text}")
+                    self.log_progress(f"❌ Error fetching issues: {resp.status_code} - {resp.text}")
                     break
 
                 data = resp.json()
@@ -188,7 +189,7 @@ class JiraMiner:
                 bulk_resp = requests.post(bulk_url, headers=self.headers, auth=self.auth, json=bulk_payload)
 
                 if bulk_resp.status_code != 200:
-                    self.log_progress(f"Error when looking for details: {bulk_resp.status_code} - {bulk_resp.text}")
+                    self.log_progress(f"Error when fetching issue details: {bulk_resp.status_code} - {bulk_resp.text}")
                     break
 
                 bulk_data = bulk_resp.json()
@@ -196,7 +197,14 @@ class JiraMiner:
 
                 for index, issue_data in enumerate(issues):
                     issue_count = collected + index + 1
-                    fields = issue_data["fields"]
+
+                    fields = issue_data.get("fields")
+                    if not isinstance(fields, dict):
+                        self.log_progress(
+                            f"Issue without 'fields' (skipping): {issue_data.get('key', issue_data.get('id', 'unknown'))}"
+                        )
+                        continue
+
                     issue_id = issue_data["id"]
                     issue_key = issue_data["key"]
                     current_timestamp = timezone.now()
@@ -257,9 +265,11 @@ class JiraMiner:
                         }
                     )
 
-                    self.log_progress(f"⛏️ Mining issue {issue_count} of {total_hint}. Key: {issue_key}")
+                    hint = total_hint if total_hint is not None else "?"
+                    self.log_progress(
+                        f"⛏️ Mining issue {issue_count} of {hint}. Key: {issue_key} - {fields['summary']}"
+                    )
 
-                    # Sub-tables
                     self.save_comments(issue_key, issue_obj)
                     self.save_history(issue_key, issue_obj)
                     self.save_activity(issue_key, issue_obj)
@@ -268,13 +278,12 @@ class JiraMiner:
                     self.save_sprints(fields, issue_obj)
 
                 collected += len(issues)
-                if not next_page_token:
+
+                # If Jira says it's the last page, or nextPageToken is missing, stop.
+                if data.get("isLast") is True or not next_page_token:
                     break
 
             return collected
-
-
-
 
         total_collected = 0
 
@@ -319,7 +328,7 @@ class JiraMiner:
 
 
     def get_commits_for_issue(self, issue_key):
-        # Buscar o id numérico da issue
+        # Search for the numeric ID of the issue
         issue_url = f"https://{self.jira_domain}/rest/api/3/issue/{issue_key}?fields=id"
         response = requests.get(issue_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -328,7 +337,7 @@ class JiraMiner:
         if not issue_id:
             return []
 
-        # Buscar os commits usando o id
+        # Search for commits using the issue ID
         jira_commits_url = f"https://{self.jira_domain}/rest/dev-status/latest/issue/detail?issueId={issue_id}&applicationType=GitHub&dataType=repository"
         response = requests.get(jira_commits_url, headers=self.headers, auth=self.auth)
         if response.status_code != 200:
@@ -808,19 +817,19 @@ class JiraMiner:
         commits = self.get_commits_for_issue(issue_key)
         for c in commits:
             JiraCommit.objects.update_or_create(
-                sha=c['id'],
+                sha=c["id"],
                 defaults={
-                    'issue': issue_obj,
-                    'author': c.get('author', ''),
-                    'author_email': c.get('authorEmail', ''),
-                    'message': c.get('message'),
+                    "issue": issue_obj,
+                    "author": c.get("author", ""),
+                    "author_email": c.get("authorEmail", ""),
+                    "message": c.get("message"),
                     # repository: we try to map to an existing GitHubMetadata by html_url
                     # If it does not exist, we leave it as None
-                    'repository': None,
-                    'timestamp': timezone.now()  # Ideally parse from data if available
-                }
+                    "repository": None,
+                    "timestamp": timezone.now(),  # Ideally parse from data if available
+                },
             )
-                
+
                 
     def save_sprints(self, fields, issue_obj):      
         sprints_data = fields.get("sprint")

@@ -69,7 +69,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, filt
         }
 
         task_obj.status = "COMPLETED"
-        task_obj.operation = "✅ Collection completed successfully."
+        task_obj.operation = f"Completed Stack Overflow question collection for {start_date} to {end_date}."
         task_obj.result = result_payload
         task_obj.save(update_fields=["status", "operation", "result"])
 

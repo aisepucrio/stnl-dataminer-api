@@ -138,3 +138,7 @@ class JiraHistoryItem(models.Model):
     toString = models.TextField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+class JiraStatus(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    def __str__(self):
+        return self.name
