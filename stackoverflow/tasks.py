@@ -26,7 +26,7 @@ def _reuse_or_create_task(self, *, defaults, task_pk=None):
 
 
 @shared_task(bind=True)
-def collect_questions_task(self, start_date: str, end_date: str, tags=None, task_pk=None, filters=None, mode=None):
+def collect_questions_task(self, start_date: str, end_date: str, tags=None, filters=None, mode: str = "default", task_pk=None):
     task_obj = None
 
     try:
@@ -54,6 +54,7 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             task_obj=task_obj,
             tags=tags,
             filters=filters,
+            mode=mode,
         )
 
         result_payload = {
@@ -62,6 +63,8 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             "start_date": start_date,
             "end_date": end_date,
             "tags": tags,
+            "filters": filters,
+            "mode": mode,
             "status": "success",
         }
 
@@ -88,7 +91,8 @@ def collect_questions_task(self, start_date: str, end_date: str, tags=None, task
             "start_date": start_date,
             "end_date": end_date,
             "tags": tags,
-            "filters": filters,  
+            "filters": filters,
+            "mode": mode,
             "status": "error",
             "code": code,
             "message": msg,
@@ -121,6 +125,8 @@ def restart_collection(self, task_pk: str):
     collect_type = (task_obj.type or "").strip().lower()
 
     tags = getattr(task_obj, "tags", None)
+    filters = getattr(task_obj, "filters", None)
+    mode = getattr(task_obj, "mode", "default")
 
     if collect_type.startswith("stackoverflow_question_collection"):
         end_date = task_obj.date_end
@@ -136,7 +142,8 @@ def restart_collection(self, task_pk: str):
         end_date_str = end_date.date().isoformat() if end_date else None
 
         new_id = collect_questions_task.apply_async(
-            args=[start_date_str, end_date_str, tags, task_pk]
+            args=[start_date_str, end_date_str, tags, filters, mode],
+            kwargs={"task_pk": task_pk},
         ).id
     else:
         return {"status": "FAILURE", "error": f"Unknown task type: {collect_type}"}
