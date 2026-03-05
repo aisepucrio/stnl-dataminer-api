@@ -1,106 +1,200 @@
-# Jira Django App
+# Jira Mining Module
 
-## Overview
-This Django app is responsible for mining, storing, and managing project data from Jira as part of the larger **RAISE data mining platform**.  
-It provides a robust, asynchronous API to collect issues and related metadata from Jira projects and allows for powerful, detailed querying of the collected data.
+This module is responsible for mining, storing, and querying Jira
+project data as part of the RAISE Data Mining Platform.
 
-## Features
-- **Asynchronous Data Mining**: Uses Celery to run long data collection jobs in the background, providing an immediate API response.  
-- **Real-Time Progress Tracking**: Integrates with the `jobs` app to provide real-time status updates of ongoing tasks, visible to a frontend.  
-- **Flexible Collection**: Allows mining of multiple projects at once and filtering by issue types and date ranges.  
-- **Advanced Querying**: Provides a rich set of `GET` endpoints to read and explore all collected Jira entities, with support for pagination, exact-match filtering, full-text search, and ordering.  
-- **Safe API Calls**: The underlying miner class handles rate limiting and rotation of multiple API tokens.  
+It supports:
 
----
+-   Issue collection (asynchronous)
+-   Multi-project mining
+-   Date-range filtering
+-   Issue type filtering
+-   Advanced querying with pagination, filtering, search, and ordering
+-   Real-time job tracking
+-   Token rotation and rate-limit protection
 
-## API Usage
+## Architecture Overview
 
-### 1. Environment Setup
-1. Follow the main project `README.md` for general Docker and `.env` setup.  
-2. Generate a Jira API Token by following the guide in the main `README.md`.  
-3. Add your Jira credentials to the `.env` file. To avoid API rate limits, you can add multiple tokens separated by commas:  
+The Jira module follows a two-phase architecture:
 
-   ```env
-   JIRA_API_TOKEN="your_token_1,your_token_2"
-   JIRA_EMAIL="your_jira_email"
-   ```
+1.  Collection Phase (POST endpoints)
+    -   Fetches data from Jira REST API
+    -   Stores normalized data in PostgreSQL
+    -   Executes asynchronously via Celery
+    -   Returns a task object for monitoring
+2.  Query Phase (GET endpoints)
+    -   Reads previously mined data from the database
+    -   Supports filtering, searching, ordering, and pagination
 
----
+All collection endpoints return:
 
-### 2. API Endpoints
+{ “task_id”: “uuid”, “message”: “Task successfully initiated”,
+“status_endpoint”: “/api/jobs/tasks/{task_id}/” }
 
-#### To Collect Data (`POST`)
+## Environment Configuration 
 
-##### **Collect Issues**
-Starts an asynchronous mining job to collect issues from one or more specified Jira projects.
+1.  Follow the main project README.md for:
 
-- **URL:** `POST /api/jira/issues/collect/`  
-- **Body (JSON):**
-  ```json
-  {
-    "projects": [
-      {
-        "jira_domain": "ecosystem.atlassian.net",
-        "project_key": "AO"
-      }
-    ],
-    "issuetypes": ["Bug", "Documentation"],
-    "start_date": "2011-11-15",
-    "end_date": "2013-12-27"
-  }
-  ```
+    -   Docker setup
+    -   PostgreSQL configuration
+    -   Base environment configuration
 
-**Parameters:**
-- `projects` (**required**): A list of project objects to mine. Each must contain:  
-  - `jira_domain` *(string)*: Your Jira instance domain.  
-  - `project_key` *(string)*: The project key in Jira (e.g., `PROJ`).  
-- `issuetypes` *(optional)*: A list of issue types to filter by (e.g., `["Bug", "Task"]`). If omitted, all types are collected.  
-- `start_date` / `end_date` *(optional)*: The date range for the issue search (format `YYYY-MM-DD` or `YYYY-MM-DD HH:mm`). If omitted, all issues are collected.  
+2.  Generate a Jira API Token via Atlassian account settings.
 
----
+3.  Add credentials to your .env file:
 
-#### To Query Data (`GET`)
-The API provides a rich set of endpoints to query all mined Jira data.  
-All list endpoints support **pagination, filtering, searching, and ordering**.
+JIRA_API_TOKEN=“your_token_1,your_token_2” JIRA_EMAIL=“your_jira_email”
 
-##### **List Jira Issues**
-- **URL:** `GET /api/jira/issues/`  
-- **Example:**  
-  ```
-  GET /api/jira/issues/?project__key=PROJ&status=Done&ordering=-created
-  ```
+Multiple tokens can be provided (comma-separated). The system
+automatically rotates tokens to prevent rate limiting.
 
-**Available Filters:**
-- **Date:** `created_after`, `created_before`, `updated_after`, `updated_before`  
-- **Text Search:** `summary`, `description`, `creator__displayName`, `assignee__displayName`  
-- **Exact Match:** `status`, `project__key`, `priority`, `issuetype__issuetype`  
-- **Ordering:** `created`, `updated`, `priority`, `status`  
+ ## Collection Endpoints (POST) 
 
----
+1) Collect Issues
 
-##### **List Jira Projects**
-- **URL:** `GET /api/jira/projects/`  
-- **Example:**  
-  ```
-  GET /api/jira/projects/?key=PROJ
-  ```
+POST /api/jira/issues/collect/
 
----
+Starts an asynchronous mining job to collect issues from one or more
+Jira projects.
 
-##### **List Jira Users**
-- **URL:** `GET /api/jira/users/`  
-- **Example:**  
-  ```
-  GET /api/jira/users/?search=John
-  ```
+Body (JSON):
 
----
+{ “projects”: [ { “jira_domain”: “ecosystem.atlassian.net”,
+“project_key”: “AO” } ], “issuetypes”: [“Bug”, “Documentation”],
+“start_date”: “2011-11-15”, “end_date”: “2013-12-27” }
 
-Additional query endpoints are available for **sprints, comments, commits, activity-logs, etc.**  
-For a complete list of available views and their specific filters, please refer to the `jira/views/lookup.py` file and the **auto-generated API documentation**.
+Parameters:
 
----
+-   projects (required) List of project objects:
 
-### 3. Job Monitoring
-All collection tasks are **asynchronous**.  
-You can monitor their progress using the `/api/jobs/` endpoints as described in the main project `README.md`.
+    -   jira_domain (string)
+    -   project_key (string)
+
+-   issuetypes (optional) List of issue types (e.g., [“Bug”, “Task”]) If
+    omitted, all issue types are collected.
+
+-   start_date / end_date (optional) Date range in format:
+
+    -   YYYY-MM-DD
+    -   YYYY-MM-DD HH:mm
+
+If omitted, all issues are collected.
+
+## Query Endpoints (GET)
+
+All list endpoints support:
+
+-   Pagination
+-   Exact-match filtering
+-   Full-text search
+-   Ordering
+
+  ---------------------
+  1) List Jira Issues
+  ---------------------
+
+GET /api/jira/issues/
+
+Example:
+
+GET /api/jira/issues/?project__key=PROJ&status=Done&ordering=-created
+
+Available Filters:
+
+Date Filters: - created_after - created_before - updated_after -
+updated_before
+
+Text Search: - summary - description - creator__displayName -
+assignee__displayName
+
+Exact Match: - status - project__key - priority - issuetype__issuetype
+
+Ordering: - created - updated - priority - status
+
+  -----------------------
+  2) List Jira Projects
+  -----------------------
+
+GET /api/jira/projects/
+
+Example:
+
+GET /api/jira/projects/?key=PROJ
+
+  --------------------
+  3) List Jira Users
+  --------------------
+
+GET /api/jira/users/
+
+Example:
+
+GET /api/jira/users/?search=John
+
+  ---------------------
+  Additional Entities
+  ---------------------
+
+Additional endpoints are available for:
+
+-   Sprints
+-   Comments
+-   Commits (linked development data)
+-   Activity Logs
+-   Issue Types
+-   Priorities
+-   Statuses
+
+For a complete list of endpoints and filters, refer to:
+
+-   jira/views/lookup.py
+-   Auto-generated API documentation
+
+## Job Monitoring
+
+
+All collection operations are asynchronous.
+
+Use the Jobs module endpoints to track task progress:
+
+GET /api/jobs/ GET /api/jobs/tasks/{task_id}/
+
+Task states typically include:
+
+-   PENDING
+-   STARTED
+-   PROGRESS
+-   SUCCESS
+-   FAILURE
+
+Refer to the main README.md for detailed job tracking documentation.
+
+## Rate Limiting & TokenRotation 
+
+The Jira miner includes:
+
+-   Automatic rate-limit handling
+-   Retry logic
+-   Multiple token rotation
+
+To maximize throughput:
+
+-   Provide multiple API tokens
+-   Use date filters for large projects
+-   Avoid collecting entire multi-year histories in a single job
+
+## Best Practices
+
+
+-   Prefer date-range filtering for large instances
+-   Limit issue types when possible
+-   Monitor jobs instead of waiting synchronously
+-   Avoid mining multiple very large projects simultaneously
+-   Use filtering in GET endpoints instead of post-processing externally
+
+## Related Documentation
+
+
+-   Main Project → ../README.md
+-   GitHub Module → ../github/README.md
+-   Jobs Module → ../jobs/README.md
