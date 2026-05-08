@@ -1,0 +1,55 @@
+name: Tests and Coverage
+
+#Create two situations for the pipeline to run
+on:
+  #For the manual push on the main
+  push:
+    branches: [ main ]
+  #When someone opens a pull request for the main
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    #Defining an internal virtual Linux machine from github to run 
+    runs-on: ubuntu-latest
+
+    #Variables necessary to run the program(secrets prevent the keys from being exposed) 
+    #env:
+      #DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SUPERUSER_PASSWORD }}
+      #STACK_ACCESS_TOKEN: ${{ secrets.STACK_API_KEY }}  
+      #IS_DEBUG: "False"
+
+  steps:
+    #Downloads the code from the repository onto the virtual machine
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    #Build the image of Docker on the project 
+    - name: Build Docker image
+      run: docker-compose build 
+
+    #Start the Data Basis and the Redis 
+    - name: Start dependencies (db, redis)
+      run: docker-compose up -d db redis
+    - name: Wait for dependencies to be healthy
+      run: sleep 10
+
+    #Install the coverage.py inside Docker
+    - name: Install test dependencies
+      run: docker-compose run --rm web pip install coverage pytest pytest-django 
+
+    #Execute the tests and displays the report in the pipeline log 
+    - name: Run tests with coverage 
+      run: docker-compose run --rm web coverage run -m pytest
+    - name: Show coverage report
+      run: docker-compose run --rm web coverage report
+
+    #Only tests with minimum coverage over 50% passes 
+    - name: Enforce minimum coverage (50%)
+      run: docker-compose run --rm web coverage report --fail-under=50
+
+    #Tear down all the containers in the end
+    - name: Tear down
+      if: always()
+      run: docker-compose down 
